@@ -93,28 +93,33 @@ export async function login(req: Request, res: Response) {
 
 // ── 아이디(닉네임) 찾기 ──────────────────────────────────────────────────────
 export async function findId(req: Request, res: Response) {
-  const email = z.string().email().safeParse(req.body.email)
-  if (!email.success) {
-    res.status(400).json({ message: '올바른 이메일을 입력해주세요.' }); return
-  }
+  const { email: rawEmail, phone: rawPhone } = req.body
 
   try {
-    const user = await prisma.user.findUnique({
-      where: { email: email.data },
-      select: { nickname: true, email: true, createdAt: true },
-    })
+    let user: { nickname: string; email: string; createdAt: Date } | null = null
 
-    // 계정 존재 여부를 노출하지 않기 위해 항상 200 응답 (보안)
-    if (!user) {
-      res.json({ found: false }); return
+    if (rawPhone) {
+      const parsed = z.string().regex(phoneRegex).safeParse(String(rawPhone).replace(/-/g, ''))
+      if (!parsed.success) { res.status(400).json({ message: '올바른 휴대폰 번호를 입력해주세요.' }); return }
+      user = await prisma.user.findFirst({ where: { phone: parsed.data }, select: { nickname: true, email: true, createdAt: true } })
+    } else if (rawEmail) {
+      const parsed = z.string().email().safeParse(rawEmail)
+      if (!parsed.success) { res.status(400).json({ message: '올바른 이메일을 입력해주세요.' }); return }
+      user = await prisma.user.findUnique({ where: { email: parsed.data }, select: { nickname: true, email: true, createdAt: true } })
+    } else {
+      res.status(400).json({ message: '이메일 또는 휴대폰 번호를 입력해주세요.' }); return
     }
 
-    // 닉네임 마스킹 (앞 2자 + ***)
-    const masked = user.nickname.slice(0, 2) + '*'.repeat(Math.max(1, user.nickname.length - 2))
+    if (!user) { res.json({ found: false }); return }
+
+    const [local, domain] = user.email.split('@')
+    const maskedLocal = local.slice(0, 2) + '*'.repeat(Math.max(3, local.length - 2))
+    const maskedNickname = user.nickname.slice(0, 2) + '*'.repeat(Math.max(1, user.nickname.length - 2))
+
     res.json({
       found: true,
-      nickname: masked,
-      email: user.email.replace(/(?<=.{2}).(?=.*@)/, '*'),
+      nickname: maskedNickname,
+      email: `${maskedLocal}@${domain}`,
       joinedAt: user.createdAt,
     })
   } catch (err) {
@@ -244,15 +249,29 @@ export async function requestPhoneOtp(req: Request, res: Response) {
   if (!phone.success) { res.status(400).json({ message: phone.error.errors[0]?.message }); return }
 
   try {
+    // 60초 쿨다운 — 타이밍 공격 방지를 위해 번호 등록 여부와 무관하게 적용
+    const recent = await prisma.phoneOtp.findFirst({
+      where: { phone: phone.data, createdAt: { gt: new Date(Date.now() - 60_000) } },
+      orderBy: { createdAt: 'desc' },
+    })
+    if (recent) {
+      const left = Math.ceil((recent.createdAt.getTime() + 60_000 - Date.now()) / 1000)
+      res.status(429).json({ message: `${left}초 후에 재요청할 수 있습니다.`, retryAfter: left })
+      return
+    }
+
+    await prisma.phoneOtp.deleteMany({ where: { phone: phone.data } })
+
+    const otp = generateOtp()
+    await prisma.phoneOtp.create({
+      data: { phone: phone.data, otp, expiresAt: new Date(Date.now() + 5 * 60_000) },
+    })
+
     const user = await prisma.user.findFirst({ where: { phone: phone.data }, select: { id: true } })
     if (user) {
-      await prisma.phoneOtp.deleteMany({ where: { phone: phone.data } })
-      const otp = generateOtp()
-      await prisma.phoneOtp.create({
-        data: { phone: phone.data, otp, expiresAt: new Date(Date.now() + 5 * 60 * 1000) },
-      })
       await sendSms(phone.data, `[Rocket AH] 인증번호: ${otp} (5분 이내 입력)`)
     }
+
     res.json({ message: '인증번호를 발송했습니다.' })
   } catch (err) {
     console.error('[requestPhoneOtp]', err)
@@ -275,9 +294,26 @@ export async function verifyPhoneOtpAndReset(req: Request, res: Response) {
   const { phone, otp, newPassword } = parsed.data
   try {
     const record = await prisma.phoneOtp.findFirst({
-      where: { phone, otp, used: false, expiresAt: { gt: new Date() } },
+      where: { phone, used: false, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
     })
-    if (!record) { res.status(400).json({ message: '인증번호가 올바르지 않거나 만료되었습니다.' }); return }
+
+    if (!record) { res.status(400).json({ message: '인증번호가 만료되었습니다. 재발송해주세요.' }); return }
+
+    if (record.attempts >= 5) {
+      res.status(429).json({ message: '인증 시도 횟수를 초과했습니다. 재발송해주세요.' }); return
+    }
+
+    if (record.otp !== otp) {
+      await prisma.phoneOtp.update({ where: { id: record.id }, data: { attempts: { increment: 1 } } })
+      const remaining = 4 - record.attempts
+      res.status(400).json({
+        message: remaining > 0
+          ? `인증번호가 올바르지 않습니다. (남은 시도: ${remaining}회)`
+          : '인증 시도 횟수를 초과했습니다. 재발송해주세요.',
+      })
+      return
+    }
 
     const user = await prisma.user.findFirst({ where: { phone }, select: { id: true } })
     if (!user) { res.status(404).json({ message: '등록된 사용자를 찾을 수 없습니다.' }); return }
