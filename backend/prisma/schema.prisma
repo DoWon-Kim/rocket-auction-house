@@ -203,6 +203,7 @@ enum ListingStatus {
   SOLD          // 판매 완료
   CANCELLED     // 취소
   EXPIRED       // 만료 (경매)
+  SUSPENDED     // 신고 누적으로 자동 숨김
 }
 
 // ─── 경매 입찰 ───────────────────────────────────────────────────────────
@@ -782,6 +783,8 @@ model Review {
   role          ReviewRole  // 리뷰어의 거래 역할
   rating        Int         // 1 ~ 5
   comment       String?     @db.VarChar(300)
+  sellerReply     String?   @db.VarChar(500)
+  sellerRepliedAt DateTime?
   createdAt     DateTime    @default(now())
 
   @@unique([transactionId, reviewerId])

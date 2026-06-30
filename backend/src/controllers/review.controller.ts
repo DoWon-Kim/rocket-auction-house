@@ -120,6 +120,40 @@ export async function getUserReviews(req: AuthRequest, res: Response) {
   }
 }
 
+// ── 판매자 답글 작성 ──────────────────────────────────────────────────────────
+
+export async function replyToReview(req: AuthRequest, res: Response) {
+  const id = String(req.params['id'])
+  const reply = (req.body.reply as string | undefined)?.trim()
+  if (!reply || reply.length > 500) {
+    res.status(400).json({ message: '답글은 1~500자 이내로 입력해주세요.' }); return
+  }
+
+  try {
+    const review = await prisma.review.findUnique({
+      where: { id },
+      select: { id: true, revieweeId: true, sellerReply: true },
+    })
+    if (!review) { res.status(404).json({ message: '리뷰를 찾을 수 없습니다.' }); return }
+    if (review.revieweeId !== req.userId) {
+      res.status(403).json({ message: '본인에 대한 리뷰에만 답글을 달 수 있습니다.' }); return
+    }
+    if (review.sellerReply) {
+      res.status(409).json({ message: '이미 답글을 작성하셨습니다.' }); return
+    }
+
+    const updated = await prisma.review.update({
+      where: { id },
+      data: { sellerReply: reply, sellerRepliedAt: new Date() },
+      select: { id: true, sellerReply: true, sellerRepliedAt: true },
+    })
+    res.json(updated)
+  } catch (err) {
+    console.error('[replyToReview]', err)
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' })
+  }
+}
+
 // ── 내가 작성 대기 중인 리뷰 (완료됐지만 미작성) ────────────────────────────
 
 export async function getMyPendingReviews(req: AuthRequest, res: Response) {

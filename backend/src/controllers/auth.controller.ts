@@ -223,6 +223,55 @@ export async function getMe(req: Request & { userId?: string }, res: Response) {
   }
 }
 
+const profileSchema = z.object({
+  nickname:        z.string().min(2).max(20).optional(),
+  avatarUrl:       z.string().url().optional().or(z.literal('')),
+  currentPassword: z.string().optional(),
+  newPassword:     z.string().min(8).optional(),
+})
+
+export async function updateProfile(req: AuthRequest, res: Response) {
+  const parsed = profileSchema.safeParse(req.body)
+  if (!parsed.success) {
+    const firstErr = Object.values(parsed.error.flatten().fieldErrors)[0]?.[0]
+    res.status(400).json({ message: firstErr ?? '입력값 오류' }); return
+  }
+  const { nickname, avatarUrl, currentPassword, newPassword } = parsed.data
+
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.userId! } })
+    if (!user) { res.status(404).json({ message: '사용자를 찾을 수 없습니다.' }); return }
+
+    // 비밀번호 변경 요청 시 현재 비밀번호 검증
+    if (newPassword) {
+      if (!currentPassword) { res.status(400).json({ message: '현재 비밀번호를 입력해주세요.' }); return }
+      const valid = await bcrypt.compare(currentPassword, user.passwordHash)
+      if (!valid) { res.status(401).json({ message: '현재 비밀번호가 올바르지 않습니다.' }); return }
+    }
+
+    // 닉네임 중복 검사
+    if (nickname && nickname !== user.nickname) {
+      const dup = await prisma.user.findUnique({ where: { nickname } })
+      if (dup) { res.status(409).json({ message: '이미 사용 중인 닉네임입니다.' }); return }
+    }
+
+    const data: Record<string, unknown> = {}
+    if (nickname) data.nickname = nickname
+    if (avatarUrl !== undefined) data.avatarUrl = avatarUrl || null
+    if (newPassword) data.passwordHash = await bcrypt.hash(newPassword, 12)
+
+    const updated = await prisma.user.update({
+      where: { id: req.userId! },
+      data,
+      select: { id: true, email: true, nickname: true, avatarUrl: true, balance: true, role: true, emailNotifications: true },
+    })
+    res.json(updated)
+  } catch (err) {
+    console.error('[updateProfile]', err)
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' })
+  }
+}
+
 export async function updateEmailNotifications(req: AuthRequest, res: Response) {
   if (!req.userId) { res.status(401).json({ message: '인증이 필요합니다.' }); return }
   const { enabled } = req.body

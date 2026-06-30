@@ -4,8 +4,30 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Clock, Tag, Gavel, Handshake } from 'lucide-react'
 import { TCG_LABELS, CONDITION_LABELS, rarityLabel } from '@/lib/utils'
-import { formatDistanceToNow } from 'date-fns'
-import { ko } from 'date-fns/locale'
+import { useState, useEffect } from 'react'
+
+function useAuctionTimer(endsAt?: string) {
+  const [label, setLabel] = useState('')
+  const [urgent, setUrgent] = useState(false)
+  useEffect(() => {
+    if (!endsAt) return
+    function tick() {
+      const diff = new Date(endsAt!).getTime() - Date.now()
+      if (diff <= 0) { setLabel('종료'); setUrgent(false); return }
+      setUrgent(diff < 3_600_000)
+      const h = Math.floor(diff / 3_600_000)
+      const m = Math.floor((diff % 3_600_000) / 60_000)
+      const s = Math.floor((diff % 60_000) / 1_000)
+      if (h > 0) setLabel(`${h}시간 ${m}분`)
+      else if (m > 0) setLabel(`${m}분 ${s}초`)
+      else setLabel(`${s}초`)
+    }
+    tick()
+    const t = setInterval(tick, 1_000)
+    return () => clearInterval(t)
+  }, [endsAt])
+  return { label, urgent }
+}
 
 interface Listing {
   id: string
@@ -60,11 +82,9 @@ export default function ListingCard({ listing }: { listing: Listing }) {
 
   const displayImage = listing.imageUrls?.[0] ?? listing.card.imageUrl
   const cfg = TYPE_CONFIG[listing.listingType as keyof typeof TYPE_CONFIG]
-
-  const isEndingSoon =
-    listing.listingType === 'AUCTION' &&
-    listing.auctionEndsAt &&
-    new Date(listing.auctionEndsAt).getTime() - Date.now() < 3600_000
+  const { label: timerLabel, urgent: isEndingSoon } = useAuctionTimer(
+    listing.listingType === 'AUCTION' ? listing.auctionEndsAt : undefined
+  )
 
   return (
     <Link href={`/listings/${listing.id}`} className="group block">
@@ -105,14 +125,14 @@ export default function ListingCard({ listing }: { listing: Listing }) {
           </div>
 
           {/* Auction timer (pinned bottom-left) */}
-          {listing.listingType === 'AUCTION' && listing.auctionEndsAt && (
+          {listing.listingType === 'AUCTION' && listing.auctionEndsAt && timerLabel && (
             <div className={`absolute bottom-2.5 left-2.5 inline-flex items-center gap-1 px-2 py-[3px] rounded-md text-[10px] font-semibold backdrop-blur-md border ${
               isEndingSoon
                 ? 'bg-red-950/70 text-red-400 border-red-800/50'
                 : 'bg-[#0f0b08]/70 text-[#f0a832] border-[#3d2e0c]/60'
             }`}>
               <Clock size={10} className={isEndingSoon ? 'animate-live' : ''} />
-              {formatDistanceToNow(new Date(listing.auctionEndsAt), { addSuffix: false, locale: ko })}
+              {timerLabel}
             </div>
           )}
 

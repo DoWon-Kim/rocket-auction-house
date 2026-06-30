@@ -46,11 +46,11 @@ export default function Footer() {
         {/* 사업자 정보 — 전자상거래법 제13조 */}
         <div className="space-y-1.5 text-[11px] text-[#5a4830] leading-relaxed">
           <p className="text-xs text-[#7a6040] font-semibold mb-2">사업자 정보</p>
-          <p>상호: <span className="text-[#7a5a38]">로켓옥션하우스</span> &nbsp;|&nbsp; 대표자: <span className="text-[#7a5a38]">[대표자명]</span> &nbsp;|&nbsp; 사업자등록번호: <span className="text-[#7a5a38]">[000-00-00000]</span></p>
-          <p>통신판매업 신고번호: <span className="text-[#7a5a38]">[제0000-서울00-0000호]</span></p>
-          <p>주소: <span className="text-[#7a5a38]">[사업장 주소]</span> &nbsp;|&nbsp; 전화: <span className="text-[#7a5a38]">[전화번호]</span> &nbsp;|&nbsp; 이메일: <span className="text-[#7a5a38]">[이메일]</span></p>
-          <p>개인정보보호 책임자: <span className="text-[#7a5a38]">[성명]</span> &nbsp;(이메일: <span className="text-[#7a5a38]">[이메일]</span>)</p>
-          <p>호스팅 서비스: <span className="text-[#7a5a38]">[서비스명]</span></p>
+          <p>상호: <span className="text-[#7a5a38]">로켓옥션하우스</span> &nbsp;|&nbsp; 대표자: <span className="text-[#7a5a38]">김도원</span> &nbsp;|&nbsp; 사업자등록번호: <span className="text-[#7a5a38]">사업자 등록 준비 중</span></p>
+          <p>통신판매업 신고번호: <span className="text-[#7a5a38]">통신판매업 신고 준비 중</span></p>
+          <p>이메일: <span className="text-[#7a5a38]">support@rocket-auction.com</span> &nbsp;|&nbsp; 고객센터: <span className="text-[#7a5a38]">평일 10:00 – 18:00</span></p>
+          <p>개인정보보호 책임자: <span className="text-[#7a5a38]">김도원</span> &nbsp;(이메일: <span className="text-[#7a5a38]">privacy@rocket-auction.com</span>)</p>
+          <p>호스팅 서비스: <span className="text-[#7a5a38]">Railway (railway.app)</span></p>
         </div>
 
         {/* 에스크로 안내 + 저작권 */}

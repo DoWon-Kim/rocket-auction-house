@@ -77,6 +77,19 @@ export async function createReport(req: AuthRequest, res: Response) {
       })
     }
 
+    // 리스팅 신고 누적 3회 이상 → 자동 숨김 (SUSPENDED)
+    if (listingId) {
+      const activeReports = await prisma.report.count({
+        where: { listingId, status: { in: ['PENDING', 'INVESTIGATING'] } },
+      })
+      if (activeReports >= 3) {
+        await prisma.listing.updateMany({
+          where: { id: listingId, status: 'ACTIVE' },
+          data: { status: 'SUSPENDED' },
+        })
+      }
+    }
+
     res.status(201).json(report)
   } catch (err) {
     console.error('[createReport]', err)
