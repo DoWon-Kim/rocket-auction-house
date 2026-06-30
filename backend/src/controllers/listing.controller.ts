@@ -33,6 +33,7 @@ export async function getListings(req: AuthRequest, res: Response) {
     const minPrice = req.query.minPrice as string | undefined
     const maxPrice = req.query.maxPrice as string | undefined
     const sort = req.query.sort as string | undefined
+    const sellerId = req.query.sellerId as string | undefined
     const rawPage = Number(req.query.page)
     const rawLimit = Number(req.query.limit)
     const page = Number.isFinite(rawPage) && rawPage > 0 ? Math.floor(rawPage) : 1
@@ -40,6 +41,7 @@ export async function getListings(req: AuthRequest, res: Response) {
 
     const where: Record<string, unknown> = { status: 'ACTIVE' }
     if (type) where.listingType = type
+    if (sellerId) where.sellerId = sellerId
     if (tcgType || cardName) {
       where.card = {
         ...(tcgType ? { tcgType } : {}),

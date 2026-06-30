@@ -473,7 +473,9 @@ export default function ListingDetailPage() {
             <InfoRow label="수량">{listing.quantity}장</InfoRow>
             <InfoRow label="판매자">
               <span className="flex items-center gap-2 flex-wrap">
-                <span>{listing.seller.nickname}</span>
+                <Link href={`/users/${listing.sellerId}`} className="hover:text-[#d4a853] transition-colors">
+                  {listing.seller.nickname}
+                </Link>
                 <RatingBadge avgRating={listing.seller.avgRating ?? null} reviewCount={listing.seller.reviewCount ?? 0} />
               </span>
             </InfoRow>

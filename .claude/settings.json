@@ -46,7 +46,15 @@
       "PowerShell($env:PATH += \";C:\\\\Program Files\\\\Git\\\\bin\"; cd d:\\\\Rocket_Auction_House; git add -A; git status --short)",
       "PowerShell($env:PATH += \";C:\\\\Program Files\\\\Git\\\\bin\"; cd d:\\\\Rocket_Auction_House; git push origin main)",
       "PowerShell($env:PATH += \";C:\\\\Program Files\\\\Git\\\\bin\"; cd d:\\\\Rocket_Auction_House; git add backend/src/controllers/auth.controller.ts; git commit -m \"fix: register에서 parsed 대신 result 변수 사용 \\(빌드 오류 수정\\)\"; git push origin main)",
-      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\Git\\\\bin\"; cd d:\\\\Rocket_Auction_House\\\\backend; npx prisma generate 2>&1 | Select-Object -Last 3)"
+      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\Git\\\\bin\"; cd d:\\\\Rocket_Auction_House\\\\backend; npx prisma generate 2>&1 | Select-Object -Last 3)",
+      "PowerShell($env:DATABASE_URL = \"postgresql://neondb_owner:npg_VmB1KMzu5ioC@ep-still-pond-atbjyps7-pooler.c-9.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require\"; cd d:\\\\Rocket_Auction_House\\\\backend; npm run seed 2>&1)",
+      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\Git\\\\bin\"; cd d:\\\\Rocket_Auction_House; git log --oneline -5; git show HEAD:backend/src/controllers/auth.controller.ts | Select-String \"parsed|result\\\\.data\\\\.phone\" | Select-Object -First 5)",
+      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\Git\\\\bin\"; cd d:\\\\Rocket_Auction_House; git log --oneline -3)",
+      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\Git\\\\bin\"; cd d:\\\\Rocket_Auction_House; git commit --allow-empty -m \"ci: Railway 재빌드 트리거\"; git push origin main)",
+      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\Git\\\\bin\"; cd d:\\\\Rocket_Auction_House; git add backend/prisma/schema.prisma backend/Dockerfile backend/.env.example; git commit -m \"fix: Neon DB 연결 안정화 — directUrl 추가, prisma db push --skip-generate\"; git push origin main)",
+      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\Git\\\\bin\"; cd d:\\\\Rocket_Auction_House; git add backend/Dockerfile; git commit -m \"fix: Dockerfile 빌드 단계에 더미 DB URL 주입 \\(prisma generate 오류 수정\\)\"; git push origin main)",
+      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\Git\\\\bin\"; cd d:\\\\Rocket_Auction_House; git commit --allow-empty -m \"ci: 프론트엔드 재빌드 트리거 \\(NEXT_PUBLIC_API_URL 반영\\)\"; git push origin main)",
+      "PowerShell($env:DATABASE_URL = \"postgresql://neondb_owner:npg_VmB1KMzu5ioC@ep-still-pond-atbjyps7-pooler.c-9.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require\"; cd d:\\\\Rocket_Auction_House\\\\backend; npx ts-node --transpile-only -e \"const { PrismaClient } = require\\('@prisma/client'\\); const p = new PrismaClient\\(\\); p.user.update\\({ where: { email: 'admin@rocket.com' }, data: { role: 'SUPER_ADMIN' }, select: { email: true, nickname: true, role: true } }\\).then\\(u => { console.log\\('완료:', JSON.stringify\\(u\\)\\); p.\\\\$disconnect\\(\\); }\\).catch\\(e => { console.error\\(e.message\\); p.\\\\$disconnect\\(\\); }\\)\" 2>&1)"
     ],
     "additionalDirectories": [
       "d:\\Rocket_Auction_House\\frontend\\src\\app\\dm",

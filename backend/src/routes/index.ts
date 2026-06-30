@@ -60,7 +60,7 @@ import { getMenus, toggleMenu, updateMenuOrder } from '../controllers/menu.contr
 import { getMaintenanceStatus, updateMaintenance } from '../controllers/siteConfig.controller'
 import { getPosts, getPost, addComment, deleteComment, togglePostLike, toggleCommentLike, userCreatePost, userUpdatePost, userDeletePost, adminCreatePost, adminUpdatePost, adminDeletePost, adminTogglePin } from '../controllers/post.controller'
 import { createReport, getMyReports, getAdminReports, updateReport } from '../controllers/report.controller'
-import { createReview, getUserReviews, getMyPendingReviews, replyToReview } from '../controllers/review.controller'
+import { createReview, getUserReviews, getUserProfile, getMyPendingReviews, replyToReview } from '../controllers/review.controller'
 import { getNotifications, getUnreadCount as getNotifUnreadCount, markRead, markAllRead, deleteNotification } from '../controllers/notification.controller'
 import { getMyWishlist, getWishlistStatus, upsertWishlist, removeWishlist } from '../controllers/wishlist.controller'
 import { getMyCollectionSummary, getMyCollectionSet } from '../controllers/collection.controller'
@@ -256,6 +256,7 @@ router.patch('/admin/reports/:id',   authenticate, requireSection('reports'), up
 router.post('/reviews',                    authenticate, apiLimiter, createReview)
 router.post('/reviews/:id/reply',          authenticate, apiLimiter, replyToReview)
 router.get('/reviews/pending',             authenticate, getMyPendingReviews)
+router.get('/users/:userId/profile',       getUserProfile)
 router.get('/users/:userId/reviews',       getUserReviews)
 
 // 위시리스트

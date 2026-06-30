@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\Git\\\\bin\"; cd d:\\\\Rocket_Auction_House; git add frontend/src/components/Navbar.tsx frontend/src/app/admin/layout.tsx; git commit -m \"fix: SUPER_ADMIN 관리자 메뉴 전체 표시 \\(모바일 Navbar + layout 필터 수정\\)\"; git push origin main)",
+      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\Git\\\\bin\"; cd d:\\\\Rocket_Auction_House; git add frontend/src/app/shop/page.tsx; git commit -m \"fix: 샵 상품 이미지 1:1 비율 + object-contain으로 전체 표시\"; git push origin main)",
+      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\Git\\\\bin\"; cd d:\\\\Rocket_Auction_House; git add backend/prisma/schema.prisma backend/src/controllers/shop.controller.ts backend/src/routes/index.ts frontend/src/app/shop/page.tsx frontend/src/app/admin/shop/page.tsx frontend/src/app/my/page.tsx; git commit -m \"feat: 샵 구매 배송 플로우 — 배송지 입력/관리자 배송 처리/사용자 배송 현황\"; git push origin main)",
+      "PowerShell(Get-ChildItem -Path \"d:\\\\Rocket_Auction_House\" -Recurse -Directory | Where-Object { $_.Name -eq \"src\" -or $_.Name -eq \"pages\" -or $_.Name -eq \"app\" } | Select-Object -First 20)",
+      "PowerShell($env:PATH = $env:PATH + \";C:\\\\Program Files\\\\Git\\\\cmd\"; cd d:\\\\Rocket_Auction_House; git status)",
+      "PowerShell($env:PATH = $env:PATH + \";C:\\\\Program Files\\\\Git\\\\cmd\"; cd d:\\\\Rocket_Auction_House; git add backend/prisma/schema.prisma backend/src/controllers/auth.controller.ts backend/src/controllers/report.controller.ts backend/src/controllers/review.controller.ts backend/src/routes/index.ts frontend/src/app/listings frontend/src/app/settings/page.tsx frontend/src/components/Footer.tsx frontend/src/components/ListingCard.tsx)",
+      "PowerShell($env:PATH = $env:PATH + \";C:\\\\Program Files\\\\Git\\\\cmd\"; cd d:\\\\Rocket_Auction_House; git push origin main)",
+      "PowerShell($env:PATH = $env:PATH + \";C:\\\\Program Files\\\\Git\\\\cmd\"; cd d:\\\\Rocket_Auction_House; git add backend/src/controllers/admin.controller.ts frontend/src/app/admin/page.tsx; git commit -m \"feat: 관리자 대시보드 강화 - 일별 거래 차트, 처리 대기 알람, 주간/월간 통계\")"
+    ],
+    "additionalDirectories": [
+      "d:\\Rocket_Auction_House\\frontend\\src\\app\\users"
+    ]
+  }
+}

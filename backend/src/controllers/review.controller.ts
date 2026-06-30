@@ -76,6 +76,23 @@ export async function createReview(req: AuthRequest, res: Response) {
   }
 }
 
+// ── 유저 공개 프로필 조회 ────────────────────────────────────────────────────
+
+export async function getUserProfile(req: AuthRequest, res: Response) {
+  const userId = String(req.params['userId'])
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, nickname: true, avatarUrl: true, avgRating: true, reviewCount: true, createdAt: true },
+    })
+    if (!user) { res.status(404).json({ message: '유저를 찾을 수 없습니다.' }); return }
+    res.json({ user })
+  } catch (err) {
+    console.error('[getUserProfile]', err)
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' })
+  }
+}
+
 // ── 유저 리뷰 목록 조회 (공개) ────────────────────────────────────────────────
 
 export async function getUserReviews(req: AuthRequest, res: Response) {
