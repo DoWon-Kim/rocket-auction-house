@@ -3,6 +3,10 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
+# 빌드 시 prisma generate/tsc에 필요한 더미 URL (실제 연결 안 함)
+ENV DATABASE_URL="postgresql://dummy:dummy@dummy:5432/dummy"
+ENV DIRECT_URL="postgresql://dummy:dummy@dummy:5432/dummy"
+
 COPY package*.json ./
 RUN npm install
 COPY . .
