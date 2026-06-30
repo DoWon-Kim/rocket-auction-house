@@ -298,7 +298,7 @@ export default function Navbar() {
               <Link href="/settings" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-white/70 hover:bg-[#1a1410] hover:text-white rounded-xl transition-colors">
                 <Settings size={15} /> 설정
               </Link>
-              {user.role === 'ADMIN' && (
+              {(user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') && (
                 <Link href="/admin" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-[#d4a853] hover:bg-[#1a1410] rounded-xl transition-colors">
                   <LayoutDashboard size={15} /> 관리자
                 </Link>

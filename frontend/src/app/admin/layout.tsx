@@ -49,6 +49,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const navItems = ALL_NAV.filter(item => {
     if (item.superOnly) return isSuperAdmin
+    if (isSuperAdmin) return true
     return allowedSections.has(item.section)
   })
 
