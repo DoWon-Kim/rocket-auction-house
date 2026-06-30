@@ -5,14 +5,14 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/store'
 import { api } from '@/lib/api'
-import { Rocket, Mail, Lock, User, AlertCircle, ArrowRight, Check } from 'lucide-react'
+import { Rocket, Mail, Lock, User, Phone, AlertCircle, ArrowRight, Check } from 'lucide-react'
 
 const inputCls = 'w-full bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] focus:border-[#d4a853]/50 rounded-xl px-4 py-3 text-sm text-[#f5ead8] placeholder:text-[#5a4830] focus:outline-none transition-colors pl-11'
 
 export default function RegisterPage() {
   const router = useRouter()
   const { user, setAuth } = useAuthStore()
-  const [form, setForm] = useState({ email: '', nickname: '', password: '', confirm: '' })
+  const [form, setForm] = useState({ email: '', nickname: '', password: '', confirm: '', phone: '' })
   const [agreed, setAgreed] = useState({ terms: false, privacy: false })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -36,7 +36,11 @@ export default function RegisterPage() {
     if (form.nickname.length < 2) { setError('닉네임은 2자 이상이어야 합니다.'); return }
     setLoading(true)
     try {
-      const { data } = await api.post('/auth/register', { email: form.email, nickname: form.nickname, password: form.password })
+      const phone = form.phone.replace(/-/g, '')
+      const { data } = await api.post('/auth/register', {
+        email: form.email, nickname: form.nickname, password: form.password,
+        ...(phone ? { phone } : {}),
+      })
       setAuth(data.user, data.token)
       router.push('/')
     } catch (err: unknown) {
@@ -109,6 +113,18 @@ export default function RegisterPage() {
                   <p className={`text-[11px] ${['', 'text-red-400', 'text-yellow-400', 'text-emerald-400'][pwStrength]}`}>{strengthLabel}</p>
                 </div>
               )}
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs text-[#7a6040] uppercase tracking-wider font-semibold">
+                휴대폰 번호 <span className="text-[#5a4830] normal-case font-normal">(선택 — 비밀번호 찾기용)</span>
+              </label>
+              <div className="relative">
+                <Phone size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5a4830] pointer-events-none" />
+                <input type="tel" value={form.phone}
+                  onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
+                  placeholder="01012345678" className={inputCls} />
+              </div>
             </div>
 
             <div className="space-y-1.5">

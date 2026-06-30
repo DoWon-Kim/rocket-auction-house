@@ -15,6 +15,7 @@ model User {
   email         String   @unique
   nickname      String   @unique
   passwordHash  String
+  phone         String?  @unique
   avatarUrl     String?
   balance       Int      @default(0) // 보유 포인트/머니
   role          UserRole @default(USER)
@@ -71,6 +72,17 @@ model PasswordResetToken {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+model PhoneOtp {
+  id        String   @id @default(uuid())
+  phone     String
+  otp       String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([phone])
 }
 
 enum UserRole {

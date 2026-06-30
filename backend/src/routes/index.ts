@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { register, login, getMe, findId, requestPasswordReset, resetPassword, updateEmailNotifications } from '../controllers/auth.controller'
+import { register, login, getMe, findId, requestPasswordReset, resetPassword, updateEmailNotifications, requestPhoneOtp, verifyPhoneOtpAndReset } from '../controllers/auth.controller'
 import {
   getListings,
   getListing,
@@ -81,6 +81,8 @@ router.get('/auth/me', authenticate, getMe)
 router.post('/auth/find-id', authLimiter, findId)
 router.post('/auth/forgot-password', authLimiter, requestPasswordReset)
 router.post('/auth/reset-password', authLimiter, resetPassword)
+router.post('/auth/request-phone-otp', authLimiter, requestPhoneOtp)
+router.post('/auth/verify-phone-otp', authLimiter, verifyPhoneOtpAndReset)
 router.patch('/auth/email-notifications', authenticate, updateEmailNotifications)
 
 // 카드 검색 (공개)

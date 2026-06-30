@@ -38,7 +38,12 @@
       "Read(//c/Users/dowon/.claude/**)",
       "PowerShell(if \\(-not \\(Test-Path \"d:\\\\Rocket_Auction_House\\\\backend\\\\.env.example\"\\)\\) { \"notfound\" } else { \"exists\" })",
       "PowerShell(New-Item -ItemType File \"d:\\\\Rocket_Auction_House\\\\frontend\\\\.env.example\")",
-      "PowerShell($git = \"C:\\\\Program Files\\\\Git\\\\bin\\\\git.exe\"; cd \"d:\\\\Rocket_Auction_House\"; & $git init; & $git add .; & $git commit -m \"initial commit\")"
+      "PowerShell($git = \"C:\\\\Program Files\\\\Git\\\\bin\\\\git.exe\"; cd \"d:\\\\Rocket_Auction_House\"; & $git init; & $git add .; & $git commit -m \"initial commit\")",
+      "PowerShell(if \\(-not \\(Test-Path \"d:\\\\Rocket_Auction_House\\\\backend\\\\railway.toml\"\\)\\) { New-Item -ItemType File \"d:\\\\Rocket_Auction_House\\\\backend\\\\railway.toml\" | Out-Null }; \"ok\")",
+      "PowerShell(New-Item -ItemType File \"d:\\\\Rocket_Auction_House\\\\backend\\\\nixpacks.toml\")",
+      "PowerShell(\"deleted\")",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri \"https://frontend-production-a8ef.up.railway.app\" -TimeoutSec 15 -UseBasicParsing; \"Status: $\\($r.StatusCode\\)\" } catch { \"Error: $_\" })",
+      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\Git\\\\bin\"; cd d:\\\\Rocket_Auction_House; git add -A; git status --short)"
     ],
     "additionalDirectories": [
       "d:\\Rocket_Auction_House\\frontend\\src\\app\\dm",

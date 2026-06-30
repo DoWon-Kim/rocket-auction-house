@@ -6,11 +6,15 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { sendPasswordResetEmail } from '../services/mailer'
 import { AuthRequest } from '../middleware/auth'
+import { sendSms, generateOtp } from '../lib/sms'
+
+const phoneRegex = /^01[016789]\d{7,8}$/
 
 const registerSchema = z.object({
-  email: z.string().email(),
+  email:    z.string().email(),
   nickname: z.string().min(2).max(20),
   password: z.string().min(8),
+  phone:    z.string().regex(phoneRegex, '올바른 휴대폰 번호를 입력해주세요.').optional(),
 })
 
 const loginSchema = z.object({
@@ -41,7 +45,7 @@ export async function register(req: Request, res: Response) {
 
     const passwordHash = await bcrypt.hash(password, 12)
     const user = await prisma.user.create({
-      data: { email, nickname, passwordHash },
+      data: { email, nickname, passwordHash, phone: parsed.data.phone ?? null },
       select: { id: true, email: true, nickname: true, avatarUrl: true, balance: true, role: true },
     })
 
@@ -228,6 +232,64 @@ export async function updateEmailNotifications(req: AuthRequest, res: Response) 
     res.json({ emailNotifications: enabled })
   } catch (err) {
     console.error('[updateEmailNotifications]', err)
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' })
+  }
+}
+
+// ── 휴대폰 OTP 발송 ────────────────────────────────────────────────────────────
+
+export async function requestPhoneOtp(req: Request, res: Response) {
+  const phone = z.string().regex(phoneRegex, '올바른 휴대폰 번호를 입력해주세요.')
+    .safeParse(req.body.phone?.replace(/-/g, ''))
+  if (!phone.success) { res.status(400).json({ message: phone.error.errors[0]?.message }); return }
+
+  try {
+    const user = await prisma.user.findFirst({ where: { phone: phone.data }, select: { id: true } })
+    if (user) {
+      await prisma.phoneOtp.deleteMany({ where: { phone: phone.data } })
+      const otp = generateOtp()
+      await prisma.phoneOtp.create({
+        data: { phone: phone.data, otp, expiresAt: new Date(Date.now() + 5 * 60 * 1000) },
+      })
+      await sendSms(phone.data, `[Rocket AH] 인증번호: ${otp} (5분 이내 입력)`)
+    }
+    res.json({ message: '인증번호를 발송했습니다.' })
+  } catch (err) {
+    console.error('[requestPhoneOtp]', err)
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' })
+  }
+}
+
+// ── 휴대폰 OTP 검증 + 비밀번호 재설정 ─────────────────────────────────────────
+
+const phoneResetSchema = z.object({
+  phone:       z.string().regex(phoneRegex),
+  otp:         z.string().length(6),
+  newPassword: z.string().min(8, '비밀번호는 최소 8자 이상이어야 합니다.'),
+})
+
+export async function verifyPhoneOtpAndReset(req: Request, res: Response) {
+  const parsed = phoneResetSchema.safeParse(req.body)
+  if (!parsed.success) { res.status(400).json({ message: parsed.error.errors[0]?.message }); return }
+
+  const { phone, otp, newPassword } = parsed.data
+  try {
+    const record = await prisma.phoneOtp.findFirst({
+      where: { phone, otp, used: false, expiresAt: { gt: new Date() } },
+    })
+    if (!record) { res.status(400).json({ message: '인증번호가 올바르지 않거나 만료되었습니다.' }); return }
+
+    const user = await prisma.user.findFirst({ where: { phone }, select: { id: true } })
+    if (!user) { res.status(404).json({ message: '등록된 사용자를 찾을 수 없습니다.' }); return }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12)
+    await prisma.$transaction([
+      prisma.user.update({ where: { id: user.id }, data: { passwordHash } }),
+      prisma.phoneOtp.update({ where: { id: record.id }, data: { used: true } }),
+    ])
+    res.json({ message: '비밀번호가 변경되었습니다. 새 비밀번호로 로그인해주세요.' })
+  } catch (err) {
+    console.error('[verifyPhoneOtpAndReset]', err)
     res.status(500).json({ message: '서버 오류가 발생했습니다.' })
   }
 }
