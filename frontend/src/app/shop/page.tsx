@@ -214,7 +214,7 @@ function BoxesTab() {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="bg-[#1a1410] border border-[#2e2318] rounded-2xl overflow-hidden animate-pulse">
-              <div className="aspect-[3/4] bg-[#1a1208]" />
+              <div className="aspect-square bg-[#1a1208]" />
               <div className="p-3 space-y-2">
                 <div className="h-3 bg-[#1a1208] rounded w-3/4" />
                 <div className="h-3 bg-[#1a1208] rounded w-1/2" />
@@ -235,9 +235,9 @@ function BoxesTab() {
                 const soldOut = item.isSoldOut || item.stock === 0
                 const lowStock = !soldOut && item.stock <= 5
                 return (
-                  <div className="aspect-[3/4] bg-[#1a1208] relative overflow-hidden">
+                  <div className="aspect-square bg-[#0e0c09] relative overflow-hidden">
                     {item.imageUrl
-                      ? <Image src={item.imageUrl} alt={item.name} fill sizes="(max-width:640px) 50vw,(max-width:1024px) 33vw,25vw" className={`object-cover transition-transform duration-300 ${soldOut ? 'grayscale opacity-60' : 'group-hover:scale-105'}`} />
+                      ? <Image src={item.imageUrl} alt={item.name} fill sizes="(max-width:640px) 50vw,(max-width:1024px) 33vw,25vw" className={`object-contain transition-transform duration-300 ${soldOut ? 'grayscale opacity-60' : 'group-hover:scale-105'}`} />
                       : <div className="flex items-center justify-center h-full text-[#5a4830]"><Package size={40} /></div>}
                     {soldOut && (
                       <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
