@@ -1,0 +1,49 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem \"d:\\\\Rocket_Auction_House\" -Recurse -Name \".gitignore\" | ForEach-Object { Write-Host $_; Get-Content \"d:\\\\Rocket_Auction_House\\\\$_\" })",
+      "PowerShell(New-Item -ItemType Directory -Force \"d:\\\\Rocket_Auction_House\\\\manager\")",
+      "PowerShell(cd d:\\\\Rocket_Auction_House\\\\backend; $env:FORCE_COLOR='0'; $env:NO_COLOR='1'; $proc = Start-Process -FilePath \"cmd\" -ArgumentList \"/c npm run dev 2>&1\" -WorkingDirectory \"d:\\\\Rocket_Auction_House\\\\backend\" -RedirectStandardOutput \"C:\\\\Users\\\\dowon\\\\AppData\\\\Local\\\\Temp\\\\backend_out.txt\" -RedirectStandardError \"C:\\\\Users\\\\dowon\\\\AppData\\\\Local\\\\Temp\\\\backend_err.txt\" -NoNewWindow -PassThru; Start-Sleep 12; Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue; Get-Content \"C:\\\\Users\\\\dowon\\\\AppData\\\\Local\\\\Temp\\\\backend_out.txt\" -ErrorAction SilentlyContinue; Write-Host \"---STDERR---\"; Get-Content \"C:\\\\Users\\\\dowon\\\\AppData\\\\Local\\\\Temp\\\\backend_err.txt\" -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Process | Where-Object { $_.Name -match 'node|npm' } | Select-Object Name, Id, @{N='RSS\\(MB\\)';E={[math]::Round\\($_.WorkingSet64/1MB,1\\)}}, @{N='CPU\\(s\\)';E={[math]::Round\\($_.CPU,1\\)}} | Sort-Object 'RSS\\(MB\\)' -Descending | Format-Table -AutoSize)",
+      "Read(//d/Rocket_Auction_House/node_modules/next/dist/server/**)",
+      "PowerShell(\\(Get-MpPreference\\).ExclusionPath)",
+      "PowerShell(Start-Sleep -Seconds 4; \\(Get-NetTCPConnection -LocalPort 4000 -State Listen -ErrorAction SilentlyContinue\\) -ne $null)",
+      "PowerShell(Start-Sleep -Seconds 5; \\(Get-NetTCPConnection -LocalPort 4000 -State Listen -ErrorAction SilentlyContinue\\).OwningProcess)",
+      "PowerShell(Get-NetTCPConnection -LocalPort 4000 -ErrorAction SilentlyContinue)",
+      "PowerShell(Stop-Process -Id 15184 -Force -ErrorAction SilentlyContinue)",
+      "PowerShell(Start-Process -FilePath \"powershell\" -ArgumentList \"-NoProfile -Command `\"cd 'd:\\\\Rocket_Auction_House\\\\backend'; npm run dev 2>&1 | Tee-Object -FilePath 'C:\\\\Users\\\\dowon\\\\AppData\\\\Local\\\\Temp\\\\backend.log'`\"\" -WindowStyle Hidden; Start-Sleep -Seconds 3; Write-Host \"backend restarting\")",
+      "Read(//c/Users/dowon/AppData/Local/Temp/**)",
+      "WebFetch(domain:cardchange.shop)",
+      "PowerShell(Get-NetTCPConnection -LocalPort 4000 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess | Where-Object { $_ -ne 0 } | Sort-Object -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }; Write-Host \"stopped\")",
+      "PowerShell(Start-Process -FilePath \"powershell\" -ArgumentList \"-NoProfile -Command `\"cd 'd:\\\\Rocket_Auction_House\\\\backend'; npm run dev 2>&1 | Tee-Object -FilePath 'C:\\\\Users\\\\dowon\\\\AppData\\\\Local\\\\Temp\\\\backend.log'`\"\" -WindowStyle Hidden; Start-Sleep -Seconds 4; Get-Content \"C:\\\\Users\\\\dowon\\\\AppData\\\\Local\\\\Temp\\\\backend.log\" -ErrorAction SilentlyContinue | Select-Object -Last 3)",
+      "PowerShell(cd \"d:\\\\Rocket_Auction_House\\\\backend\"; Start-Process powershell -ArgumentList \"-Command\", \"npm run dev 2>&1\" -WindowStyle Hidden; Start-Sleep -Seconds 2; Write-Host \"backend started\")",
+      "PowerShell(cd \"d:\\\\Rocket_Auction_House\\\\backend\"; Start-Process powershell -ArgumentList \"-Command\", \"npm run dev 2>&1\" -WindowStyle Hidden; Start-Sleep -Seconds 3; Write-Host \"backend started\")",
+      "PowerShell(Get-NetTCPConnection -LocalPort 4000 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess | Where-Object { $_ -ne 0 } | Sort-Object -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }; Start-Sleep -Seconds 1; cd \"d:\\\\Rocket_Auction_House\\\\backend\"; Start-Process powershell -ArgumentList \"-Command\", \"npm run dev 2>&1\" -WindowStyle Hidden; Write-Host \"restarted\")",
+      "PowerShell($port4000 = \\(Get-NetTCPConnection -LocalPort 4000 -State Listen -ErrorAction SilentlyContinue\\).OwningProcess; Write-Host \"Backend PID: $port4000\"; Stop-Process -Id $port4000 -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1; cd \"d:\\\\Rocket_Auction_House\\\\backend\"; npx prisma generate 2>&1 | Select-Object -Last 5)",
+      "PowerShell(cd \"d:\\\\Rocket_Auction_House\\\\backend\"; $env:NODE_ENV=\"development\"; Start-Process -NoNewWindow -FilePath \"npx\" -ArgumentList \"ts-node-dev\",\"--respawn\",\"--transpile-only\",\"src/index.ts\" -PassThru | Select-Object -ExpandProperty Id)",
+      "PowerShell(cd \"d:\\\\Rocket_Auction_House\\\\backend\"; Start-Process powershell -ArgumentList \"-NoExit\",\"-Command\",\"npm run dev\" -WindowStyle Minimized; Start-Sleep -Seconds 3; \\(Get-NetTCPConnection -LocalPort 4000 -State Listen -ErrorAction SilentlyContinue\\).OwningProcess)",
+      "PowerShell(try { \\(Get-NetTCPConnection -LocalPort 4000 -State Listen -ErrorAction Stop\\).OwningProcess } catch { \"not running\" })",
+      "PowerShell(Stop-Process -Id 29364 -Force)",
+      "PowerShell(\"killed\")",
+      "PowerShell(Start-Process powershell -ArgumentList '-NoExit', '-Command', 'cd \"d:\\\\Rocket_Auction_House\\\\backend\"; npm run dev' -WindowStyle Normal; \"backend restarted\")",
+      "PowerShell(try { $p = \\(Get-NetTCPConnection -LocalPort 4000 -State Listen -ErrorAction Stop\\).OwningProcess; Stop-Process -Id $p -Force; \"stopped $p\" } catch { \"not running\" })",
+      "PowerShell(try { $p = \\(Get-NetTCPConnection -LocalPort 4000 -State Listen -ErrorAction Stop\\).OwningProcess; Stop-Process -Id $p -Force } catch {}; Start-Process powershell -ArgumentList '-NoExit','-Command','cd \"d:\\\\Rocket_Auction_House\\\\backend\"; npm run dev' -WindowStyle Normal; \"restarted\")",
+      "PowerShell(try { $p = \\(Get-NetTCPConnection -LocalPort 4000 -State Listen -ErrorAction Stop\\).OwningProcess; Stop-Process -Id $p -Force } catch {}; Start-Sleep -Milliseconds 300; cd \"d:\\\\Rocket_Auction_House\\\\backend\"; npx prisma db push 2>&1 | Select-Object -Last 6)",
+      "PowerShell(Start-Process powershell -ArgumentList '-NoExit','-Command','cd \"d:\\\\Rocket_Auction_House\\\\backend\"; npm run dev' -WindowStyle Normal; \"restarted\")",
+      "PowerShell(New-Item -ItemType Directory -Path \"d:\\\\Rocket_Auction_House\\\\frontend\\\\src\\\\app\\\\wishlist\" -Force)",
+      "PowerShell(\"created\")",
+      "PowerShell(try { $p = \\(Get-NetTCPConnection -LocalPort 4000 -State Listen -ErrorAction Stop\\).OwningProcess; Stop-Process -Id $p -Force } catch {}; Start-Sleep -Milliseconds 300; cd \"d:\\\\Rocket_Auction_House\\\\backend\"; npx prisma db push 2>&1 | Select-Object -Last 5)",
+      "PowerShell(New-Item -ItemType Directory -Path \"d:\\\\Rocket_Auction_House\\\\frontend\\\\src\\\\app\\\\settings\" -Force)",
+      "PowerShell(\"ok\")",
+      "Read(//c/Users/dowon/.claude/**)",
+      "PowerShell(if \\(-not \\(Test-Path \"d:\\\\Rocket_Auction_House\\\\backend\\\\.env.example\"\\)\\) { \"notfound\" } else { \"exists\" })",
+      "PowerShell(New-Item -ItemType File \"d:\\\\Rocket_Auction_House\\\\frontend\\\\.env.example\")",
+      "PowerShell($git = \"C:\\\\Program Files\\\\Git\\\\bin\\\\git.exe\"; cd \"d:\\\\Rocket_Auction_House\"; & $git init; & $git add .; & $git commit -m \"initial commit\")"
+    ],
+    "additionalDirectories": [
+      "d:\\Rocket_Auction_House\\frontend\\src\\app\\dm",
+      "d:\\Rocket_Auction_House\\frontend\\src\\app\\cards",
+      "d:\\Rocket_Auction_House\\frontend\\src\\app\\collection\\[tcgType]"
+    ]
+  }
+}

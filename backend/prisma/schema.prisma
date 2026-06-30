@@ -1,0 +1,809 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── 유저 ───────────────────────────────────────────────────────────────
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  nickname      String   @unique
+  passwordHash  String
+  avatarUrl     String?
+  balance       Int      @default(0) // 보유 포인트/머니
+  role          UserRole @default(USER)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  listings        Listing[]
+  bids            Bid[]
+  offersGiven     Offer[]         @relation("OfferBuyer")
+  transactions    Transaction[]   @relation("TransactionBuyer")
+  sales           Transaction[]   @relation("TransactionSeller")
+  oripaPurchases  OripaPurchase[]
+  inventoryItems      InventoryItem[]
+  shippingRequests    ShippingRequest[]
+  withdrawalRequests  WithdrawalRequest[]
+  chatRoomsAsBuyer    ChatRoom[]          @relation("ChatBuyer")
+  chatRoomsAsSeller   ChatRoom[]          @relation("ChatSeller")
+  chatMessages        ChatMessage[]       @relation("ChatMessages")
+  passwordResetTokens PasswordResetToken[]
+  shopOrders          ShopOrder[]
+  posts               Post[]
+  comments            Comment[]
+  adminPermissions    AdminPermission[]
+  postLikes           PostLike[]
+  commentLikes        CommentLike[]
+  reportsGiven        Report[]    @relation("ReportReporter")
+  reportsReceived     Report[]    @relation("ReportedUser")
+  friendRequestsSent     FriendRequest[] @relation("FriendRequestsSent")
+  friendRequestsReceived FriendRequest[] @relation("FriendRequestsReceived")
+  friendRoomsAsUser1     FriendRoom[]    @relation("FriendRoomUser1")
+  friendRoomsAsUser2     FriendRoom[]    @relation("FriendRoomUser2")
+  friendMessages         FriendMessage[] @relation("FriendMessages")
+
+  // 평점/리뷰
+  avgRating       Float?
+  reviewCount     Int      @default(0)
+  reviewsGiven    Review[] @relation("ReviewsGiven")
+  reviewsReceived Review[] @relation("ReviewsReceived")
+
+  // 알림
+  notifications        Notification[]
+  emailNotifications   Boolean  @default(true)  // 이메일 알림 수신 여부
+
+  // 위시리스트
+  wishlists       Wishlist[]
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+enum UserRole {
+  USER
+  ADMIN        // 중간 관리자
+  SUPER_ADMIN  // 최종 관리자
+}
+
+// ─── 카드 ────────────────────────────────────────────────────────────────
+
+model Card {
+  id          String      @id @default(uuid())
+  name        String
+  tcgType     TcgType
+  setName     String      // 세트/팩 이름
+  setCode     String?     // 공식 세트 코드
+  cardNumber  String?     // 카드 번호
+  rarity      String      // C, UC, R, RR, SR, HR, UR 등
+  imageUrl    String?
+  description String?
+  externalId  String?     @unique  // 외부 API 중복 방지 키
+  nameKo      String?              // 한국어 카드명 (검색용)
+  nameJa      String?              // 일본어 카드명 (검색용)
+  createdAt   DateTime    @default(now())
+
+  listings        Listing[]
+  oripaItems      OripaItem[]
+  inventoryItems  InventoryItem[]
+  wishlists       Wishlist[]
+
+  @@index([tcgType])
+  @@index([name])
+  @@index([nameKo])
+  @@index([nameJa])
+}
+
+enum TcgType {
+  POKEMON
+  YUGIOH
+  MTG
+  DIGIMON
+  WEISS
+  OTHER
+}
+
+// ─── 거래 리스팅 ─────────────────────────────────────────────────────────
+
+model Listing {
+  id            String        @id @default(uuid())
+  seller        User          @relation(fields: [sellerId], references: [id])
+  sellerId      String
+  card          Card          @relation(fields: [cardId], references: [id])
+  cardId        String
+  listingType   ListingType
+  condition     CardCondition
+  quantity      Int           @default(1)
+  imageUrls     String[]      // 실물 사진
+  description   String?
+
+  // 즉시구매
+  buyNowPrice   Int?
+
+  // 경매
+  startingPrice     Int?
+  currentPrice      Int?
+  auctionEndsAt     DateTime?
+  instantBuyPrice   Int?      // 경매 즉시낙찰가 (이 금액 이상 입찰 시 즉시 낙찰)
+  autoExtendMinutes Int?      // 스나이핑 방지: 마감 N분 전 입찰 시 N분 자동 연장
+  autoExtendCount   Int       @default(0)
+  maxAutoExtends    Int       @default(3)
+
+  // 가격제안
+  minOfferPrice Int?
+
+  // 그레이딩 (없으면 null → UI에서 "None" 표시)
+  gradingCompany String?  // PSA | BGS | CGC | SGC | HGA | ACE | 기타 | null
+  gradingGrade   String?  // "10", "9.5", "8" 등
+
+  status        ListingStatus @default(ACTIVE)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  bids          Bid[]
+  offers        Offer[]
+  transaction   Transaction?
+  chatRooms     ChatRoom[]
+  reports       Report[]
+
+  @@index([listingType])
+  @@index([status])
+  @@index([cardId])
+  @@index([sellerId])
+  @@index([createdAt])
+  @@index([status, listingType])
+  @@index([status, listingType, auctionEndsAt])
+}
+
+enum ListingType {
+  BUY_NOW       // 즉시구매
+  AUCTION       // 경매
+  OFFER         // 가격제안
+}
+
+enum CardCondition {
+  MINT          // 미개봉/완전무결
+  NEAR_MINT     // 거의 민트
+  EXCELLENT     // 매우 좋음
+  GOOD          // 좋음
+  LIGHT_PLAYED  // 약간 사용
+  PLAYED        // 사용
+  POOR          // 불량
+}
+
+enum ListingStatus {
+  ACTIVE        // 거래 중
+  SOLD          // 판매 완료
+  CANCELLED     // 취소
+  EXPIRED       // 만료 (경매)
+}
+
+// ─── 경매 입찰 ───────────────────────────────────────────────────────────
+
+model Bid {
+  id        String   @id @default(uuid())
+  listing   Listing  @relation(fields: [listingId], references: [id])
+  listingId String
+  bidder    User     @relation(fields: [bidderId], references: [id])
+  bidderId  String
+  amount    Int
+  isWinning Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([listingId])
+  @@index([bidderId])
+}
+
+// ─── 가격 제안 ───────────────────────────────────────────────────────────
+
+model Offer {
+  id        String      @id @default(uuid())
+  listing   Listing     @relation(fields: [listingId], references: [id])
+  listingId String
+  buyer     User        @relation("OfferBuyer", fields: [buyerId], references: [id])
+  buyerId   String
+  amount    Int
+  message   String?
+  status    OfferStatus @default(PENDING)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([listingId])
+  @@index([buyerId])
+  @@index([status])
+}
+
+enum OfferStatus {
+  PENDING   // 대기
+  ACCEPTED  // 수락
+  DECLINED  // 거절
+  WITHDRAWN // 철회
+}
+
+// ─── 거래 내역 ───────────────────────────────────────────────────────────
+
+model Transaction {
+  id               String            @id @default(uuid())
+  listing          Listing           @relation(fields: [listingId], references: [id])
+  listingId        String            @unique
+  buyer            User              @relation("TransactionBuyer", fields: [buyerId], references: [id])
+  buyerId          String
+  seller           User              @relation("TransactionSeller", fields: [sellerId], references: [id])
+  sellerId         String
+  finalPrice       Int
+
+  // 번개장터식 거래 단계
+  txStatus         TxStatus          @default(PENDING_SHIPMENT)
+
+  // 배송 정보 (판매자 입력)
+  trackingCarrier  String?           // 택배사
+  trackingNumber   String?           // 운송장 번호
+  shippedAt        DateTime?         // 발송 처리 시각
+
+  // 정산 정보
+  escrowStatus     EscrowStatus      @default(HELD)
+  escrowReleasedAt DateTime?
+  confirmedAt      DateTime?         // 구매자 수령 확인 시각
+
+  // 분쟁 정보
+  disputeStatus    DisputeStatus?
+  disputedAt       DateTime?
+
+  completedAt      DateTime          @default(now())
+
+  chatRoom         ChatRoom?
+  reports          Report[]
+  reviews          Review[]
+
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([completedAt])
+  @@index([txStatus])
+  @@index([escrowStatus])
+  @@index([txStatus, escrowStatus, shippedAt])
+}
+
+enum TxStatus {
+  PENDING_SHIPMENT  // 결제 완료, 판매자 발송 대기
+  SHIPPED           // 판매자 발송 완료, 구매자 수령 대기
+  COMPLETED         // 구매자 수령 확인 → 거래 완료
+  AUTO_COMPLETED    // 자동 구매 확정 (발송 후 7일)
+  CANCELLED         // 취소
+  AUTO_CANCELLED    // 미발송으로 자동 취소 (발송 기한 3일 초과)
+  DISPUTED          // 분쟁 중
+}
+
+enum EscrowStatus {
+  HELD          // 에스크로 보관 중
+  RELEASED      // 정산 완료
+  AUTO_RELEASED // 자동 정산
+  REFUNDED      // 환불됨 (미발송 자동 취소 or 분쟁 환불)
+}
+
+enum DisputeStatus {
+  OPEN       // 분쟁 접수
+  REVIEWING  // 검토 중
+  RESOLVED   // 해결됨
+}
+
+enum ReportReason {
+  FAKE_ITEM    // 가짜/위조 카드
+  NO_SHIPMENT  // 미발송/잠수
+  WRONG_ITEM   // 다른 물품 발송
+  DAMAGED_ITEM // 손상 물품 발송
+  FRAUD        // 사기 의심
+  HARASSMENT   // 괴롭힘/욕설
+  OTHER        // 기타
+}
+
+enum ReportStatus {
+  PENDING       // 접수됨
+  INVESTIGATING // 조사 중
+  RESOLVED      // 해결됨
+  DISMISSED     // 기각됨
+}
+
+// ─── 채팅 ─────────────────────────────────────────────────────────────────────
+
+model ChatRoom {
+  id            String        @id @default(uuid())
+  listingId     String
+  listing       Listing       @relation(fields: [listingId], references: [id])
+  buyerId       String
+  buyer         User          @relation("ChatBuyer", fields: [buyerId], references: [id])
+  sellerId      String
+  seller        User          @relation("ChatSeller", fields: [sellerId], references: [id])
+  transactionId String?       @unique
+  transaction   Transaction?  @relation(fields: [transactionId], references: [id])
+  messages      ChatMessage[]
+  lastMessageAt DateTime?
+  createdAt     DateTime      @default(now())
+
+  @@unique([listingId, buyerId])
+  @@index([buyerId])
+  @@index([sellerId])
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  room      ChatRoom @relation(fields: [roomId], references: [id])
+  roomId    String
+  senderId  String
+  sender    User     @relation("ChatMessages", fields: [senderId], references: [id])
+  content   String
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([roomId, createdAt])
+}
+
+// ─── 오리파 ──────────────────────────────────────────────────────────────
+
+model Oripa {
+  id          String      @id @default(uuid())
+  title       String
+  description String?
+  imageUrl    String?
+  pricePerDraw Int        // 1회 뽑기 가격
+  totalSlots  Int         // 전체 슬롯 수
+  remainSlots Int         // 남은 슬롯 수
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  items       OripaItem[]
+  purchases   OripaPurchase[]
+}
+
+model OripaItem {
+  id        String  @id @default(uuid())
+  oripa     Oripa   @relation(fields: [oripaId], references: [id])
+  oripaId   String
+  card      Card    @relation(fields: [cardId], references: [id])
+  cardId    String
+  quantity  Int     @default(1)
+  grade     Int     @default(1) // 등급 (1=일반, 2=레어, 3=최상위)
+  weight    Int     @default(0) // 커스텀 가중치 (0=등급 기반 자동)
+  isLastOne Boolean @default(false) // 라스트 원 보장 아이템
+
+  @@index([oripaId])
+}
+
+// ─── 결제 로그 (중복 결제 방지용) ────────────────────────────────────────────
+
+model PaymentLog {
+  id         String   @id @default(uuid())
+  orderId    String   @unique  // 토스페이먼츠 orderId (멱등성 키)
+  userId     String
+  amount     Int
+  status     String   @default("SUCCESS")
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ─── 인벤토리 ─────────────────────────────────────────────────────────────
+
+model InventoryItem {
+  id              String         @id @default(uuid())
+  userId          String
+  user            User           @relation(fields: [userId], references: [id])
+  cardId          String
+  card            Card           @relation(fields: [cardId], references: [id])
+  quantity        Int            @default(1)
+  source          ItemSource
+  sourceId        String?        // Transaction.id 또는 OripaPurchase.id
+  condition       CardCondition?
+  gradingCompany  String?
+  gradingGrade    String?
+  imageUrls       String[]       @default([])
+  note            String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  shippingItems   ShippingRequestItem[]
+
+  @@index([userId])
+  @@index([cardId])
+}
+
+enum ItemSource {
+  PURCHASE
+  ORIPA
+}
+
+model ShippingRequest {
+  id              String                @id @default(uuid())
+  userId          String
+  user            User                  @relation(fields: [userId], references: [id])
+  items           ShippingRequestItem[]
+  recipientName   String
+  phone           String
+  zipCode         String
+  address         String
+  addressDetail   String?
+  memo            String?
+  status          ShippingStatus        @default(PENDING)
+  trackingNumber  String?
+  courier         String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+model ShippingRequestItem {
+  id                String          @id @default(uuid())
+  shippingRequestId String
+  shippingRequest   ShippingRequest @relation(fields: [shippingRequestId], references: [id], onDelete: Cascade)
+  inventoryItemId   String
+  inventoryItem     InventoryItem   @relation(fields: [inventoryItemId], references: [id])
+  quantity          Int             @default(1)
+}
+
+enum ShippingStatus {
+  PENDING     // 신청됨
+  PROCESSING  // 처리 중
+  SHIPPED     // 발송됨
+  DELIVERED   // 배송 완료
+  CANCELLED   // 취소
+}
+
+// ─── 환전 신청 ────────────────────────────────────────────────────────────
+
+model WithdrawalRequest {
+  id              String           @id @default(uuid())
+  user            User             @relation(fields: [userId], references: [id])
+  userId          String
+  amount          Int              // 환전 신청 금액 (포인트)
+  bankName        String           // 은행명
+  accountNumber   String           // 계좌번호
+  accountHolder   String           // 예금주
+  status          WithdrawalStatus @default(PENDING)
+  adminNote       String?          // 거절 사유 등
+  transferId      String?          // 이체 트랜잭션 ID (Toss 등)
+  transferError   String?          // 이체 실패 메시지
+  processedAt     DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum WithdrawalStatus {
+  PENDING    // 대기 중
+  APPROVED   // 승인 (송금 처리 중)
+  COMPLETED  // 완료 (송금 완료)
+  REJECTED   // 거절 (잔액 환불)
+  CANCELLED  // 취소 (사용자, 잔액 환불)
+}
+
+model OripaPurchase {
+  id        String   @id @default(uuid())
+  oripa     Oripa    @relation(fields: [oripaId], references: [id])
+  oripaId   String
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  draws     Int      // 뽑기 횟수
+  results   Json     // 뽑기 결과 (카드 목록)
+  totalPaid Int
+  createdAt DateTime @default(now())
+
+  @@index([oripaId])
+  @@index([userId])
+}
+
+// ─── 관리자 샵 (TCG 박스 판매) ─────────────────────────────────────────────
+
+model ShopItem {
+  id          String       @id @default(uuid())
+  name        String
+  description String?
+  tcgType     TcgType
+  category    ShopCategory
+  price       Int                    // 포인트
+  stock       Int          @default(0)
+  imageUrl    String?
+  isActive    Boolean      @default(true)
+  isSoldOut   Boolean      @default(false)  // 명시적 품절 (재고와 무관하게 관리자가 토글)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  orders      ShopOrder[]
+
+  @@index([tcgType])
+  @@index([isActive])
+  @@index([isSoldOut])
+}
+
+enum ShopCategory {
+  BOOSTER_BOX   // 부스터 박스
+  STARTER_DECK  // 스타터 덱
+  SINGLE_PACK   // 단품 팩
+  GIFT_SET      // 기프트 세트
+  SPECIAL       // 특별판/프리미엄
+  OTHER         // 기타
+}
+
+// ─── 사이트 설정 ─────────────────────────────────────────────────────────────
+
+model SiteConfig {
+  key   String @id
+  value String
+}
+
+// ─── 관리자 권한 ─────────────────────────────────────────────────────────────
+
+model AdminPermission {
+  id      String @id @default(uuid())
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId  String
+  section String // 'posts' | 'cards' | 'shop' | 'oripas' | 'shipping' | 'withdrawal'
+
+  @@unique([userId, section])
+  @@index([userId])
+}
+
+// ─── 사이트 메뉴 설정 ───────────────────────────────────────────────────────
+
+model SiteMenu {
+  id      String  @id @default(uuid())
+  key     String  @unique
+  label   String
+  path    String
+  enabled Boolean @default(true)
+  order   Int     @default(0)
+}
+
+// ─── 게시판 ───────────────────────────────────────────────────────────────
+
+enum PostType {
+  NOTICE
+  EVENT
+  COMMUNITY
+}
+
+model Post {
+  id           String    @id @default(uuid())
+  type         PostType
+  title        String
+  content      String
+  author       User      @relation(fields: [authorId], references: [id])
+  authorId     String
+  pinned       Boolean   @default(false)
+  viewCount    Int       @default(0)
+  imageUrl     String?
+  tcgType      TcgType?  // 커뮤니티 게시글 TCG 카테고리 (선택)
+  eventStartAt DateTime?
+  eventEndAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  comments     Comment[]
+  likes        PostLike[]
+
+  @@index([type])
+  @@index([type, tcgType])
+  @@index([pinned])
+  @@index([createdAt])
+}
+
+model PostLike {
+  postId    String
+  userId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@id([postId, userId])
+  @@index([userId])
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    String
+  author    User     @relation(fields: [authorId], references: [id])
+  authorId  String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  likes     CommentLike[]
+
+  @@index([postId])
+  @@index([authorId])
+}
+
+model CommentLike {
+  commentId String
+  userId    String
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@id([commentId, userId])
+  @@index([userId])
+}
+
+model ShopOrder {
+  id          String    @id @default(uuid())
+  user        User      @relation(fields: [userId], references: [id])
+  userId      String
+  shopItem    ShopItem  @relation(fields: [shopItemId], references: [id])
+  shopItemId  String
+  quantity    Int       @default(1)
+  unitPrice   Int                    // 구매 시점 단가 스냅샷
+  totalPrice  Int
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@index([shopItemId])
+  @@index([createdAt])
+}
+
+// ─── 신고 ─────────────────────────────────────────────────────────────────────
+
+model Report {
+  id             String       @id @default(uuid())
+  reporter       User         @relation("ReportReporter", fields: [reporterId], references: [id])
+  reporterId     String
+  reportedUser   User         @relation("ReportedUser",  fields: [reportedUserId], references: [id])
+  reportedUserId String
+  listing        Listing?     @relation(fields: [listingId], references: [id])
+  listingId      String?
+  transaction    Transaction? @relation(fields: [transactionId], references: [id])
+  transactionId  String?
+  reason         ReportReason
+  detail         String?
+  status         ReportStatus @default(PENDING)
+  adminNote      String?
+  resolvedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([reporterId])
+  @@index([reportedUserId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ─── 친구 ──────────────────────────────────────────────────────────────────────
+
+model FriendRequest {
+  id         String              @id @default(uuid())
+  sender     User                @relation("FriendRequestsSent",     fields: [senderId],   references: [id], onDelete: Cascade)
+  senderId   String
+  receiver   User                @relation("FriendRequestsReceived", fields: [receiverId], references: [id], onDelete: Cascade)
+  receiverId String
+  status     FriendRequestStatus @default(PENDING)
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  @@unique([senderId, receiverId])
+  @@index([receiverId, status])
+  @@index([senderId, status])
+}
+
+enum FriendRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+model FriendRoom {
+  id            String          @id @default(uuid())
+  user1         User            @relation("FriendRoomUser1", fields: [user1Id], references: [id])
+  user1Id       String
+  user2         User            @relation("FriendRoomUser2", fields: [user2Id], references: [id])
+  user2Id       String
+  messages      FriendMessage[]
+  lastMessageAt DateTime?
+  createdAt     DateTime        @default(now())
+
+  @@unique([user1Id, user2Id])
+  @@index([user1Id])
+  @@index([user2Id])
+}
+
+model FriendMessage {
+  id        String     @id @default(uuid())
+  room      FriendRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  roomId    String
+  sender    User       @relation("FriendMessages", fields: [senderId], references: [id])
+  senderId  String
+  content   String
+  readAt    DateTime?
+  createdAt DateTime   @default(now())
+
+  @@index([roomId, createdAt])
+  @@index([senderId])
+}
+
+// ─── 평점 & 리뷰 ──────────────────────────────────────────────────────────────
+
+model Review {
+  id            String      @id @default(uuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+  reviewerId    String
+  reviewer      User        @relation("ReviewsGiven",    fields: [reviewerId],  references: [id])
+  revieweeId    String
+  reviewee      User        @relation("ReviewsReceived", fields: [revieweeId],  references: [id])
+  role          ReviewRole  // 리뷰어의 거래 역할
+  rating        Int         // 1 ~ 5
+  comment       String?     @db.VarChar(300)
+  createdAt     DateTime    @default(now())
+
+  @@unique([transactionId, reviewerId])
+  @@index([revieweeId])
+  @@index([reviewerId])
+  @@index([transactionId])
+}
+
+enum ReviewRole {
+  BUYER   // 구매자가 판매자를 평가
+  SELLER  // 판매자가 구매자를 평가
+}
+
+// ─── 알림 ─────────────────────────────────────────────────────────────────────
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String?
+  link      String?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+}
+
+// ─── 위시리스트 ───────────────────────────────────────────────────────────────
+
+model Wishlist {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cardId      String
+  card        Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  targetPrice Int?     // 이 가격 이하 리스팅 등록 시 알림 (null = 알림 없음)
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, cardId])
+  @@index([userId])
+  @@index([cardId])
+}
+
+enum NotificationType {
+  BID_OUTBID            // 입찰 밀림
+  BID_WON               // 낙찰
+  OFFER_RECEIVED        // 제안 받음
+  OFFER_ACCEPTED        // 제안 수락
+  OFFER_REJECTED        // 제안 거절
+  TRANSACTION_SHIPPED   // 발송 완료
+  TRANSACTION_COMPLETED // 거래 완료
+  REVIEW_RECEIVED       // 리뷰 받음
+  FRIEND_REQUEST        // 친구 요청
+  FRIEND_ACCEPTED       // 친구 수락
+  WISHLIST_PRICE_ALERT  // 위시리스트 가격 알림
+  SYSTEM                // 시스템 공지
+}

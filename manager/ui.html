@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🚀 서버 관리 — Rocket Auction House</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#05080f;--s1:#0a0e1a;--s2:#0e1422;
+  --border:#182030;--border-h:#263450;
+  --text:#e2e8f4;--sec:#8899bb;--muted:#4d6080;
+  --blue:#4f7aff;--gold:#f0a832;
+  --green:#34d399;--red:#f87171;--yellow:#fbbf24;--orange:#fb923c;
+}
+html,body{height:100%;overflow:hidden}
+body{font-family:-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column}
+
+/* ── Header ── */
+.hd{display:flex;align-items:center;justify-content:space-between;padding:10px 18px;background:var(--s1);border-bottom:1px solid var(--border);flex-shrink:0;gap:10px;flex-wrap:wrap}
+.hd-left{display:flex;align-items:center;gap:10px}
+.hd-logo{font-size:20px;line-height:1}
+.hd-title{font-weight:700;font-size:14px;line-height:1.3}
+.hd-sub{font-size:11px;color:var(--muted)}
+.hd-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+/* ── Toolbar ── */
+.toolbar{display:flex;align-items:center;gap:6px;padding:8px 18px;background:var(--s2);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap}
+.tb-sep{width:1px;height:20px;background:var(--border);margin:0 2px}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:7px;border:1px solid transparent;cursor:pointer;font-size:12px;font-weight:600;transition:all .13s;white-space:nowrap;font-family:inherit;line-height:1.4}
+.btn:disabled{opacity:.3;cursor:not-allowed}
+.btn-green{background:rgba(52,211,153,.1);color:var(--green);border-color:rgba(52,211,153,.28)}
+.btn-green:not(:disabled):hover{background:rgba(52,211,153,.18)}
+.btn-warn{background:rgba(251,191,36,.08);color:var(--yellow);border-color:rgba(251,191,36,.22)}
+.btn-warn:not(:disabled):hover{background:rgba(251,191,36,.15)}
+.btn-red{background:rgba(248,113,113,.08);color:var(--red);border-color:rgba(248,113,113,.22)}
+.btn-red:not(:disabled):hover{background:rgba(248,113,113,.16)}
+.btn-ghost{background:var(--s1);color:var(--sec);border-color:var(--border)}
+.btn-ghost:not(:disabled):hover{border-color:var(--border-h);color:var(--text)}
+.btn-blue{background:rgba(79,122,255,.12);color:var(--blue);border-color:rgba(79,122,255,.28)}
+.btn-blue:not(:disabled):hover{background:rgba(79,122,255,.2)}
+.btn-sm{padding:3px 8px;font-size:11px;border-radius:5px}
+
+/* ── Status badge ── */
+.status{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600}
+.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.st-running  .dot{background:var(--green);box-shadow:0 0 7px var(--green);animation:blink 1.8s ease-in-out infinite}
+.st-stopped  .dot{background:var(--muted)}
+.st-starting .dot{background:var(--yellow);animation:blink .65s ease-in-out infinite}
+.st-stopping .dot{background:var(--orange);animation:blink .65s ease-in-out infinite}
+.st-error    .dot{background:var(--red)}
+.st-unknown  .dot{background:var(--border-h)}
+.st-running {color:var(--green)}
+.st-stopped {color:var(--muted)}
+.st-starting{color:var(--yellow)}
+.st-stopping{color:var(--orange)}
+.st-error   {color:var(--red)}
+.st-unknown {color:var(--border-h)}
+@keyframes blink{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.68)}}
+
+/* ── PostgreSQL bar ── */
+.pg-bar{display:flex;align-items:center;gap:10px;padding:6px 18px;background:var(--s2);border-bottom:1px solid var(--border);flex-shrink:0}
+.pg-label{font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.04em}
+
+/* ── Two-column layout ── */
+.cols{display:grid;grid-template-columns:1fr 1fr;flex:1;overflow:hidden;min-height:0}
+
+/* ── Panel ── */
+.panel{display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--border)}
+.panel:last-child{border-right:none}
+
+/* ── Server card ── */
+.srv{padding:13px 18px 12px;border-bottom:1px solid var(--border);background:var(--s1);flex-shrink:0}
+.srv-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:9px}
+.srv-name{font-weight:700;font-size:13px}
+.srv-meta{display:flex;align-items:center;gap:8px;margin-top:3px}
+.srv-port{font-family:monospace;font-size:10.5px;color:var(--muted);background:var(--s2);border:1px solid var(--border);padding:1px 6px;border-radius:4px}
+.uptime{font-size:10px;color:var(--border-h);font-family:monospace}
+.srv-acts{display:flex;gap:5px;flex-wrap:wrap}
+
+/* ── Log pane ── */
+.log-head{display:flex;align-items:center;justify-content:space-between;padding:6px 14px;background:var(--s2);border-bottom:1px solid var(--border);flex-shrink:0}
+.log-label{font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.07em}
+.log-meta{display:flex;align-items:center;gap:6px}
+.log-cnt{font-size:10px;color:var(--border-h);font-family:monospace}
+.log-body{flex:1;overflow-y:auto;padding:3px 0;font-family:'Cascadia Code','JetBrains Mono',Consolas,'Courier New',monospace;font-size:11px;line-height:1.7;min-height:0}
+.log-body::-webkit-scrollbar{width:4px}
+.log-body::-webkit-scrollbar-track{background:transparent}
+.log-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.log-line{display:flex;gap:9px;padding:0 14px;align-items:baseline}
+.log-line:hover{background:rgba(255,255,255,.016)}
+.log-ts{color:var(--border-h);flex-shrink:0;user-select:none;font-size:10px}
+.log-txt{word-break:break-all}
+.log-txt.sys {color:#4f7aff}
+.log-txt.err {color:#f87171}
+.log-txt.warn{color:#fbbf24}
+.log-txt.ok  {color:#34d399}
+.log-txt.req {color:#5a7a9a}
+.log-txt.info{color:#4d6080}
+
+/* ── Responsive ── */
+@media(max-width:680px){.cols{grid-template-columns:1fr}.panel{border-right:none;border-bottom:1px solid var(--border)}}
+</style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header class="hd">
+  <div class="hd-left">
+    <span class="hd-logo">🚀</span>
+    <div>
+      <div class="hd-title">Rocket Auction House</div>
+      <div class="hd-sub">서버 관리자 · localhost:3900</div>
+    </div>
+  </div>
+  <div class="hd-right">
+    <button class="btn btn-ghost" onclick="doShutdown()" title="관리자 프로세스 종료">✕ 종료</button>
+  </div>
+</header>
+
+<!-- ── PostgreSQL ── -->
+<div class="pg-bar">
+  <span class="pg-label">PostgreSQL</span>
+  <div class="status st-unknown" id="st-postgres">
+    <span class="dot"></span>
+    <span class="st-txt">확인 중...</span>
+  </div>
+  <button class="btn btn-blue btn-sm" id="btn-pg-start" onclick="startPostgres()">▶ 시작</button>
+</div>
+
+<!-- ── Toolbar ── -->
+<div class="toolbar">
+  <button class="btn btn-green" onclick="actionAll('start')">▶ 전체 시작</button>
+  <button class="btn btn-warn"  onclick="actionAll('restart')">↺ 전체 재시작</button>
+  <button class="btn btn-red"   onclick="actionAll('stop')">■ 전체 중지</button>
+  <span class="tb-sep"></span>
+  <button class="btn btn-ghost btn-sm" onclick="window.open('http://localhost:3000')">↗ 프론트 열기</button>
+  <button class="btn btn-ghost btn-sm" onclick="window.open('http://localhost:4000')">↗ 백엔드 열기</button>
+</div>
+
+<!-- ── Main ── -->
+<div class="cols">
+
+  <!-- Backend -->
+  <div class="panel">
+    <div class="srv">
+      <div class="srv-head">
+        <div>
+          <div class="srv-name">백엔드 서버</div>
+          <div class="srv-meta">
+            <div class="status st-stopped" id="st-backend">
+              <span class="dot"></span>
+              <span class="st-txt">중지됨</span>
+            </div>
+            <span class="uptime" id="up-backend"></span>
+            <span class="srv-port">:4000</span>
+          </div>
+        </div>
+      </div>
+      <div class="srv-acts">
+        <button class="btn btn-green btn-sm" id="btn-backend-start"   onclick="act('backend','start')">▶ 시작</button>
+        <button class="btn btn-warn  btn-sm" id="btn-backend-restart" onclick="act('backend','restart')" disabled>↺ 재시작</button>
+        <button class="btn btn-red   btn-sm" id="btn-backend-stop"    onclick="act('backend','stop')"    disabled>■ 중지</button>
+      </div>
+    </div>
+    <div class="log-head">
+      <span class="log-label">백엔드 로그</span>
+      <div class="log-meta">
+        <span class="log-cnt" id="cnt-backend">0줄</span>
+        <button class="btn btn-ghost btn-sm" onclick="clearLog('backend')">지우기</button>
+      </div>
+    </div>
+    <div class="log-body" id="log-backend"></div>
+  </div>
+
+  <!-- Frontend -->
+  <div class="panel">
+    <div class="srv">
+      <div class="srv-head">
+        <div>
+          <div class="srv-name">프론트엔드 서버</div>
+          <div class="srv-meta">
+            <div class="status st-stopped" id="st-frontend">
+              <span class="dot"></span>
+              <span class="st-txt">중지됨</span>
+            </div>
+            <span class="uptime" id="up-frontend"></span>
+            <span class="srv-port">:3000</span>
+          </div>
+        </div>
+      </div>
+      <div class="srv-acts">
+        <button class="btn btn-green btn-sm" id="btn-frontend-start"   onclick="act('frontend','start')">▶ 시작</button>
+        <button class="btn btn-warn  btn-sm" id="btn-frontend-restart" onclick="act('frontend','restart')" disabled>↺ 재시작</button>
+        <button class="btn btn-red   btn-sm" id="btn-frontend-stop"    onclick="act('frontend','stop')"    disabled>■ 중지</button>
+      </div>
+    </div>
+    <div class="log-head">
+      <span class="log-label">프론트엔드 로그</span>
+      <div class="log-meta">
+        <span class="log-cnt" id="cnt-frontend">0줄</span>
+        <button class="btn btn-ghost btn-sm" onclick="clearLog('frontend')">지우기</button>
+      </div>
+    </div>
+    <div class="log-body" id="log-frontend"></div>
+  </div>
+
+</div>
+
+<script>
+const ST_LABEL = {
+  running:'실행 중', stopped:'중지됨',
+  starting:'시작 중...', stopping:'종료 중...', error:'오류', unknown:'확인 중...'
+}
+const counts    = { backend: 0, frontend: 0 }
+const startedAt = { backend: null, frontend: null }
+
+// ── Log ────────────────────────────────────────────────────────────────────────
+function classify(e) {
+  if (e.type === 'sys') return 'sys'
+  if (e.type === 'err') return /warn/i.test(e.line) ? 'warn' : 'err'
+  if (/\berror\b|Error|\bERR\b/i.test(e.line)) return 'err'
+  if (/warn|Warning/i.test(e.line))             return 'warn'
+  if (/✓|✅|ready|compiled|Local:|listening|started/i.test(e.line)) return 'ok'
+  if (/GET |POST |PUT |DELETE |PATCH /i.test(e.line)) return 'req'
+  return 'info'
+}
+
+function fmtTime(ms) {
+  return new Date(ms).toLocaleTimeString('ko-KR', { hour12: false })
+}
+
+function appendLog(name, entry) {
+  const box = document.getElementById(`log-${name}`)
+  const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 50
+
+  const row = document.createElement('div')
+  row.className = 'log-line'
+  const ts = document.createElement('span')
+  ts.className = 'log-ts'; ts.textContent = fmtTime(entry.t)
+  const txt = document.createElement('span')
+  txt.className = `log-txt ${classify(entry)}`; txt.textContent = entry.line
+  row.append(ts, txt)
+  box.appendChild(row)
+
+  while (box.children.length > 300) box.removeChild(box.firstChild)
+  counts[name]++
+  document.getElementById(`cnt-${name}`).textContent = `${counts[name]}줄`
+  if (atBottom) box.scrollTop = box.scrollHeight
+}
+
+// ── Status ─────────────────────────────────────────────────────────────────────
+function setStatus(name, status) {
+  const badge = document.getElementById(`st-${name}`)
+  if (!badge) return
+  badge.className = `status st-${status}`
+  badge.querySelector('.st-txt').textContent = ST_LABEL[status] ?? status
+
+  if (name === 'postgres') {
+    document.getElementById('btn-pg-start').disabled = status === 'running'
+    return
+  }
+
+  const isStopped = status === 'stopped' || status === 'error'
+  document.getElementById(`btn-${name}-start`).disabled   = !isStopped
+  document.getElementById(`btn-${name}-stop`).disabled    = isStopped
+  document.getElementById(`btn-${name}-restart`).disabled = isStopped
+
+  if (status === 'running' && !startedAt[name]) {
+    startedAt[name] = Date.now()
+    tickUptime(name)
+  }
+  if (isStopped) {
+    startedAt[name] = null
+    document.getElementById(`up-${name}`).textContent = ''
+  }
+}
+
+function tickUptime(name) {
+  if (!startedAt[name]) return
+  const s = Math.floor((Date.now() - startedAt[name]) / 1000)
+  const str = s < 60 ? `${s}s`
+            : s < 3600 ? `${Math.floor(s/60)}m ${s%60}s`
+            : `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m`
+  document.getElementById(`up-${name}`).textContent = str
+  setTimeout(() => tickUptime(name), 1000)
+}
+
+// ── SSE ────────────────────────────────────────────────────────────────────────
+function connectStatus() {
+  const src = new EventSource('/status/stream')
+  src.onmessage = e => {
+    const d = JSON.parse(e.data)
+    setStatus('backend',  d.backend.status)
+    setStatus('frontend', d.frontend.status)
+    if (d.postgres) setStatus('postgres', d.postgres.status)
+  }
+  src.onerror = () => { src.close(); setTimeout(connectStatus, 2000) }
+}
+
+function connectLog(name) {
+  const src = new EventSource(`/logs/${name}`)
+  src.onmessage = e => appendLog(name, JSON.parse(e.data))
+  src.onerror   = () => { src.close(); setTimeout(() => connectLog(name), 2000) }
+}
+
+// ── Actions ────────────────────────────────────────────────────────────────────
+function act(server, action) {
+  fetch('/action', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ server, action }),
+  })
+}
+
+function actionAll(action) {
+  act('backend', action)
+  act('frontend', action)
+}
+
+function clearLog(name) {
+  fetch(`/logs/${name}/clear`, { method: 'POST' })
+  document.getElementById(`log-${name}`).innerHTML = ''
+  counts[name] = 0
+  document.getElementById(`cnt-${name}`).textContent = '0줄'
+}
+
+function startPostgres() {
+  document.getElementById('btn-pg-start').disabled = true
+  fetch('/postgres/start', { method: 'POST' })
+    .then(r => r.json())
+    .then(d => { if (d.msg) alert(d.msg) })
+    .catch(() => {})
+    .finally(() => { document.getElementById('btn-pg-start').disabled = false })
+}
+
+function doShutdown() {
+  if (!confirm('서버 관리자와 실행 중인 모든 서버를 종료합니까?')) return
+  fetch('/shutdown', { method: 'POST' }).finally(() => {
+    document.body.innerHTML = `
+      <div style="height:100vh;display:flex;align-items:center;justify-content:center;
+        flex-direction:column;gap:14px;font-family:sans-serif;color:#4d6080;background:#05080f">
+        <span style="font-size:36px">🛑</span>
+        <span style="font-size:15px;color:#e2e8f4">관리자가 종료되었습니다</span>
+        <span style="font-size:12px">이 창을 닫아도 됩니다.</span>
+      </div>`
+  })
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────────
+connectStatus()
+connectLog('backend')
+connectLog('frontend')
+</script>
+</body>
+</html>
