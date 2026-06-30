@@ -52,7 +52,7 @@ import { authLimiter, paymentLimiter, uploadLimiter, apiLimiter } from '../middl
 import {
   getShopItems, getShopItem, buyShopItem, getMyShopOrders,
   adminGetShopItems, adminCreateShopItem, adminUpdateShopItem, adminDeleteShopItem, adminRestockShopItem, adminToggleSoldOut,
-  adminGetShopStats, adminGetShopOrders,
+  adminGetShopStats, adminGetShopOrders, adminUpdateShopOrderShipping,
 } from '../controllers/shop.controller'
 import { getOrCreateRoom, getMyRooms, getRoomMessages, getUnreadCount } from '../controllers/chat.controller'
 import { shipItem, confirmReceipt, adminReleaseEscrow, getCarriers } from '../controllers/escrow.controller'
@@ -112,8 +112,9 @@ router.get('/shop', getShopItems)
 router.get('/shop/:id', getShopItem)
 router.post('/shop/:id/buy', authenticate, buyShopItem)
 router.get('/my/shop-orders', authenticate, getMyShopOrders)
-router.get('/admin/shop/stats',          authenticate, requireSection('shop'), adminGetShopStats)
-router.get('/admin/shop/orders',         authenticate, requireSection('shop'), adminGetShopOrders)
+router.get('/admin/shop/stats',                    authenticate, requireSection('shop'), adminGetShopStats)
+router.get('/admin/shop/orders',                   authenticate, requireSection('shop'), adminGetShopOrders)
+router.patch('/admin/shop/orders/:id/shipping',    authenticate, requireSection('shop'), adminUpdateShopOrderShipping)
 router.get('/admin/shop',                authenticate, requireSection('shop'), adminGetShopItems)
 router.post('/admin/shop',           authenticate, requireSection('shop'), adminCreateShopItem)
 router.patch('/admin/shop/:id',      authenticate, requireSection('shop'), adminUpdateShopItem)

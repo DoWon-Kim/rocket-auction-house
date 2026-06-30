@@ -1,6 +1,6 @@
 import { Request, Response } from 'express'
 import { z } from 'zod'
-import { TcgType, ShopCategory } from '@prisma/client'
+import { TcgType, ShopCategory, ShopOrderStatus } from '@prisma/client'
 import { prisma } from '../lib/prisma'
 import { AuthRequest } from '../middleware/auth'
 
@@ -55,12 +55,23 @@ export async function getShopItem(req: Request, res: Response) {
 // 구매 (로그인 필요)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const buySchema = z.object({ quantity: z.number().int().min(1).max(10).default(1) })
+const buySchema = z.object({
+  quantity:      z.number().int().min(1).max(10).default(1),
+  recipientName:  z.string().min(1, '수령인 이름을 입력해주세요.').max(50),
+  recipientPhone: z.string().min(1, '연락처를 입력해주세요.').max(20),
+  zipCode:        z.string().min(1, '우편번호를 입력해주세요.').max(10),
+  address:        z.string().min(1, '주소를 입력해주세요.').max(200),
+  addressDetail:  z.string().max(100).optional(),
+  shippingMemo:   z.string().max(200).optional(),
+})
 
 export async function buyShopItem(req: AuthRequest, res: Response) {
   const parsed = buySchema.safeParse(req.body)
-  if (!parsed.success) { res.status(400).json({ message: '수량이 올바르지 않습니다.' }); return }
-  const { quantity } = parsed.data
+  if (!parsed.success) {
+    const firstErr = Object.values(parsed.error.flatten().fieldErrors)[0]?.[0]
+    res.status(400).json({ message: firstErr ?? '입력값을 확인해주세요.' }); return
+  }
+  const { quantity, recipientName, recipientPhone, zipCode, address, addressDetail, shippingMemo } = parsed.data
 
   try {
     const item = await prisma.shopItem.findUnique({ where: { id: String(req.params['id']) } })
@@ -96,7 +107,12 @@ export async function buyShopItem(req: AuthRequest, res: Response) {
       }
 
       return tx.shopOrder.create({
-        data: { userId: req.userId!, shopItemId: item.id, quantity, unitPrice: item.price, totalPrice },
+        data: {
+          userId: req.userId!, shopItemId: item.id, quantity, unitPrice: item.price, totalPrice,
+          recipientName, recipientPhone, zipCode, address,
+          addressDetail: addressDetail ?? null,
+          shippingMemo:  shippingMemo  ?? null,
+        },
       })
     })
 
@@ -122,6 +138,7 @@ export async function getMyShopOrders(req: AuthRequest, res: Response) {
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
+        // 배송 정보 포함
       }),
       prisma.shopOrder.count({ where }),
     ])
@@ -215,15 +232,17 @@ export async function adminGetShopStats(req: AuthRequest, res: Response) {
 
 // 주문 목록 (관리자)
 export async function adminGetShopOrders(req: AuthRequest, res: Response) {
-  const page       = Math.max(1, Number(req.query.page ?? 1))
-  const limit      = 20
-  const shopItemId = req.query.shopItemId as string | undefined
-  const dateFrom   = req.query.dateFrom   as string | undefined
-  const dateTo     = req.query.dateTo     as string | undefined
+  const page           = Math.max(1, Number(req.query.page ?? 1))
+  const limit          = 20
+  const shopItemId     = req.query.shopItemId     as string | undefined
+  const dateFrom       = req.query.dateFrom       as string | undefined
+  const dateTo         = req.query.dateTo         as string | undefined
+  const shippingStatus = req.query.shippingStatus as ShopOrderStatus | undefined
 
   try {
     const where = {
-      ...(shopItemId ? { shopItemId } : {}),
+      ...(shopItemId     ? { shopItemId }     : {}),
+      ...(shippingStatus ? { shippingStatus } : {}),
       ...((dateFrom || dateTo) ? {
         createdAt: {
           ...(dateFrom ? { gte: new Date(dateFrom) }              : {}),
@@ -249,6 +268,32 @@ export async function adminGetShopOrders(req: AuthRequest, res: Response) {
     res.json({ orders, total, page, limit, totalPages: Math.ceil(total / limit) })
   } catch (err) {
     console.error('[adminGetShopOrders]', err)
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' })
+  }
+}
+
+// 배송 상태 업데이트 (관리자)
+const shippingUpdateSchema = z.object({
+  shippingStatus: z.nativeEnum(ShopOrderStatus).optional(),
+  trackingNumber: z.string().max(100).optional(),
+  courier:        z.string().max(50).optional(),
+})
+
+export async function adminUpdateShopOrderShipping(req: AuthRequest, res: Response) {
+  const parsed = shippingUpdateSchema.safeParse(req.body)
+  if (!parsed.success) { res.status(400).json({ message: '입력값 오류' }); return }
+  try {
+    const order = await prisma.shopOrder.update({
+      where: { id: String(req.params['id']) },
+      data:  parsed.data,
+      include: {
+        user:     { select: { id: true, nickname: true } },
+        shopItem: { select: { name: true } },
+      },
+    })
+    res.json(order)
+  } catch (err) {
+    console.error('[adminUpdateShopOrderShipping]', err)
     res.status(500).json({ message: '서버 오류가 발생했습니다.' })
   }
 }

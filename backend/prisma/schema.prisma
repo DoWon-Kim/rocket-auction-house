@@ -656,19 +656,39 @@ model CommentLike {
 }
 
 model ShopOrder {
-  id          String    @id @default(uuid())
-  user        User      @relation(fields: [userId], references: [id])
+  id          String          @id @default(uuid())
+  user        User            @relation(fields: [userId], references: [id])
   userId      String
-  shopItem    ShopItem  @relation(fields: [shopItemId], references: [id])
+  shopItem    ShopItem        @relation(fields: [shopItemId], references: [id])
   shopItemId  String
-  quantity    Int       @default(1)
-  unitPrice   Int                    // 구매 시점 단가 스냅샷
+  quantity    Int             @default(1)
+  unitPrice   Int
   totalPrice  Int
-  createdAt   DateTime  @default(now())
+
+  recipientName  String?
+  recipientPhone String?
+  zipCode        String?
+  address        String?
+  addressDetail  String?
+  shippingMemo   String?
+  shippingStatus ShopOrderStatus @default(PENDING)
+  trackingNumber String?
+  courier        String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([userId])
   @@index([shopItemId])
+  @@index([shippingStatus])
   @@index([createdAt])
+}
+
+enum ShopOrderStatus {
+  PENDING    // 결제 완료, 배송 준비 중
+  PREPARING  // 포장 중
+  SHIPPED    // 발송 완료
+  DELIVERED  // 배송 완료
 }
 
 // ─── 신고 ─────────────────────────────────────────────────────────────────────

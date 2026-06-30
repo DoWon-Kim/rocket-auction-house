@@ -1351,6 +1351,13 @@ const SHOP_CAT: Record<string, string> = {
   GIFT_SET: '기프트 세트', SPECIAL: '특별판', OTHER: '기타',
 }
 
+const SHIP_STATUS_MY: Record<string, { label: string; color: string }> = {
+  PENDING:   { label: '배송 준비 중', color: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20' },
+  PREPARING: { label: '포장 중',      color: 'text-blue-400 bg-blue-400/10 border-blue-400/20' },
+  SHIPPED:   { label: '배송 중',      color: 'text-indigo-400 bg-indigo-400/10 border-indigo-400/20' },
+  DELIVERED: { label: '배송 완료',    color: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' },
+}
+
 function ShopOrdersTab() {
   const [page, setPage] = useState(1)
   const { data, isLoading } = useQuery({
@@ -1365,31 +1372,45 @@ function ShopOrdersTab() {
       {isLoading ? <SkeletonList /> : orders.length === 0 ? <EmptyState text="샵 구매 내역이 없습니다." /> : (
         orders.map((order: {
           id: string; quantity: number; unitPrice: number; totalPrice: number; createdAt: string
+          shippingStatus: string; trackingNumber: string | null; courier: string | null
+          recipientName: string | null; address: string | null
           shopItem: { name: string; imageUrl: string | null; tcgType: string; category: string }
-        }) => (
-          <div key={order.id} className="bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] rounded-2xl p-4 flex items-center gap-4 transition-colors">
-            <div className="w-10 h-12 bg-[#2a1c0c] rounded-xl overflow-hidden shrink-0 border border-[#2e2318]">
-              {order.shopItem.imageUrl
-                ? <Image src={order.shopItem.imageUrl} alt={order.shopItem.name} width={40} height={48} className="object-cover w-full h-full" />
-                : <div className="flex items-center justify-center h-full text-[#5a4830]"><Store size={14} /></div>
-              }
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-[#f5ead8] truncate">{order.shopItem.name}</p>
-              <div className="flex items-center gap-2 text-xs text-[#7a6040] mt-0.5 flex-wrap">
-                <span>{TCG_LABELS[order.shopItem.tcgType]}</span>
-                <span>{SHOP_CAT[order.shopItem.category]}</span>
-                <span>·</span>
-                <span>{order.quantity}개</span>
-                <span>·</span>
-                <span>{format(new Date(order.createdAt), 'yy.MM.dd', { locale: ko })}</span>
+        }) => {
+          const st = SHIP_STATUS_MY[order.shippingStatus] ?? { label: order.shippingStatus, color: '' }
+          return (
+            <div key={order.id} className="bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] rounded-2xl p-4 transition-colors">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-[#0e0c09] rounded-xl overflow-hidden shrink-0 border border-[#2e2318]">
+                  {order.shopItem.imageUrl
+                    ? <Image src={order.shopItem.imageUrl} alt={order.shopItem.name} width={40} height={40} className="object-contain w-full h-full" />
+                    : <div className="flex items-center justify-center h-full text-[#5a4830]"><Store size={14} /></div>
+                  }
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-semibold text-[#f5ead8] truncate">{order.shopItem.name}</p>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${st.color}`}>{st.label}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-[#7a6040] mt-0.5 flex-wrap">
+                    <span>{TCG_LABELS[order.shopItem.tcgType]}</span>
+                    <span>{SHOP_CAT[order.shopItem.category]}</span>
+                    <span>·</span><span>{order.quantity}개</span>
+                    <span>·</span><span>{format(new Date(order.createdAt), 'yy.MM.dd', { locale: ko })}</span>
+                  </div>
+                </div>
+                <p className="text-[#f0a832] font-bold tabular-nums text-sm shrink-0">{order.totalPrice.toLocaleString()}P</p>
               </div>
+              {(order.courier || order.trackingNumber || order.address) && (
+                <div className="mt-3 pt-3 border-t border-[#2e2318] text-xs text-[#7a6040] space-y-0.5">
+                  {order.address && <p>배송지: {order.recipientName} · {order.address}</p>}
+                  {order.courier && order.trackingNumber && (
+                    <p className="text-[#d4a853]/80">{order.courier} · 운송장: {order.trackingNumber}</p>
+                  )}
+                </div>
+              )}
             </div>
-            <p className="text-[#f0a832] font-bold tabular-nums text-sm shrink-0">
-              {order.totalPrice.toLocaleString()} P
-            </p>
-          </div>
-        ))
+          )
+        })
       )}
       <Pagination page={page} total={totalPages} onPageChange={setPage} />
     </div>

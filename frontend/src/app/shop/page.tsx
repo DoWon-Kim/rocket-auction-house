@@ -57,48 +57,74 @@ function Pagination({ page, total, onChange }: { page: number; total: number; on
   )
 }
 
+const EMPTY_ADDR = { recipientName: '', recipientPhone: '', zipCode: '', address: '', addressDetail: '', shippingMemo: '' }
+
 function BuyModal({ item, onClose }: { item: ShopItem; onClose: () => void }) {
   const { user } = useAuthStore()
   const router = useRouter()
   const qc = useQueryClient()
+  const [step, setStep] = useState<'qty' | 'addr' | 'done'>('qty')
   const [qty, setQty] = useState(1)
-  const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null)
+  const [addr, setAddr] = useState(EMPTY_ADDR)
+  const [errMsg, setErrMsg] = useState('')
 
   const mut = useMutation({
-    mutationFn: () => api.post(`/shop/${item.id}/buy`, { quantity: qty }),
-    onSuccess: (res) => {
-      setResult({ ok: true, msg: `구매 완료! ${res.data.totalPrice.toLocaleString()}P 결제되었습니다.` })
+    mutationFn: () => api.post(`/shop/${item.id}/buy`, { quantity: qty, ...addr }),
+    onSuccess: () => {
+      setStep('done')
       qc.invalidateQueries({ queryKey: ['shop'] })
       qc.invalidateQueries({ queryKey: ['me'] })
     },
     onError: (e: { response?: { data?: { message?: string } } }) =>
-      setResult({ ok: false, msg: e.response?.data?.message ?? '구매 실패' }),
+      setErrMsg(e.response?.data?.message ?? '구매 실패'),
   })
 
   const total = item.price * qty
 
+  const addrValid = addr.recipientName && addr.recipientPhone && addr.zipCode && addr.address
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/70" onClick={onClose}>
       <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl p-6 w-full max-w-sm space-y-4" onClick={e => e.stopPropagation()}>
+        {/* 헤더 */}
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0 pr-3">
             <h3 className="font-bold text-base leading-tight mb-1 text-[#f5ead8]">{item.name}</h3>
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs text-[#8a7055]">{TCG_LABELS[item.tcgType]}</span>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${CATEGORY_COLOR[item.category]}`}>
-                {CATEGORY_LABELS[item.category]}
-              </span>
+              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${CATEGORY_COLOR[item.category]}`}>{CATEGORY_LABELS[item.category]}</span>
             </div>
           </div>
           <button onClick={onClose} className="text-[#5a4830] hover:text-[#f5ead8] shrink-0 transition-colors"><X size={18} /></button>
         </div>
 
-        {result ? (
-          <div className={`flex items-start gap-2 rounded-xl px-4 py-3 text-sm ${result.ok ? 'bg-emerald-950/50 border border-emerald-800/50 text-emerald-400' : 'bg-red-950/50 border border-red-800/50 text-red-400'}`}>
-            {result.ok ? <CheckCircle size={16} className="shrink-0 mt-0.5" /> : <AlertCircle size={16} className="shrink-0 mt-0.5" />}
-            {result.msg}
+        {/* 스텝 인디케이터 */}
+        {step !== 'done' && (
+          <div className="flex items-center gap-2 text-xs text-[#5a4830]">
+            <span className={step === 'qty' ? 'text-[#d4a853] font-semibold' : 'text-[#5a4830]'}>① 수량 선택</span>
+            <span>›</span>
+            <span className={step === 'addr' ? 'text-[#d4a853] font-semibold' : 'text-[#5a4830]'}>② 배송지 입력</span>
+            <span>›</span>
+            <span>③ 구매 완료</span>
           </div>
-        ) : (
+        )}
+
+        {/* 완료 */}
+        {step === 'done' && (
+          <div className="space-y-3">
+            <div className="flex items-start gap-2 rounded-xl px-4 py-3 text-sm bg-emerald-950/50 border border-emerald-800/50 text-emerald-400">
+              <CheckCircle size={16} className="shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold">구매가 완료됐습니다!</p>
+                <p className="text-xs mt-0.5 text-emerald-500/80">{total.toLocaleString()}P 결제 · 마이페이지에서 배송 현황을 확인하세요.</p>
+              </div>
+            </div>
+            <button onClick={onClose} className="w-full bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] hover:text-[#e8d5b0] py-2.5 rounded-xl text-sm transition-colors">닫기</button>
+          </div>
+        )}
+
+        {/* 1단계 - 수량 */}
+        {step === 'qty' && (
           <>
             <div className="bg-[#1a1208] border border-[#2e2318] rounded-xl p-4 space-y-3">
               <div className="flex justify-between text-sm">
@@ -129,18 +155,57 @@ function BuyModal({ item, onClose }: { item: ShopItem; onClose: () => void }) {
                 </p>
               )}
             </div>
-            <button onClick={() => { if (!user) { router.push('/login'); return } mut.mutate() }}
-              disabled={mut.isPending || (!!user && user.balance < total)}
+            <button
+              onClick={() => { if (!user) { router.push('/login'); return } if (user.balance >= total) setStep('addr') }}
+              disabled={!!user && user.balance < total}
               className="w-full bg-[#d4a853] hover:bg-[#c49440] disabled:opacity-50 text-white py-3 rounded-xl font-semibold transition-colors shadow-[0_0_20px_rgba(212,168,83,0.25)]">
-              {mut.isPending ? '처리 중...' : user ? `${total.toLocaleString()}P 구매` : '로그인 후 구매'}
+              {user ? '다음 — 배송지 입력' : '로그인 후 구매'}
             </button>
           </>
         )}
 
-        {result?.ok && (
-          <button onClick={onClose} className="w-full bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] hover:text-[#e8d5b0] py-2.5 rounded-xl text-sm transition-colors">
-            닫기
-          </button>
+        {/* 2단계 - 배송지 */}
+        {step === 'addr' && (
+          <>
+            <div className="space-y-2.5">
+              {[
+                { key: 'recipientName',  label: '수령인',   placeholder: '받으실 분 이름', type: 'text' },
+                { key: 'recipientPhone', label: '연락처',   placeholder: '010-0000-0000',  type: 'tel'  },
+                { key: 'zipCode',        label: '우편번호', placeholder: '12345',           type: 'text' },
+                { key: 'address',        label: '주소',     placeholder: '기본 주소',       type: 'text' },
+                { key: 'addressDetail',  label: '상세주소', placeholder: '상세 주소 (선택)', type: 'text' },
+                { key: 'shippingMemo',   label: '배송 메모', placeholder: '예: 문 앞에 놔주세요 (선택)', type: 'text' },
+              ].map(({ key, label, placeholder, type }) => (
+                <div key={key}>
+                  <label className="block text-xs text-[#7a6040] mb-1">{label}</label>
+                  <input
+                    type={type}
+                    value={addr[key as keyof typeof addr]}
+                    onChange={e => setAddr(p => ({ ...p, [key]: e.target.value }))}
+                    placeholder={placeholder}
+                    className="w-full bg-[#1a1208] border border-[#2e2318] focus:border-[#d4a853]/60 rounded-lg px-3 py-2 text-sm text-[#f5ead8] placeholder:text-[#4a3820] outline-none transition-colors"
+                  />
+                </div>
+              ))}
+            </div>
+            {errMsg && (
+              <div className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm bg-red-950/50 border border-red-800/50 text-red-400">
+                <AlertCircle size={14} className="shrink-0" />{errMsg}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button onClick={() => { setErrMsg(''); setStep('qty') }}
+                className="flex-1 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] hover:text-[#e8d5b0] py-2.5 rounded-xl text-sm transition-colors">
+                이전
+              </button>
+              <button
+                onClick={() => { setErrMsg(''); mut.mutate() }}
+                disabled={mut.isPending || !addrValid}
+                className="flex-[2] bg-[#d4a853] hover:bg-[#c49440] disabled:opacity-50 text-white py-2.5 rounded-xl font-semibold text-sm transition-colors shadow-[0_0_20px_rgba(212,168,83,0.25)]">
+                {mut.isPending ? '처리 중...' : `${total.toLocaleString()}P 결제 · 구매 완료`}
+              </button>
+            </div>
+          </>
         )}
       </div>
     </div>

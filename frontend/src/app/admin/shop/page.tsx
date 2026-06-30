@@ -10,7 +10,7 @@ import {
   Plus, Pencil, Eye, EyeOff, Package, X, Layers, AlertCircle,
   Search, ShoppingBag, BarChart2, TrendingUp, ShoppingCart,
   Boxes, CreditCard, ChevronLeft, ChevronRight, User, Trash2,
-  CheckCircle2, Filter,
+  CheckCircle2, Filter, Truck, Check,
 } from 'lucide-react'
 import Badge from '@/components/ui/Badge'
 import { formatDistanceToNow } from 'date-fns'
@@ -781,8 +781,185 @@ function ItemsTab({ triggerCreate, onCreateHandled }: { triggerCreate: boolean; 
 
 // ─── 메인 페이지 ──────────────────────────────────────────────────────────────
 
+// ─── 주문 배송 탭 ─────────────────────────────────────────────────────────────
+
+const SHIP_STATUS: Record<string, { label: string; color: string }> = {
+  PENDING:   { label: '배송 준비',  color: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/30' },
+  PREPARING: { label: '포장 중',    color: 'text-blue-400 bg-blue-400/10 border-blue-400/30' },
+  SHIPPED:   { label: '발송 완료',  color: 'text-indigo-400 bg-indigo-400/10 border-indigo-400/30' },
+  DELIVERED: { label: '배송 완료',  color: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/30' },
+}
+
+interface ShopOrderShipping {
+  id: string; quantity: number; unitPrice: number; totalPrice: number; createdAt: string
+  recipientName: string | null; recipientPhone: string | null
+  zipCode: string | null; address: string | null; addressDetail: string | null; shippingMemo: string | null
+  shippingStatus: string; trackingNumber: string | null; courier: string | null
+  user: { id: string; nickname: string; avatarUrl: string | null }
+  shopItem: { id: string; name: string; imageUrl: string | null; tcgType: string; category: string }
+}
+
+function ShipUpdateModal({ order, onClose }: { order: ShopOrderShipping; onClose: () => void }) {
+  const qc = useQueryClient()
+  const [form, setForm] = useState({
+    shippingStatus: order.shippingStatus,
+    courier:        order.courier ?? '',
+    trackingNumber: order.trackingNumber ?? '',
+  })
+  const [err, setErr] = useState('')
+
+  const mut = useMutation({
+    mutationFn: () => api.patch(`/admin/shop/orders/${order.id}/shipping`, form),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-shop-shipping'] }); onClose() },
+    onError:   () => setErr('업데이트에 실패했습니다.'),
+  })
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl p-6 w-full max-w-md space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-[#f5ead8]">배송 상태 업데이트</h3>
+          <button onClick={onClose} className="text-[#5a4830] hover:text-[#f5ead8]"><X size={18} /></button>
+        </div>
+        <div className="text-sm text-[#8a7055] space-y-0.5 bg-[#1a1208] border border-[#2e2318] rounded-xl p-3">
+          <p>주문자: <span className="text-[#f5ead8]">{order.user.nickname}</span> · {order.shopItem.name} ×{order.quantity}</p>
+          {order.recipientName && <p>수령인: <span className="text-[#f5ead8]">{order.recipientName}</span> · {order.recipientPhone}</p>}
+          {order.address && <p>주소: [{order.zipCode}] {order.address} {order.addressDetail}</p>}
+          {order.shippingMemo && <p>메모: {order.shippingMemo}</p>}
+        </div>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs text-[#7a6040] mb-1">배송 상태</label>
+            <select value={form.shippingStatus}
+              onChange={e => setForm(p => ({ ...p, shippingStatus: e.target.value }))}
+              className="w-full bg-[#1a1208] border border-[#2e2318] focus:border-[#d4a853]/60 rounded-lg px-3 py-2 text-sm text-[#f5ead8] outline-none">
+              {Object.entries(SHIP_STATUS).map(([v, m]) => (
+                <option key={v} value={v}>{m.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-[#7a6040] mb-1">택배사</label>
+            <input value={form.courier}
+              onChange={e => setForm(p => ({ ...p, courier: e.target.value }))}
+              placeholder="예: CJ대한통운, 한진택배"
+              className="w-full bg-[#1a1208] border border-[#2e2318] focus:border-[#d4a853]/60 rounded-lg px-3 py-2 text-sm text-[#f5ead8] placeholder:text-[#4a3820] outline-none transition-colors" />
+          </div>
+          <div>
+            <label className="block text-xs text-[#7a6040] mb-1">운송장 번호</label>
+            <input value={form.trackingNumber}
+              onChange={e => setForm(p => ({ ...p, trackingNumber: e.target.value }))}
+              placeholder="운송장 번호 입력"
+              className="w-full bg-[#1a1208] border border-[#2e2318] focus:border-[#d4a853]/60 rounded-lg px-3 py-2 text-sm text-[#f5ead8] placeholder:text-[#4a3820] outline-none transition-colors" />
+          </div>
+        </div>
+        {err && <p className="text-sm text-red-400">{err}</p>}
+        <div className="flex gap-2">
+          <button onClick={() => mut.mutate()} disabled={mut.isPending}
+            className="flex items-center gap-1.5 bg-[#d4a853] hover:bg-[#c49440] disabled:opacity-50 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors">
+            <Check size={14} /> {mut.isPending ? '저장 중...' : '저장'}
+          </button>
+          <button onClick={onClose}
+            className="bg-[#1a1208] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] px-4 py-2 rounded-xl text-sm transition-colors">
+            취소
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ShipOrdersTab() {
+  const [statusFilter, setStatusFilter] = useState('')
+  const [page, setPage] = useState(1)
+  const [editing, setEditing] = useState<ShopOrderShipping | null>(null)
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin-shop-shipping', statusFilter, page],
+    queryFn: () => api.get('/admin/shop/orders', {
+      params: { shippingStatus: statusFilter || undefined, page },
+    }).then(r => r.data),
+  })
+
+  const orders: ShopOrderShipping[] = data?.orders ?? []
+  const totalPages: number = data?.totalPages ?? 0
+
+  return (
+    <div className="space-y-4">
+      {/* 상태 필터 */}
+      <div className="flex flex-wrap gap-1.5">
+        {[['', '전체'], ...Object.entries(SHIP_STATUS).map(([v, m]) => [v, m.label])].map(([val, label]) => (
+          <button key={val} onClick={() => { setStatusFilter(val); setPage(1) }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              statusFilter === val ? 'bg-[#d4a853] text-white' : 'bg-[#1a1208] border border-[#2e2318] text-[#8a7055] hover:text-[#e8d5b0] hover:border-[#4a3520]'
+            }`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2">{Array.from({length:5}).map((_,i)=>(
+          <div key={i} className="bg-[#1a1410] border border-[#2e2318] rounded-xl h-20 animate-pulse" />
+        ))}</div>
+      ) : orders.length === 0 ? (
+        <div className="text-center py-16 text-[#5a4830]">
+          <Truck size={36} className="mx-auto mb-3 opacity-30" />
+          <p>주문 내역이 없습니다.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {orders.map(order => {
+            const st = SHIP_STATUS[order.shippingStatus] ?? { label: order.shippingStatus, color: '' }
+            return (
+              <div key={order.id} className="bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] rounded-xl p-4 flex items-center gap-4 transition-colors">
+                <div className="w-10 h-10 bg-[#0e0c09] rounded-lg overflow-hidden shrink-0 border border-[#2e2318]">
+                  {order.shopItem.imageUrl
+                    ? <Image src={order.shopItem.imageUrl} alt={order.shopItem.name} width={40} height={40} className="object-contain w-full h-full" />
+                    : <div className="flex items-center justify-center h-full text-[#5a4830]"><Package size={14} /></div>}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                    <span className="text-sm font-semibold text-[#f5ead8] truncate">{order.shopItem.name}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${st.color}`}>{st.label}</span>
+                    {order.courier && order.trackingNumber && (
+                      <span className="text-[10px] text-[#8a7055]">{order.courier} · {order.trackingNumber}</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-[#7a6040]">
+                    {order.user.nickname} · ×{order.quantity} · {order.totalPrice.toLocaleString()}P ·{' '}
+                    {order.recipientName && `→ ${order.recipientName}`}
+                    {order.address && ` · ${order.address}`}
+                  </p>
+                  <p className="text-[10px] text-[#4a3820] mt-0.5">{new Date(order.createdAt).toLocaleDateString('ko-KR')}</p>
+                </div>
+                <button onClick={() => setEditing(order)}
+                  className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-[#1a1208] border border-[#2e2318] hover:border-[#d4a853]/50 hover:text-[#d4a853] text-[#8a7055] rounded-lg text-xs transition-colors">
+                  <Truck size={12} /> 배송 처리
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex justify-center gap-1.5">
+          <button onClick={() => setPage(p => Math.max(1, p-1))} disabled={page===1}
+            className="px-3 py-1.5 rounded-lg text-sm bg-[#1a1208] border border-[#2e2318] text-[#8a7055] hover:text-[#e8d5b0] disabled:opacity-40 transition-colors">이전</button>
+          <span className="px-3 py-1.5 text-sm text-[#8a7055]">{page} / {totalPages}</span>
+          <button onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page===totalPages}
+            className="px-3 py-1.5 rounded-lg text-sm bg-[#1a1208] border border-[#2e2318] text-[#8a7055] hover:text-[#e8d5b0] disabled:opacity-40 transition-colors">다음</button>
+        </div>
+      )}
+
+      {editing && <ShipUpdateModal order={editing} onClose={() => setEditing(null)} />}
+    </div>
+  )
+}
+
 export default function AdminShopPage() {
-  const [activeTab, setActiveTab]   = useState<'items' | 'sales'>('items')
+  const [activeTab, setActiveTab]   = useState<'items' | 'shipping' | 'sales'>('items')
   const [creating, setCreating]     = useState(false)
 
   return (
@@ -800,7 +977,11 @@ export default function AdminShopPage() {
 
       {/* 탭 */}
       <div className="flex gap-1 bg-[#150f0c] border border-[#2e2318] rounded-xl p-1 w-fit">
-        {([['items', <Package key="p" size={14} />, '상품 관리'], ['sales', <BarChart2 key="b" size={14} />, '매출 현황']] as const).map(([key, icon, label]) => (
+        {([
+          ['items',    <Package key="p" size={14} />,   '상품 관리'],
+          ['shipping', <Truck   key="t" size={14} />,   '주문/배송'],
+          ['sales',    <BarChart2 key="b" size={14} />, '매출 현황'],
+        ] as const).map(([key, icon, label]) => (
           <button key={key} onClick={() => setActiveTab(key)}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === key ? 'bg-[#2a1c08] text-[#e0b878]' : 'text-[#7a6040] hover:text-[#9e8a6a]'}`}>
             {icon}{label}
@@ -808,8 +989,9 @@ export default function AdminShopPage() {
         ))}
       </div>
 
-      {activeTab === 'items' && <ItemsTab key="items" triggerCreate={creating} onCreateHandled={() => setCreating(false)} />}
-      {activeTab === 'sales' && <SalesTab />}
+      {activeTab === 'items'    && <ItemsTab key="items" triggerCreate={creating} onCreateHandled={() => setCreating(false)} />}
+      {activeTab === 'shipping' && <ShipOrdersTab />}
+      {activeTab === 'sales'    && <SalesTab />}
     </div>
   )
 }
