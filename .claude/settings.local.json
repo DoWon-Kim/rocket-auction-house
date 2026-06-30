@@ -8,7 +8,8 @@
       "PowerShell($env:PATH = $env:PATH + \";C:\\\\Program Files\\\\Git\\\\cmd\"; cd d:\\\\Rocket_Auction_House; git status)",
       "PowerShell($env:PATH = $env:PATH + \";C:\\\\Program Files\\\\Git\\\\cmd\"; cd d:\\\\Rocket_Auction_House; git add backend/prisma/schema.prisma backend/src/controllers/auth.controller.ts backend/src/controllers/report.controller.ts backend/src/controllers/review.controller.ts backend/src/routes/index.ts frontend/src/app/listings frontend/src/app/settings/page.tsx frontend/src/components/Footer.tsx frontend/src/components/ListingCard.tsx)",
       "PowerShell($env:PATH = $env:PATH + \";C:\\\\Program Files\\\\Git\\\\cmd\"; cd d:\\\\Rocket_Auction_House; git push origin main)",
-      "PowerShell($env:PATH = $env:PATH + \";C:\\\\Program Files\\\\Git\\\\cmd\"; cd d:\\\\Rocket_Auction_House; git add backend/src/controllers/admin.controller.ts frontend/src/app/admin/page.tsx; git commit -m \"feat: 관리자 대시보드 강화 - 일별 거래 차트, 처리 대기 알람, 주간/월간 통계\")"
+      "PowerShell($env:PATH = $env:PATH + \";C:\\\\Program Files\\\\Git\\\\cmd\"; cd d:\\\\Rocket_Auction_House; git add backend/src/controllers/admin.controller.ts frontend/src/app/admin/page.tsx; git commit -m \"feat: 관리자 대시보드 강화 - 일별 거래 차트, 처리 대기 알람, 주간/월간 통계\")",
+      "PowerShell($env:PATH = $env:PATH + \";C:\\\\Program Files\\\\Git\\\\cmd\"; cd d:\\\\Rocket_Auction_House; git add -A; git commit -m \"fix: 신고 기각 시 SUSPENDED 리스팅 자동 복원, listings sellerId 필터 추가\")"
     ],
     "additionalDirectories": [
       "d:\\Rocket_Auction_House\\frontend\\src\\app\\users"

@@ -215,6 +215,19 @@ export async function updateReport(req: AuthRequest, res: Response) {
       })
     }
 
+    // 신고 기각(DISMISSED) 시 SUSPENDED 상태 리스팅 복원
+    if (status === 'DISMISSED' && report.listingId) {
+      const remaining = await prisma.report.count({
+        where: { listingId: report.listingId, status: { in: ['PENDING', 'INVESTIGATING'] } },
+      })
+      if (remaining === 0) {
+        await prisma.listing.updateMany({
+          where: { id: report.listingId, status: 'SUSPENDED' },
+          data: { status: 'ACTIVE' },
+        })
+      }
+    }
+
     const updated = await prisma.report.findUnique({ where: { id }, select: REPORT_SELECT })
     res.json(updated)
   } catch (err) {
