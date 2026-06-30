@@ -45,7 +45,7 @@ export async function register(req: Request, res: Response) {
 
     const passwordHash = await bcrypt.hash(password, 12)
     const user = await prisma.user.create({
-      data: { email, nickname, passwordHash, phone: parsed.data.phone ?? null },
+      data: { email, nickname, passwordHash, phone: result.data.phone ?? null },
       select: { id: true, email: true, nickname: true, avatarUrl: true, balance: true, role: true },
     })
 
