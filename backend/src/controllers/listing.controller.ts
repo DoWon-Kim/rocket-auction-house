@@ -429,7 +429,7 @@ export async function placeBid(req: AuthRequest, res: Response) {
         title: '입찰이 밀렸습니다',
         body: `${bidder?.nickname ?? '다른 사용자'}님이 ${amount.toLocaleString()}P에 재입찰했습니다.`,
         link: `/listings/${listing.id}`,
-      })
+      }).catch(e => console.error('[notify BID_OUTBID]', e))
     }
 
     getIo()?.to(`listing:${listing.id}`).emit('bid:placed', {
@@ -486,7 +486,7 @@ export async function makeOffer(req: AuthRequest, res: Response) {
       title: '새 제안이 도착했습니다',
       body: `${buyer?.nickname ?? '구매자'}님이 ${amount.toLocaleString()}P를 제안했습니다.`,
       link: `/listings/${listing.id}`,
-    })
+    }).catch(e => console.error('[notify OFFER_RECEIVED]', e))
 
     res.status(201).json(offer)
   } catch (err) {
@@ -514,24 +514,26 @@ export async function respondToOffer(req: AuthRequest, res: Response) {
     }
 
     if (action === 'ACCEPTED') {
-      const buyer = await prisma.user.findUnique({ where: { id: offer.buyerId } })
-      if (!buyer || buyer.balance < offer.amount) {
-        res.status(400).json({ message: '구매자의 잔액이 부족합니다.' })
-        return
-      }
       const fullListing = await prisma.listing.findUnique({ where: { id: offer.listingId } })
       if (!fullListing) {
         res.status(404).json({ message: '리스팅을 찾을 수 없습니다.' })
         return
       }
       await prisma.$transaction(async (tx) => {
+        // 잔액 차감을 where 조건에 포함해 원자적으로 검증 (TOCTOU 방지)
+        const balanceUpdated = await tx.user.updateMany({
+          where: { id: offer.buyerId, balance: { gte: offer.amount } },
+          data: { balance: { decrement: offer.amount } },
+        })
+        if (balanceUpdated.count === 0) {
+          throw Object.assign(new Error('BALANCE'), { status: 400, message: '구매자의 잔액이 부족합니다.' })
+        }
         await tx.offer.update({ where: { id: String(offerId) }, data: { status: 'ACCEPTED' } })
         await tx.offer.updateMany({
           where: { listingId: offer.listingId, id: { not: String(offerId) }, status: 'PENDING' },
           data: { status: 'DECLINED' },
         })
         await tx.listing.update({ where: { id: offer.listingId }, data: { status: 'SOLD' } })
-        await tx.user.update({ where: { id: offer.buyerId }, data: { balance: { decrement: offer.amount } } })
         const txRecord = await tx.transaction.create({
           data: {
             listingId: offer.listingId, buyerId: offer.buyerId, sellerId: req.userId!,
@@ -563,7 +565,7 @@ export async function respondToOffer(req: AuthRequest, res: Response) {
         title: '제안이 수락되었습니다',
         body: `${offer.amount.toLocaleString()}P 제안이 수락되었습니다. 거래를 진행해 주세요.`,
         link: '/my?tab=purchases',
-      })
+      }).catch(e => console.error('[notify OFFER_ACCEPTED]', e))
     } else {
       notify({
         userId: offer.buyerId,
@@ -571,11 +573,13 @@ export async function respondToOffer(req: AuthRequest, res: Response) {
         title: '제안이 거절되었습니다',
         body: `${offer.amount.toLocaleString()}P 제안이 거절되었습니다.`,
         link: '/my?tab=offers-sent',
-      })
+      }).catch(e => console.error('[notify OFFER_REJECTED]', e))
     }
 
     res.json({ message: action === 'ACCEPTED' ? '제안을 수락했습니다.' : '제안을 거절했습니다.' })
   } catch (err) {
+    const e = err as { status?: number; message?: string }
+    if (e.status) { res.status(e.status).json({ message: e.message }); return }
     console.error('[respondToOffer]', err)
     res.status(500).json({ message: '서버 오류가 발생했습니다.' })
   }

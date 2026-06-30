@@ -67,7 +67,7 @@ export async function createReview(req: AuthRequest, res: Response) {
       title: '새 리뷰가 도착했습니다',
       body: `${reviewer?.nickname ?? '익명'}님이 ★${rating} 평가를 남겼습니다.`,
       link: `/my?tab=${role === 'BUYER' ? 'sales' : 'purchases'}`,
-    })
+    }).catch(e => console.error('[notify REVIEW_RECEIVED]', e))
 
     res.status(201).json(review)
   } catch (err) {

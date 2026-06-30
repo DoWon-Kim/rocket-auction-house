@@ -13,6 +13,9 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+// 동시 401 응답이 여러 개 와도 한 번만 리다이렉트하도록 플래그 관리
+let isRedirecting = false
+
 api.interceptors.response.use(
   (res) => res,
   (err) => {
@@ -20,8 +23,10 @@ api.interceptors.response.use(
       const hadToken = !!useAuthStore.getState().token
       useAuthStore.getState().clearAuth()
       const path = window.location.pathname
-      if (hadToken && path !== '/login' && path !== '/register') {
+      if (hadToken && path !== '/login' && path !== '/register' && !isRedirecting) {
+        isRedirecting = true
         window.location.href = '/login'
+        setTimeout(() => { isRedirecting = false }, 3000)
       }
     }
     return Promise.reject(err)

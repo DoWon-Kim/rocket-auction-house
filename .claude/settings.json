@@ -44,7 +44,9 @@
       "PowerShell(\"deleted\")",
       "PowerShell(try { $r = Invoke-WebRequest -Uri \"https://frontend-production-a8ef.up.railway.app\" -TimeoutSec 15 -UseBasicParsing; \"Status: $\\($r.StatusCode\\)\" } catch { \"Error: $_\" })",
       "PowerShell($env:PATH += \";C:\\\\Program Files\\\\Git\\\\bin\"; cd d:\\\\Rocket_Auction_House; git add -A; git status --short)",
-      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\Git\\\\bin\"; cd d:\\\\Rocket_Auction_House; git push origin main)"
+      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\Git\\\\bin\"; cd d:\\\\Rocket_Auction_House; git push origin main)",
+      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\Git\\\\bin\"; cd d:\\\\Rocket_Auction_House; git add backend/src/controllers/auth.controller.ts; git commit -m \"fix: register에서 parsed 대신 result 변수 사용 \\(빌드 오류 수정\\)\"; git push origin main)",
+      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\Git\\\\bin\"; cd d:\\\\Rocket_Auction_House\\\\backend; npx prisma generate 2>&1 | Select-Object -Last 3)"
     ],
     "additionalDirectories": [
       "d:\\Rocket_Auction_House\\frontend\\src\\app\\dm",

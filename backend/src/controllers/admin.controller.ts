@@ -289,23 +289,28 @@ export async function grantBalance(req: Request, res: Response) {
     res.status(400).json({ message: '0이 아닌 정수 금액을 입력해주세요.' })
     return
   }
+  const userId = String(req.params['id'])
   try {
-    if (amount < 0) {
-      // 차감 시 잔액이 0 아래로 내려가지 않도록 확인
-      const user = await prisma.user.findUnique({ where: { id: String(req.params['id']) }, select: { balance: true } })
-      if (!user) { res.status(404).json({ message: '사용자를 찾을 수 없습니다.' }); return }
-      if (user.balance + amount < 0) {
-        res.status(400).json({ message: '차감 금액이 현재 잔액을 초과합니다.' })
-        return
+    const user = await prisma.$transaction(async (tx) => {
+      // 차감 시 잔액 조건을 where에 포함해 원자적으로 처리 (TOCTOU 방지)
+      const updated = await tx.user.updateMany({
+        where: {
+          id: userId,
+          ...(amount < 0 ? { balance: { gte: -amount } } : {}),
+        },
+        data: { balance: { increment: amount } },
+      })
+      if (updated.count === 0) {
+        const exists = await tx.user.findUnique({ where: { id: userId }, select: { id: true } })
+        if (!exists) throw Object.assign(new Error('NOT_FOUND'), { status: 404, message: '사용자를 찾을 수 없습니다.' })
+        throw Object.assign(new Error('INSUFFICIENT'), { status: 400, message: '차감 금액이 현재 잔액을 초과합니다.' })
       }
-    }
-    const user = await prisma.user.update({
-      where: { id: String(req.params['id']) },
-      data: { balance: { increment: amount } },
-      select: { id: true, nickname: true, balance: true },
+      return tx.user.findUnique({ where: { id: userId }, select: { id: true, nickname: true, balance: true } })
     })
     res.json(user)
   } catch (err) {
+    const e = err as { status?: number; message?: string }
+    if (e.status) { res.status(e.status).json({ message: e.message }); return }
     console.error('[grantBalance]', err)
     res.status(500).json({ message: '서버 오류가 발생했습니다.' })
   }

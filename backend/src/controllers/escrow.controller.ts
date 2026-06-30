@@ -56,7 +56,7 @@ export async function shipItem(req: AuthRequest, res: Response) {
       title: '상품이 발송되었습니다',
       body: `${parsed.data.trackingCarrier} ${parsed.data.trackingNumber} — 수령 후 수령 확인을 눌러주세요.`,
       link: '/my?tab=purchases',
-    })
+    }).catch(e => console.error('[notify TRANSACTION_SHIPPED]', e))
 
     res.json({ message: '발송 처리가 완료되었습니다.', transaction: updated })
   } catch (err) {
@@ -105,7 +105,7 @@ export async function confirmReceipt(req: AuthRequest, res: Response) {
       title: '거래가 완료되었습니다',
       body: `${tx.finalPrice.toLocaleString()}P가 잔액에 정산되었습니다.`,
       link: '/my?tab=sales',
-    })
+    }).catch(e => console.error('[notify TRANSACTION_COMPLETED]', e))
 
     res.json({ message: '수령 확인 완료! 판매자에게 대금이 정산되었습니다.' })
   } catch (err) {

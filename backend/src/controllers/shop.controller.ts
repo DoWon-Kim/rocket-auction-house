@@ -70,25 +70,40 @@ export async function buyShopItem(req: AuthRequest, res: Response) {
 
     const totalPrice = item.price * quantity
 
-    const user = await prisma.user.findUnique({ where: { id: req.userId! }, select: { balance: true } })
-    if (!user || user.balance < totalPrice) {
-      res.status(402).json({ message: `포인트가 부족합니다. (필요: ${totalPrice.toLocaleString()}P)` }); return
-    }
+    const order = await prisma.$transaction(async (tx) => {
+      // 잔액 차감을 where 조건에 포함해 원자적으로 검증 (race condition 방지)
+      const balanceUpdated = await tx.user.updateMany({
+        where: { id: req.userId!, balance: { gte: totalPrice } },
+        data: { balance: { decrement: totalPrice } },
+      })
+      if (balanceUpdated.count === 0) {
+        throw Object.assign(new Error('BALANCE'), { status: 402, message: `포인트가 부족합니다. (필요: ${totalPrice.toLocaleString()}P)` })
+      }
 
-    const newStock = item.stock - quantity
-    const [, order] = await prisma.$transaction([
-      prisma.user.update({ where: { id: req.userId! }, data: { balance: { decrement: totalPrice } } }),
-      prisma.shopOrder.create({
+      // 재고 차감을 where 조건에 포함해 원자적으로 검증
+      const stockUpdated = await tx.shopItem.updateMany({
+        where: { id: item.id, stock: { gte: quantity }, isActive: true, isSoldOut: false },
+        data: { stock: { decrement: quantity } },
+      })
+      if (stockUpdated.count === 0) {
+        throw Object.assign(new Error('STOCK'), { status: 409, message: '재고가 부족하거나 품절된 상품입니다.' })
+      }
+
+      // 재고 0이면 품절 처리
+      const afterItem = await tx.shopItem.findUnique({ where: { id: item.id }, select: { stock: true } })
+      if (afterItem && afterItem.stock === 0) {
+        await tx.shopItem.update({ where: { id: item.id }, data: { isSoldOut: true } })
+      }
+
+      return tx.shopOrder.create({
         data: { userId: req.userId!, shopItemId: item.id, quantity, unitPrice: item.price, totalPrice },
-      }),
-      prisma.shopItem.update({
-        where: { id: item.id },
-        data: { stock: { decrement: quantity }, ...(newStock === 0 ? { isSoldOut: true } : {}) },
-      }),
-    ])
+      })
+    })
 
     res.json({ message: '구매가 완료되었습니다!', orderId: order.id, totalPrice })
   } catch (err) {
+    const e = err as { status?: number; message?: string }
+    if (e.status) { res.status(e.status).json({ message: e.message }); return }
     console.error('[buyShopItem]', err)
     res.status(500).json({ message: '서버 오류가 발생했습니다.' })
   }

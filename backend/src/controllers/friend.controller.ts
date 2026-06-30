@@ -75,7 +75,7 @@ export async function sendFriendRequest(req: AuthRequest, res: Response) {
       title: '친구 요청이 왔습니다',
       body: `${request.sender.nickname}님이 친구 요청을 보냈습니다.`,
       link: '/friends',
-    })
+    }).catch(e => console.error('[notify FRIEND_REQUEST]', e))
 
     res.status(201).json(request)
   } catch (err) {
@@ -126,7 +126,7 @@ export async function respondFriendRequest(req: AuthRequest, res: Response) {
         title: '친구 요청이 수락되었습니다',
         body: `${me?.nickname ?? ''}님과 친구가 되었습니다!`,
         link: '/friends',
-      })
+      }).catch(e => console.error('[notify FRIEND_ACCEPTED]', e))
     }
 
     res.json(updated)

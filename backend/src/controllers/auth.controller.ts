@@ -269,7 +269,11 @@ export async function requestPhoneOtp(req: Request, res: Response) {
 
     const user = await prisma.user.findFirst({ where: { phone: phone.data }, select: { id: true } })
     if (user) {
-      await sendSms(phone.data, `[Rocket AH] 인증번호: ${otp} (5분 이내 입력)`)
+      try {
+        await sendSms(phone.data, `[Rocket AH] 인증번호: ${otp} (5분 이내 입력)`)
+      } catch (smsErr) {
+        console.error('[requestPhoneOtp] SMS 발송 실패:', smsErr)
+      }
     }
 
     res.json({ message: '인증번호를 발송했습니다.' })
