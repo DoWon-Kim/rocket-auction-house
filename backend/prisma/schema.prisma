@@ -676,8 +676,7 @@ model ShopOrder {
   trackingNumber String?
   courier        String?
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime? @updatedAt
+  createdAt   DateTime @default(now())
 
   @@index([userId])
   @@index([shopItemId])
