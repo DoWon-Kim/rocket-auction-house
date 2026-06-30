@@ -7,24 +7,65 @@ import { GRANTABLE_SECTIONS } from '../middleware/permissions'
 
 export async function getStats(_req: Request, res: Response) {
   try {
-    const [users, listings, transactions, oripas] = await Promise.all([
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const weekAgo  = new Date(today.getTime() - 7  * 86400_000)
+    const monthAgo = new Date(today.getTime() - 30 * 86400_000)
+
+    const [
+      users, activeListings, transactions, activeOripas,
+      newUsersToday, newUsersWeek,
+      txToday, txWeek, txMonth,
+      pendingReports, pendingWithdrawals, pendingShipments,
+    ] = await Promise.all([
       prisma.user.count(),
       prisma.listing.count({ where: { status: 'ACTIVE' } }),
       prisma.transaction.count(),
       prisma.oripa.count({ where: { isActive: true } }),
+      prisma.user.count({ where: { createdAt: { gte: today } } }),
+      prisma.user.count({ where: { createdAt: { gte: weekAgo } } }),
+      prisma.transaction.count({ where: { completedAt: { gte: today },    txStatus: { in: ['COMPLETED', 'AUTO_COMPLETED'] } } }),
+      prisma.transaction.count({ where: { completedAt: { gte: weekAgo },  txStatus: { in: ['COMPLETED', 'AUTO_COMPLETED'] } } }),
+      prisma.transaction.count({ where: { completedAt: { gte: monthAgo }, txStatus: { in: ['COMPLETED', 'AUTO_COMPLETED'] } } }),
+      prisma.report.count({ where: { status: 'PENDING' } }),
+      prisma.withdrawalRequest.count({ where: { status: 'PENDING' } }),
+      prisma.transaction.count({ where: { txStatus: 'PENDING_SHIPMENT' } }),
     ])
 
+    // 일별 거래 현황 (최근 7일)
+    const dailyTxRaw = await prisma.$queryRaw<{ day: Date; count: bigint; revenue: bigint }[]>`
+      SELECT DATE_TRUNC('day', "completedAt") AS day, COUNT(*) AS count, COALESCE(SUM("finalPrice"), 0) AS revenue
+      FROM "Transaction"
+      WHERE "completedAt" >= ${weekAgo}
+        AND "txStatus" IN ('COMPLETED', 'AUTO_COMPLETED')
+      GROUP BY 1
+      ORDER BY 1
+    `
+    const dailyStats = dailyTxRaw.map(r => ({
+      date: r.day.toISOString().slice(0, 10),
+      count: Number(r.count),
+      revenue: Number(r.revenue),
+    }))
+
     const recentTransactions = await prisma.transaction.findMany({
-      take: 5,
+      take: 10,
       orderBy: { completedAt: 'desc' },
+      where: { txStatus: { in: ['COMPLETED', 'AUTO_COMPLETED'] } },
       include: {
-        buyer: { select: { nickname: true } },
+        buyer:  { select: { nickname: true } },
         seller: { select: { nickname: true } },
-        listing: { include: { card: { select: { name: true } } } },
+        listing: { include: { card: { select: { name: true, nameKo: true } } } },
       },
     })
 
-    res.json({ users, activeListings: listings, transactions, activeOripas: oripas, recentTransactions })
+    res.json({
+      users, activeListings, transactions, activeOripas,
+      newUsersToday, newUsersWeek,
+      txToday, txWeek, txMonth,
+      pendingReports, pendingWithdrawals, pendingShipments,
+      dailyStats,
+      recentTransactions,
+    })
   } catch (err) {
     console.error('[getStats]', err)
     res.status(500).json({ message: '서버 오류가 발생했습니다.' })
