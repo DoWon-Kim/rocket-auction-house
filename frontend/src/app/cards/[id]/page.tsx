@@ -265,9 +265,26 @@ export default function CardDetailPage() {
     )
   }
 
-  const displayName  = card.nameKo ?? card.name
+  const displayName  = card.nameKo ?? card.nameJa ?? card.name
   const rColor       = rarityColorClass(card.rarity)
   const listings     = listingsData?.listings ?? []
+
+  // 외부 데이터베이스 링크 생성
+  function externalLink(): { label: string; url: string } | null {
+    switch (card.tcgType) {
+      case 'YUGIOH':
+        return { label: 'YGOProDeck', url: `https://ygoprodeck.com/card/?search=${encodeURIComponent(card.name)}` }
+      case 'MTG':
+        return { label: 'Scryfall', url: `https://scryfall.com/search?q=${encodeURIComponent(card.name)}+set:${card.setCode ?? ''}` }
+      case 'POKEMON':
+        return { label: 'Pokémon TCG DB', url: `https://www.pokemon.com/us/pokemon-tcg/pokemon-cards/?cardName=${encodeURIComponent(card.name)}` }
+      case 'DIGIMON':
+        return { label: 'Digimon Card DB', url: `https://www.digimoncard.com/products/card_game/card/` }
+      default:
+        return null
+    }
+  }
+  const extLink = externalLink()
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -311,6 +328,18 @@ export default function CardDetailPage() {
           >
             <ShoppingBag size={15} /> 이 카드 판매하기
           </Link>
+
+          {/* 외부 링크 */}
+          {extLink && (
+            <a
+              href={extLink.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full max-w-[260px] flex items-center justify-center gap-1.5 py-2 border border-[#2e2318] hover:border-[#4a3520] rounded-xl text-xs text-[#7a6040] hover:text-[#c9a860] transition-colors"
+            >
+              <TrendingUp size={12} /> {extLink.label}에서 보기 ↗
+            </a>
+          )}
         </div>
 
         {/* 우측 정보 */}
@@ -318,28 +347,59 @@ export default function CardDetailPage() {
 
           {/* 이름 + 배지 */}
           <div>
-            <div className="flex items-start gap-2 flex-wrap mb-1">
+            {/* 레어도 + TCG 타입 + 언어 뱃지 */}
+            <div className="flex items-start gap-2 flex-wrap mb-2">
               <span className={`inline-flex items-center px-2 py-0.5 rounded border text-[11px] font-semibold ${rColor}`}>
                 {rarityLabel(card.rarity)}
               </span>
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-[#2e2318] bg-[#1a1208] text-[11px] text-[#7a6040]">
                 {TCG_ICONS[card.tcgType]} {TCG_LABELS[card.tcgType] ?? card.tcgType}
               </span>
+              {card.nameKo && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-emerald-700/40 bg-emerald-900/20 text-[11px] text-emerald-400 font-medium">
+                  🇰🇷 한국어
+                </span>
+              )}
+              {card.nameJa && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-blue-700/40 bg-blue-900/20 text-[11px] text-blue-400 font-medium">
+                  🇯🇵 日本語
+                </span>
+              )}
             </div>
+
+            {/* 메인 카드명 (한국어 우선) */}
             <div className="flex items-start gap-3">
               <h1 className="text-2xl font-bold text-[#f5ead8] leading-tight flex-1">{displayName}</h1>
               <WishlistButton cardId={card.id} cardName={displayName} />
             </div>
-            {card.nameKo && card.name !== card.nameKo && (
-              <p className="text-sm text-[#7a6040] mt-0.5">{card.name}</p>
-            )}
-            {card.nameJa && (
-              <p className="text-sm text-[#5a4830] mt-0.5">{card.nameJa}</p>
-            )}
+
+            {/* 서브 이름 (원문, 일본어) */}
+            <div className="mt-1.5 space-y-0.5">
+              {card.nameKo && card.name !== card.nameKo && (
+                <p className="text-sm text-[#7a6040]">
+                  <span className="text-[10px] mr-1.5 opacity-60">🇺🇸</span>{card.name}
+                </p>
+              )}
+              {card.nameJa && (
+                <p className="text-sm text-[#5a4830]">
+                  <span className="text-[10px] mr-1.5 opacity-60">🇯🇵</span>{card.nameJa}
+                </p>
+              )}
+            </div>
           </div>
 
           {/* 카드 기본 정보 */}
           <div className="bg-[#1a1410] border border-[#2e2318] rounded-xl px-4 divide-y divide-[#1a1208]">
+            {card.nameKo && (
+              <InfoRow label="한국어 이름" value={
+                <span className="text-emerald-400 font-medium">{card.nameKo}</span>
+              } />
+            )}
+            {card.nameJa && (
+              <InfoRow label="일본어 이름" value={
+                <span className="text-blue-300">{card.nameJa}</span>
+              } />
+            )}
             <InfoRow label="세트" value={card.setName} />
             <InfoRow label="세트 코드" value={card.setCode} />
             <InfoRow label="카드 번호" value={card.cardNumber} />

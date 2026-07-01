@@ -132,9 +132,21 @@ function CardTile({ card, displayLang }: { card: Card; displayLang?: string }) {
           : card.nameKo && card.name !== card.nameKo && <p className="text-[11px] text-[#5a4830] truncate">{card.name}</p>
         }
 
-        {/* 레어도 배지 */}
-        <div className={`inline-flex items-center self-start px-1.5 py-0.5 rounded border text-[10px] font-semibold ${rColor}`}>
-          {rarityLabel(card.rarity)}
+        {/* 레어도 + 언어 배지 */}
+        <div className="flex items-center gap-1 flex-wrap">
+          <div className={`inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-semibold ${rColor}`}>
+            {rarityLabel(card.rarity)}
+          </div>
+          {card.nameKo && (
+            <div className="inline-flex items-center px-1 py-0.5 rounded border border-emerald-800/50 bg-emerald-900/20 text-[9px] text-emerald-500">
+              🇰🇷
+            </div>
+          )}
+          {card.nameJa && (
+            <div className="inline-flex items-center px-1 py-0.5 rounded border border-blue-800/50 bg-blue-900/20 text-[9px] text-blue-500">
+              🇯🇵
+            </div>
+          )}
         </div>
 
         <div className="mt-auto space-y-0.5">
@@ -435,7 +447,9 @@ function CardsContent() {
           카드 도감
         </h1>
         <p className="text-xs text-[#5a4830]">
-          {total > 0 ? `${total.toLocaleString()}개 카드` : '카드를 검색하거나 필터를 선택하세요'}
+          {total > 0
+            ? `${total.toLocaleString()}개 카드 — 포켓몬·유희왕·MTG·디지몬·원피스 통합 한글 검색`
+            : '한국어·일어·영어 카드명으로 검색 가능 · 포켓몬·유희왕·MTG·디지몬·원피스'}
         </p>
       </div>
 
@@ -447,7 +461,7 @@ function CardsContent() {
           onChange={e => { setSearchInput(e.target.value); setShowInstant(true) }}
           onFocus={() => setShowInstant(true)}
           onKeyDown={e => { if (e.key === 'Escape') setShowInstant(false) }}
-          placeholder="카드명, 세트명, 카드번호로 검색..."
+          placeholder="한국어·영어·일어로 카드명, 세트명, 번호 검색..."
           className="w-full pl-11 pr-10 py-3.5 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] focus:border-[#d4a853]/40 rounded-xl text-sm text-[#f5ead8] placeholder:text-[#4a3820] focus:outline-none transition-colors shadow-sm"
         />
         {searchInput && (

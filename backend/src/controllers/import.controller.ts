@@ -731,6 +731,7 @@ export async function importDigimon(_req: AuthRequest, res: Response) {
 
 interface YgoMeta { total_rows: number; next_page_offset?: number }
 interface YgoBulkResponse { data: YgoCard[]; meta: YgoMeta }
+interface YgoCardWithKo extends YgoCard { name_ko?: string }
 
 export async function importYugiohAll(_req: AuthRequest, res: Response) {
   const PAGE = 500
@@ -738,6 +739,22 @@ export async function importYugiohAll(_req: AuthRequest, res: Response) {
   let totalRows = 0
   let imported = 0
   let skipped = 0
+
+  // language=ko 로 한국어 이름 맵 사전 수집
+  const koMap = new Map<number, string>()
+  try {
+    let koOffset = 0
+    while (true) {
+      const body = await fetchWithRetry<YgoBulkResponse>(
+        `https://db.ygoprodeck.com/api/v7/cardinfo.php?num=${PAGE}&offset=${koOffset}&language=ko`,
+        { timeoutMs: 30_000, retries: 2 },
+      )
+      for (const c of body.data) koMap.set(c.id, c.name)
+      koOffset += body.data.length
+      if (koOffset >= body.meta.total_rows || body.data.length < PAGE) break
+      await sleep(200)
+    }
+  } catch { /* 한국어 API 미지원 시 무시 */ }
 
   try {
     while (true) {
@@ -748,6 +765,7 @@ export async function importYugiohAll(_req: AuthRequest, res: Response) {
 
       const records = body.data.flatMap(c => {
         const seen = new Set<string>()
+        const nameKo = koMap.get(c.id) ?? undefined
         return (c.card_sets ?? []).filter(s => {
           const key = `yugioh_${c.id}_${s.set_code}`
           if (seen.has(key)) return false
@@ -756,6 +774,7 @@ export async function importYugiohAll(_req: AuthRequest, res: Response) {
         }).map(s => ({
           externalId: `yugioh_${c.id}_${s.set_code}`,
           name: c.name,
+          nameKo,
           tcgType: 'YUGIOH' as const,
           setName: s.set_name,
           setCode: s.set_code?.replace(/-.*/, '') ?? null,
@@ -777,7 +796,7 @@ export async function importYugiohAll(_req: AuthRequest, res: Response) {
       await sleep(300)
     }
 
-    res.json({ imported, merged: 0, total: totalRows, skipped })
+    res.json({ imported, merged: 0, total: totalRows, skipped, koNames: koMap.size })
   } catch (err) {
     console.error('[importYugiohAll]', err)
     res.status(502).json({ message: '유희왕 전체 카드 가져오기에 실패했습니다.' })
