@@ -1,5 +1,6 @@
 import { Response } from 'express'
 import { z } from 'zod'
+import { Prisma } from '@prisma/client'
 import { prisma } from '../lib/prisma'
 import { AuthRequest } from '../middleware/auth'
 import { getIo } from '../lib/socketio'
@@ -82,7 +83,7 @@ export async function getListings(req: AuthRequest, res: Response) {
       }
     }
 
-    const orderBy = (() => {
+    const orderBy = ((): Prisma.ListingOrderByWithRelationInput | Prisma.ListingOrderByWithRelationInput[] => {
       if (sort === 'price_asc' || sort === 'price_desc') {
         const dir = sort === 'price_asc' ? 'asc' as const : 'desc' as const
         if (type === 'AUCTION') return { currentPrice: dir }
@@ -104,7 +105,7 @@ export async function getListings(req: AuthRequest, res: Response) {
           seller: { select: { id: true, nickname: true, avatarUrl: true, avgRating: true, reviewCount: true } },
           _count: { select: { bids: true, offers: true } },
         },
-        orderBy: orderBy as Parameters<typeof prisma.listing.findMany>[0]['orderBy'],
+        orderBy,
         skip,
         take: limit,
       }),
