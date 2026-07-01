@@ -8,6 +8,7 @@ import {
   placeBid,
   makeOffer,
   respondToOffer,
+  getMarketSummary,
 } from '../controllers/listing.controller'
 import { getOripaList, getOripa, getOripaHistory, drawOripa } from '../controllers/oripa.controller'
 import { getInventory, deleteInventoryItem } from '../controllers/inventory.controller'
@@ -102,6 +103,7 @@ router.post('/upload', authenticate, uploadLimiter, upload.single('file'), uploa
 router.post('/payments/confirm', authenticate, paymentLimiter, confirmPayment)
 
 // 리스팅
+router.get('/listings/market-summary', getMarketSummary)
 router.get('/listings', getListings)
 router.get('/listings/:id', getListing)
 router.post('/listings', authenticate, createListing)

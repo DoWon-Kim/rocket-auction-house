@@ -12,7 +12,7 @@ import Image from 'next/image'
 import {
   Clock, Gavel, Tag, Handshake, ChevronLeft, ChevronRight,
   Zap, ShieldAlert, Flame, MessageCircle, ShieldCheck, AlertCircle, Check, Flag,
-  Star, Reply,
+  Star, Reply, TrendingUp, TrendingDown, Minus, BarChart2, ArrowRight,
 } from 'lucide-react'
 import Link from 'next/link'
 import { io, Socket } from 'socket.io-client'
@@ -40,6 +40,160 @@ function useCountdown(endsAt: Date | null | undefined) {
     return () => clearInterval(t)
   }, [endsAt])
   return { remaining, urgent }
+}
+
+/* ─── Market Stats Panel ──────────────────────── */
+interface CardMarket {
+  activeCount: number
+  minPrice: number | null
+  maxPrice: number | null
+  avgBuyNow: number | null
+  recentAvgPrice: number | null
+  recentTxCount: number
+}
+
+function MarketStatsPanel({ cardMarket, currentPrice, listingType }: { cardMarket: CardMarket; currentPrice: number | null; listingType: string }) {
+  if (!cardMarket || cardMarket.activeCount === 0) return null
+
+  const refPrice = cardMarket.recentAvgPrice ?? cardMarket.avgBuyNow
+  const priceDiff = refPrice && currentPrice ? currentPrice - refPrice : null
+  const pricePct  = refPrice && priceDiff != null ? Math.round((priceDiff / refPrice) * 100) : null
+
+  const PriceIndicator = () => {
+    if (pricePct === null) return null
+    if (Math.abs(pricePct) < 3) return <Minus size={12} className="text-[#7a6040]" />
+    if (pricePct > 0)  return <TrendingUp size={12} className="text-red-400" />
+    return <TrendingDown size={12} className="text-emerald-400" />
+  }
+  const diffLabel = pricePct === null ? null
+    : Math.abs(pricePct) < 3 ? '시세 수준'
+    : pricePct > 0 ? `시세보다 ${pricePct}% 높음`
+    : `시세보다 ${Math.abs(pricePct)}% 낮음`
+
+  return (
+    <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl px-4 py-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] text-[#5a4830] uppercase tracking-wider font-semibold flex items-center gap-1.5">
+          <BarChart2 size={11} className="text-[#d4a853]" /> 시세 현황
+        </p>
+        <span className="text-[10px] text-[#4a3820]">활성 리스팅 {cardMarket.activeCount}개</span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3 text-center">
+        {cardMarket.minPrice != null && (
+          <div>
+            <p className="text-sm font-bold text-emerald-400 tabular-nums">{cardMarket.minPrice.toLocaleString()}<span className="text-[10px] ml-0.5">P</span></p>
+            <p className="text-[10px] text-[#5a4830] mt-0.5">최저가</p>
+          </div>
+        )}
+        {cardMarket.avgBuyNow != null && (
+          <div>
+            <p className="text-sm font-bold text-[#e0b878] tabular-nums">{cardMarket.avgBuyNow.toLocaleString()}<span className="text-[10px] ml-0.5">P</span></p>
+            <p className="text-[10px] text-[#5a4830] mt-0.5">평균 즉구가</p>
+          </div>
+        )}
+        {cardMarket.maxPrice != null && (
+          <div>
+            <p className="text-sm font-bold text-[#f0a832] tabular-nums">{cardMarket.maxPrice.toLocaleString()}<span className="text-[10px] ml-0.5">P</span></p>
+            <p className="text-[10px] text-[#5a4830] mt-0.5">최고가</p>
+          </div>
+        )}
+      </div>
+
+      {cardMarket.recentAvgPrice != null && (
+        <div className="flex items-center justify-between pt-2 border-t border-[#2e2318]">
+          <div>
+            <p className="text-[10px] text-[#5a4830]">30일 평균 체결가 ({cardMarket.recentTxCount}건)</p>
+            <p className="text-sm font-bold text-[#f5ead8] tabular-nums mt-0.5">
+              {cardMarket.recentAvgPrice.toLocaleString()}P
+            </p>
+          </div>
+          {diffLabel && listingType !== 'OFFER' && (
+            <div className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-semibold border ${
+              pricePct === null || Math.abs(pricePct) < 3
+                ? 'bg-[#1a1208] border-[#2e2318] text-[#7a6040]'
+                : pricePct > 0
+                  ? 'bg-red-900/20 border-red-700/40 text-red-400'
+                  : 'bg-emerald-900/20 border-emerald-700/40 text-emerald-400'
+            }`}>
+              <PriceIndicator />
+              {diffLabel}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ─── Comparable Listings ──────────────────────── */
+interface ComparableListing {
+  id: string
+  listingType: string
+  condition: string
+  buyNowPrice: number | null
+  currentPrice: number | null
+  minOfferPrice: number | null
+  gradingCompany: string | null
+  gradingGrade: string | null
+  auctionEndsAt: string | null
+  status: string
+  seller: { id: string; nickname: string; avgRating: number | null }
+  _count: { bids: number }
+}
+
+function ComparableListings({ cardId, currentListingId }: { cardId: string; currentListingId: string }) {
+  const { data } = useQuery({
+    queryKey: ['card-listings', cardId],
+    queryFn: () => api.get(`/cards/${cardId}/listings`, { params: { limit: 6 } }).then(r => r.data),
+    staleTime: 30_000,
+  })
+
+  const listings: ComparableListing[] = (data?.listings ?? []).filter((l: ComparableListing) => l.id !== currentListingId)
+  if (!listings.length) return null
+
+  const typeIcon = (t: string) => t === 'AUCTION' ? <Gavel size={10} /> : t === 'OFFER' ? <Handshake size={10} /> : <Tag size={10} />
+  const price = (l: ComparableListing) => l.buyNowPrice ?? l.currentPrice ?? l.minOfferPrice
+
+  return (
+    <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl overflow-hidden">
+      <div className="px-4 py-3 border-b border-[#2e2318] flex items-center justify-between">
+        <p className="text-[10px] text-[#5a4830] uppercase tracking-wider font-semibold flex items-center gap-1.5">
+          <BarChart2 size={11} className="text-[#d4a853]" /> 이 카드의 다른 리스팅 ({listings.length})
+        </p>
+        <Link href={`/cards/${cardId}`} className="flex items-center gap-1 text-[10px] text-[#5a4830] hover:text-[#d4a853] transition-colors">
+          카드 도감 <ArrowRight size={10} />
+        </Link>
+      </div>
+      <div className="divide-y divide-[#1a1208]">
+        {listings.map(l => (
+          <Link key={l.id} href={`/listings/${l.id}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#1a1208] transition-colors group">
+            <div className={`flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded border ${
+              l.listingType === 'AUCTION' ? 'text-[#f0a832] border-[#3d2e0c] bg-[#2a1f08]'
+              : l.listingType === 'OFFER' ? 'text-emerald-400 border-emerald-700/40 bg-emerald-900/20'
+              : 'text-[#d4a853] border-[#3d2a0c] bg-[#2a1c08]'
+            }`}>
+              {typeIcon(l.listingType)}
+              {l.listingType === 'AUCTION' ? '경매' : l.listingType === 'OFFER' ? '제안' : '즉구'}
+            </div>
+            <span className="text-[11px] text-[#7a6040]">{CONDITION_LABELS[l.condition as keyof typeof CONDITION_LABELS] ?? l.condition}</span>
+            {l.gradingCompany && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#2a1c08] border border-[#3d2a0c] text-[#e0b878] font-bold">
+                {l.gradingCompany}{l.gradingGrade ? ` ${l.gradingGrade}` : ''}
+              </span>
+            )}
+            <span className="text-[11px] text-[#5a4830] truncate">{l.seller.nickname}</span>
+            {l.listingType === 'AUCTION' && l._count.bids > 0 && (
+              <span className="text-[10px] text-[#7a6040]">{l._count.bids}입찰</span>
+            )}
+            <span className="ml-auto text-sm font-bold text-[#f0a832] tabular-nums shrink-0 group-hover:text-white transition-colors">
+              {price(l) != null ? `${price(l)!.toLocaleString()}P` : '—'}
+            </span>
+          </Link>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 /* ─── Seller Reviews ─────────────────────────── */
@@ -682,6 +836,19 @@ export default function ListingDetailPage() {
             )}
           </div>
 
+          {/* 시세 현황 */}
+          {listing.cardMarket && (
+            <MarketStatsPanel
+              cardMarket={listing.cardMarket}
+              currentPrice={
+                listing.listingType === 'BUY_NOW' ? listing.buyNowPrice
+                : listing.listingType === 'AUCTION' ? (livePrice ?? listing.currentPrice)
+                : listing.minOfferPrice
+              }
+              listingType={listing.listingType}
+            />
+          )}
+
           {/* 판매자 신뢰 지표 */}
           {listing.sellerStats && (
             <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl px-4 py-4 space-y-3">
@@ -718,6 +885,9 @@ export default function ListingDetailPage() {
 
           {/* 이 카드 체결 가격 히스토리 */}
           <PriceHistoryChart cardId={listing.card.id} />
+
+          {/* 이 카드의 다른 리스팅 */}
+          <ComparableListings cardId={listing.card.id} currentListingId={listing.id} />
 
           {/* 판매자 리뷰 */}
           <SellerReviews sellerId={listing.sellerId} viewerId={user?.id ?? null} />

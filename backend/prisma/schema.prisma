@@ -180,6 +180,7 @@ model Listing {
   gradingGrade   String?  // "10", "9.5", "8" 등
 
   status        ListingStatus @default(ACTIVE)
+  viewCount     Int           @default(0)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
@@ -194,8 +195,10 @@ model Listing {
   @@index([cardId])
   @@index([sellerId])
   @@index([createdAt])
+  @@index([viewCount])
   @@index([status, listingType])
   @@index([status, listingType, auctionEndsAt])
+  @@index([condition])
 }
 
 enum ListingType {

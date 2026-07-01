@@ -34,6 +34,9 @@ export async function getListings(req: AuthRequest, res: Response) {
     const maxPrice = req.query.maxPrice as string | undefined
     const sort = req.query.sort as string | undefined
     const sellerId = req.query.sellerId as string | undefined
+    const condition = req.query.condition as string | undefined
+    const gradingCompany = req.query.gradingCompany as string | undefined
+    const hasGrading = req.query.hasGrading as string | undefined
     const rawPage = Number(req.query.page)
     const rawLimit = Number(req.query.limit)
     const page = Number.isFinite(rawPage) && rawPage > 0 ? Math.floor(rawPage) : 1
@@ -42,6 +45,10 @@ export async function getListings(req: AuthRequest, res: Response) {
     const where: Record<string, unknown> = { status: 'ACTIVE' }
     if (type) where.listingType = type
     if (sellerId) where.sellerId = sellerId
+    if (condition) where.condition = condition
+    if (hasGrading === 'true') where.gradingCompany = { not: null }
+    if (gradingCompany) where.gradingCompany = gradingCompany
+
     if (tcgType || cardName) {
       where.card = {
         ...(tcgType ? { tcgType } : {}),
@@ -83,26 +90,28 @@ export async function getListings(req: AuthRequest, res: Response) {
         return { buyNowPrice: dir }
       }
       if (sort === 'ending_soon') return { auctionEndsAt: 'asc' as const }
+      if (sort === 'popular')     return { viewCount: 'desc' as const }
+      if (sort === 'bid_count')   return [{ bids: { _count: 'desc' as const } }, { createdAt: 'desc' as const }]
       return { createdAt: 'desc' as const }
     })()
 
-    const skip = (Number(page) - 1) * Number(limit)
+    const skip = (page - 1) * limit
     const [listings, total] = await Promise.all([
       prisma.listing.findMany({
         where,
         include: {
-          card: { select: { id: true, name: true, nameKo: true, imageUrl: true, rarity: true, tcgType: true, setName: true, setCode: true, cardNumber: true } },
-          seller: { select: { id: true, nickname: true, avatarUrl: true } },
+          card: { select: { id: true, name: true, nameKo: true, imageUrl: true, rarity: true, tcgType: true, setName: true, setCode: true, cardNumber: true, cardTypes: true, supertype: true } },
+          seller: { select: { id: true, nickname: true, avatarUrl: true, avgRating: true, reviewCount: true } },
           _count: { select: { bids: true, offers: true } },
         },
-        orderBy,
+        orderBy: orderBy as Parameters<typeof prisma.listing.findMany>[0]['orderBy'],
         skip,
-        take: Number(limit),
+        take: limit,
       }),
       prisma.listing.count({ where }),
     ])
 
-    res.json({ listings, total, page: Number(page), limit: Number(limit) })
+    res.json({ listings, total, page, limit })
   } catch (err) {
     console.error('[getListings]', err)
     res.status(500).json({ message: '서버 오류가 발생했습니다.' })
@@ -111,9 +120,11 @@ export async function getListings(req: AuthRequest, res: Response) {
 
 export async function getListing(req: AuthRequest, res: Response) {
   try {
-    const [listing, sellerStats] = await Promise.all([
+    const listingId = String(req.params['id'])
+
+    const [listing] = await Promise.all([
       prisma.listing.findUnique({
-        where: { id: String(req.params['id']) },
+        where: { id: listingId },
         include: {
           card: true,
           seller: { select: { id: true, nickname: true, avatarUrl: true, avgRating: true, reviewCount: true } },
@@ -127,8 +138,6 @@ export async function getListing(req: AuthRequest, res: Response) {
             : undefined,
         },
       }),
-      // 판매자 신뢰 지표는 listing 조회 후 sellerId로 계산
-      null as null,  // placeholder — computed below after listing is confirmed
     ])
 
     if (!listing) {
@@ -136,8 +145,10 @@ export async function getListing(req: AuthRequest, res: Response) {
       return
     }
 
-    // 판매자 거래 신뢰 지표
-    const [totalSales, completedSales] = await Promise.all([
+    // 조회수 비동기 증가
+    prisma.listing.update({ where: { id: listingId }, data: { viewCount: { increment: 1 } } }).catch(() => {})
+
+    const [totalSales, completedSales, cardMarketStats] = await Promise.all([
       prisma.transaction.count({ where: { sellerId: listing.seller.id } }),
       prisma.transaction.count({
         where: {
@@ -145,7 +156,25 @@ export async function getListing(req: AuthRequest, res: Response) {
           txStatus: { in: ['COMPLETED', 'AUTO_COMPLETED'] },
         },
       }),
+      // 이 카드의 시장 현황 — 활성 리스팅 기준
+      prisma.listing.aggregate({
+        where: { cardId: listing.cardId, status: 'ACTIVE' },
+        _count: true,
+        _min: { buyNowPrice: true, currentPrice: true, minOfferPrice: true },
+        _max: { buyNowPrice: true, currentPrice: true, minOfferPrice: true },
+        _avg: { buyNowPrice: true },
+      }),
     ])
+
+    // 최근 30일 체결가 평균
+    const recentAvg = await prisma.transaction.aggregate({
+      where: {
+        listing: { cardId: listing.cardId },
+        completedAt: { gte: new Date(Date.now() - 30 * 24 * 3600 * 1000) },
+      },
+      _avg: { finalPrice: true },
+      _count: true,
+    })
 
     res.json({
       ...listing,
@@ -153,6 +182,14 @@ export async function getListing(req: AuthRequest, res: Response) {
         totalSales,
         completedSales,
         completionRate: totalSales > 0 ? Math.round((completedSales / totalSales) * 100) : null,
+      },
+      cardMarket: {
+        activeCount: cardMarketStats._count,
+        minPrice: cardMarketStats._min.buyNowPrice ?? cardMarketStats._min.currentPrice ?? cardMarketStats._min.minOfferPrice,
+        maxPrice: cardMarketStats._max.buyNowPrice ?? cardMarketStats._max.currentPrice ?? cardMarketStats._max.minOfferPrice,
+        avgBuyNow: cardMarketStats._avg.buyNowPrice ? Math.round(cardMarketStats._avg.buyNowPrice) : null,
+        recentAvgPrice: recentAvg._avg.finalPrice ? Math.round(recentAvg._avg.finalPrice) : null,
+        recentTxCount: recentAvg._count,
       },
     })
   } catch (err) {
@@ -210,7 +247,7 @@ export async function createListing(req: AuthRequest, res: Response) {
       include: { card: true },
     })
 
-    // 위시리스트 가격 알림 — 비동기 (응답 차단 X)
+    // 위시리스트 가격 알림 — 비동기
     ;(async () => {
       try {
         const listingPrice = data.buyNowPrice ?? data.minOfferPrice ?? data.startingPrice
@@ -219,8 +256,8 @@ export async function createListing(req: AuthRequest, res: Response) {
         const alerts = await prisma.wishlist.findMany({
           where: {
             cardId: data.cardId,
-            userId: { not: req.userId! }, // 본인 제외
-            targetPrice: { gte: listingPrice }, // 목표가 이상이어야 알림 발생
+            userId: { not: req.userId! },
+            targetPrice: { gte: listingPrice },
           },
           select: { userId: true, targetPrice: true },
         })
@@ -286,7 +323,6 @@ export async function buyNow(req: AuthRequest, res: Response) {
             gradingGrade: listing.gradingGrade, imageUrls: listing.imageUrls,
           },
         })
-        // 채팅방 생성 (없으면)
         await tx.chatRoom.upsert({
           where: { listingId_buyerId: { listingId: listing.id, buyerId: req.userId! } },
           create: {
@@ -337,13 +373,12 @@ export async function placeBid(req: AuthRequest, res: Response) {
 
     const bidder = await prisma.user.findUnique({ where: { id: req.userId }, select: { nickname: true, balance: true } })
 
-    // 현재 최고 입찰자 (밀릴 예정)
     const prevWinningBid = await prisma.bid.findFirst({
       where: { listingId: listing.id, isWinning: true },
       select: { bidderId: true },
     })
 
-    // ── 즉시낙찰 처리 ─────────────────────────────────────────────────────────
+    // ── 즉시낙찰 처리 ────────────────────────────────────────────────────────
     if (listing.instantBuyPrice != null && amount >= listing.instantBuyPrice) {
       if (!bidder || bidder.balance < amount) {
         res.status(400).json({ message: '잔액이 부족합니다.' })
@@ -423,7 +458,6 @@ export async function placeBid(req: AuthRequest, res: Response) {
       }),
     ])
 
-    // 이전 최고 입찰자에게 밀림 알림
     if (prevWinningBid && prevWinningBid.bidderId !== req.userId) {
       notify({
         userId: prevWinningBid.bidderId,
@@ -522,7 +556,6 @@ export async function respondToOffer(req: AuthRequest, res: Response) {
         return
       }
       await prisma.$transaction(async (tx) => {
-        // 잔액 차감을 where 조건에 포함해 원자적으로 검증 (TOCTOU 방지)
         const balanceUpdated = await tx.user.updateMany({
           where: { id: offer.buyerId, balance: { gte: offer.amount } },
           data: { balance: { decrement: offer.amount } },
@@ -583,6 +616,114 @@ export async function respondToOffer(req: AuthRequest, res: Response) {
     const e = err as { status?: number; message?: string }
     if (e.status) { res.status(e.status).json({ message: e.message }); return }
     console.error('[respondToOffer]', err)
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' })
+  }
+}
+
+// ── 시장 현황 요약 ─────────────────────────────────────────────────────────────
+export async function getMarketSummary(req: AuthRequest, res: Response) {
+  try {
+    const now = new Date()
+    const since24h = new Date(now.getTime() - 24 * 3600 * 1000)
+    const since7d  = new Date(now.getTime() - 7 * 24 * 3600 * 1000)
+
+    const [
+      activeCount,
+      activeAuctions,
+      tx24h,
+      tx7d,
+      topCards,
+      recentDeals,
+    ] = await Promise.all([
+      // 활성 리스팅 수
+      prisma.listing.count({ where: { status: 'ACTIVE' } }),
+      // 진행 중 경매 수
+      prisma.listing.count({ where: { status: 'ACTIVE', listingType: 'AUCTION' } }),
+      // 24h 체결 건수 + 총액
+      prisma.transaction.aggregate({
+        where: { completedAt: { gte: since24h } },
+        _count: true,
+        _sum: { finalPrice: true },
+        _avg: { finalPrice: true },
+      }),
+      // 7일 체결 건수 + 총액
+      prisma.transaction.aggregate({
+        where: { completedAt: { gte: since7d } },
+        _count: true,
+        _sum: { finalPrice: true },
+      }),
+      // 최근 7일 가장 많이 거래된 카드 TOP 5
+      prisma.transaction.groupBy({
+        by: ['listingId'],
+        where: { completedAt: { gte: since7d } },
+        _count: { listingId: true },
+        _avg: { finalPrice: true },
+        orderBy: { _count: { listingId: 'desc' } },
+        take: 10,
+      }).then(async (rows) => {
+        if (!rows.length) return []
+        const listingIds = rows.map(r => r.listingId)
+        const listings = await prisma.listing.findMany({
+          where: { id: { in: listingIds } },
+          select: { id: true, card: { select: { id: true, name: true, nameKo: true, imageUrl: true, tcgType: true, rarity: true } } },
+        })
+        return rows.slice(0, 5).map(r => {
+          const l = listings.find(x => x.id === r.listingId)
+          return {
+            cardId: l?.card.id,
+            name: l?.card.nameKo ?? l?.card.name,
+            imageUrl: l?.card.imageUrl,
+            tcgType: l?.card.tcgType,
+            rarity: l?.card.rarity,
+            txCount: r._count.listingId,
+            avgPrice: r._avg.finalPrice ? Math.round(r._avg.finalPrice) : null,
+          }
+        }).filter(r => r.cardId)
+      }),
+      // 최근 체결 5건
+      prisma.transaction.findMany({
+        where: { completedAt: { gte: since24h } },
+        orderBy: { completedAt: 'desc' },
+        take: 5,
+        select: {
+          id: true, finalPrice: true, completedAt: true,
+          listing: { select: { card: { select: { name: true, nameKo: true, imageUrl: true, tcgType: true } }, listingType: true } },
+        },
+      }),
+    ])
+
+    // TCG 별 활성 리스팅 분포
+    const tcgBreakdown = await prisma.listing.groupBy({
+      by: ['cardId'],
+      where: { status: 'ACTIVE' },
+      _count: true,
+    })
+
+    res.json({
+      activeCount,
+      activeAuctions,
+      tx24h: {
+        count: tx24h._count,
+        volume: tx24h._sum.finalPrice ?? 0,
+        avgPrice: tx24h._avg.finalPrice ? Math.round(tx24h._avg.finalPrice) : null,
+      },
+      tx7d: {
+        count: tx7d._count,
+        volume: tx7d._sum.finalPrice ?? 0,
+      },
+      topCards,
+      recentDeals: recentDeals.map(d => ({
+        id: d.id,
+        finalPrice: d.finalPrice,
+        completedAt: d.completedAt,
+        cardName: d.listing.card.nameKo ?? d.listing.card.name,
+        cardImage: d.listing.card.imageUrl,
+        tcgType: d.listing.card.tcgType,
+        listingType: d.listing.listingType,
+      })),
+    })
+  } catch (err) {
+    console.error('[getMarketSummary]', err)
     res.status(500).json({ message: '서버 오류가 발생했습니다.' })
   }
 }

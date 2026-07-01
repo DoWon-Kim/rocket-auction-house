@@ -23,10 +23,11 @@ interface SiteMenu {
 
 const FALLBACK_MENUS: SiteMenu[] = [
   { key: 'marketplace', label: '마켓플레이스', path: '/listings', enabled: true, order: 0 },
-  { key: 'cards',       label: '카드 도감',    path: '/cards',    enabled: true, order: 1 },
-  { key: 'shop',        label: '숍',           path: '/shop',     enabled: true, order: 2 },
-  { key: 'notice',      label: '공지/이벤트',  path: '/notice',   enabled: true, order: 3 },
-  { key: 'community',   label: '공유 게시판',  path: '/community', enabled: true, order: 4 },
+  { key: 'market',      label: '시장 분석',    path: '/market',   enabled: true, order: 1 },
+  { key: 'cards',       label: '카드 도감',    path: '/cards',    enabled: true, order: 2 },
+  { key: 'shop',        label: '숍',           path: '/shop',     enabled: true, order: 3 },
+  { key: 'notice',      label: '공지/이벤트',  path: '/notice',   enabled: true, order: 4 },
+  { key: 'community',   label: '공유 게시판',  path: '/community', enabled: true, order: 5 },
 ]
 
 export default function Navbar() {

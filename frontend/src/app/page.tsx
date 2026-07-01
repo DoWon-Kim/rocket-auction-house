@@ -2,10 +2,11 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { Gavel, Tag, Handshake, Package, ChevronRight, ShieldCheck, Zap, TrendingUp } from 'lucide-react'
+import { Gavel, Tag, Handshake, Package, ChevronRight, ShieldCheck, Zap, TrendingUp, BarChart2 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import ListingCard from '@/components/ListingCard'
+import { TCG_LABELS } from '@/lib/utils'
 
 const FEATURES = [
   {
@@ -42,6 +43,38 @@ const FEATURES = [
   },
 ]
 
+interface MarketSummary {
+  activeCount: number
+  activeAuctions: number
+  tx24h: { count: number; volume: number; avgPrice: number | null }
+  tx7d: { count: number; volume: number }
+  topCards: { cardId: string; name: string; imageUrl: string | null; tcgType: string; txCount: number; avgPrice: number | null }[]
+  recentDeals: { id: string; finalPrice: number; completedAt: string; cardName: string; cardImage: string | null; tcgType: string; listingType: string }[]
+}
+
+function MarketStatsBanner({ data }: { data: MarketSummary | undefined }) {
+  if (!data) return null
+  const stats = [
+    { label: '활성 리스팅', value: data.activeCount.toLocaleString(), suffix: '개', color: 'text-[#e0b878]' },
+    { label: '진행 중 경매', value: data.activeAuctions.toLocaleString(), suffix: '개', color: 'text-[#f0a832]' },
+    { label: '24h 체결', value: data.tx24h.count.toLocaleString(), suffix: '건', color: 'text-emerald-400' },
+    { label: '7일 거래량', value: data.tx7d.count.toLocaleString(), suffix: '건', color: 'text-blue-400' },
+    { label: '24h 거래액', value: data.tx24h.volume > 0 ? `${(data.tx24h.volume / 10000).toFixed(1)}만`, suffix: 'P', color: 'text-purple-400' },
+  ]
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      {stats.map(s => (
+        <div key={s.label} className="bg-[#1a1410] border border-[#2e2318] hover:border-[#3a2a18] rounded-xl px-4 py-3 transition-colors">
+          <p className={`text-xl font-extrabold tabular-nums leading-none ${s.color}`}>
+            {s.value}<span className="text-sm ml-0.5">{s.suffix}</span>
+          </p>
+          <p className="text-[11px] text-[#5a4830] mt-1">{s.label}</p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 const TCG_LIST = [
   { name: '포켓몬', emoji: '⚡' },
   { name: '유희왕', emoji: '👁' },
@@ -64,15 +97,20 @@ export default function Home() {
     queryFn: () => api.get('/listings', { params: { limit: 8, sort: 'newest' } }).then(r => r.data),
     staleTime: 60_000,
   })
-
   const { data: auctionData } = useQuery({
     queryKey: ['listings', 'live-auctions-home'],
     queryFn: () => api.get('/listings', { params: { limit: 4, type: 'AUCTION', sort: 'ending_soon' } }).then(r => r.data),
     staleTime: 30_000,
   })
+  const { data: marketData } = useQuery<MarketSummary>({
+    queryKey: ['market-summary'],
+    queryFn: () => api.get('/listings/market-summary').then(r => r.data),
+    staleTime: 60_000,
+  })
 
   const recentListings = recentData?.listings ?? []
   const liveAuctions = auctionData?.listings ?? []
+  const topCards = marketData?.topCards ?? []
 
   return (
     <div className="space-y-20">
@@ -144,6 +182,55 @@ export default function Home() {
             ))}
           </div>
         </div>
+      </section>
+
+      {/* ── Market Stats ─────────────────────── */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <BarChart2 size={17} className="text-[#d4a853]" />
+            <h2 className="text-lg font-bold text-white">시장 현황</h2>
+          </div>
+          <Link href="/market" className="flex items-center gap-1 text-sm text-[#7a6040] hover:text-[#d4a853] transition-colors">
+            상세 분석 <ChevronRight size={14} />
+          </Link>
+        </div>
+        <MarketStatsBanner data={marketData} />
+
+        {/* 7일 인기 카드 */}
+        {topCards.length > 0 && (
+          <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-[#2e2318]">
+              <p className="text-[10px] text-[#5a4830] uppercase tracking-wider font-semibold flex items-center gap-1.5">
+                <TrendingUp size={11} className="text-[#d4a853]" /> 7일 인기 카드 TOP {topCards.length}
+              </p>
+            </div>
+            <div className="divide-y divide-[#150f0c]">
+              {topCards.map((card, idx) => (
+                <Link key={card.cardId} href={`/cards/${card.cardId}`}
+                  className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#1a1208] transition-colors group">
+                  <span className={`w-5 text-center text-xs font-black shrink-0 ${
+                    idx === 0 ? 'text-[#f0a832]' : idx === 1 ? 'text-[#9e9e9e]' : idx === 2 ? 'text-[#cd7f32]' : 'text-[#4a3820]'
+                  }`}>{idx + 1}</span>
+                  {card.imageUrl
+                    ? <div className="relative w-8 h-11 shrink-0 rounded overflow-hidden bg-[#0f0b08]">
+                        <Image src={card.imageUrl} alt={card.name ?? ''} fill className="object-contain" sizes="32px" />
+                      </div>
+                    : <div className="w-8 h-11 shrink-0 rounded bg-[#1a1208] flex items-center justify-center text-xs">🃏</div>
+                  }
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-[#e8d5b0] truncate group-hover:text-white transition-colors font-medium">{card.name}</p>
+                    <p className="text-[10px] text-[#5a4830]">{TCG_LABELS[card.tcgType] ?? card.tcgType} · {card.txCount}건 거래</p>
+                  </div>
+                  {card.avgPrice && (
+                    <p className="text-sm font-bold text-[#f0a832] tabular-nums shrink-0">{card.avgPrice.toLocaleString()}<span className="text-[10px] ml-0.5">P</span></p>
+                  )}
+                  <ChevronRight size={13} className="text-[#3a2818] group-hover:text-[#7a6040] transition-colors shrink-0" />
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* ── Trade types ──────────────────────── */}
