@@ -20,7 +20,6 @@ const SCRYFALL_HEADERS = {
 const LANG_PREFIXES = ['tcgdex_ko_', 'tcgdex_ja_', 'mtg_ko_', 'mtg_ja_']
 
 // pokemontcg.io (sv1, swsh1) ↔ TCGdex (sv01, swsh01) 세트 코드 교차 변환
-// 두 API는 숫자 패딩 방식이 달라 동일 세트가 다른 코드로 저장됨
 function pokemonSetCodeVariants(code: string): string[] {
   if (!code) return []
   const lower = code.toLowerCase()
@@ -36,6 +35,38 @@ function pokemonSetCodeVariants(code: string): string[] {
   // sv01 → sv1, sm03pt5 → sm3pt5 (0 패딩 제거)
   const unpadded = lower.replace(/^([a-z]+)0(\d)(.*)$/, '$1$2$3')
   variants.add(unpadded)
+
+  return [...variants].filter(Boolean)
+}
+
+// 카드 번호 정규화: 양쪽 API의 표기 차이를 흡수해 다양한 변형을 반환
+// pokemontcg.io "TG01/TG30" ↔ TCGdex "TG01"
+// pokemontcg.io "001" ↔ TCGdex "1"
+function normalizeCardNumber(num: string): string[] {
+  const n = num.trim()
+  const variants = new Set<string>([n])
+
+  // "TG01/TG30" → "TG01" (슬래시 뒤 총 수량 제거)
+  const slashIdx = n.indexOf('/')
+  if (slashIdx > 0) {
+    const base = n.slice(0, slashIdx).trim()
+    variants.add(base)
+    // base가 순수 숫자이면 패딩 변형도 추가
+    if (/^\d+$/.test(base)) {
+      const int = parseInt(base, 10)
+      variants.add(String(int))
+      variants.add(String(int).padStart(2, '0'))
+      variants.add(String(int).padStart(3, '0'))
+    }
+  }
+
+  // 순수 숫자: 패딩 변형
+  if (/^\d+$/.test(n)) {
+    const int = parseInt(n, 10)
+    variants.add(String(int))           // "001" → "1"
+    variants.add(String(int).padStart(2, '0'))  // "1" → "01"
+    variants.add(String(int).padStart(3, '0'))  // "1" → "001"
+  }
 
   return [...variants].filter(Boolean)
 }
@@ -267,84 +298,202 @@ export async function importPokemon(req: AuthRequest, res: Response) {
   }
 }
 
-// ── 포켓몬 이름 보강 (KO / JA) ────────────────────────────────────────────────
-// 기존 방식(카드별 ID 조회)은 pokemontcg.io(sv1-1)↔TCGdex(sv01-1) ID 불일치로 대부분 실패함
-// 개선: 세트 단위로 TCGdex에서 카드 목록을 받아 localId(카드번호)로 매칭
+// ── 포켓몬 이름 보강 (KO / JA) — SSE 스트리밍 ───────────────────────────────
+// 개선 내역:
+//   1) SSE 스트리밍으로 HTTP 타임아웃 방지 + 실시간 진행 상황 전달
+//   2) normalizeCardNumber()로 "TG01/TG30"↔"TG01", "001"↔"1" 불일치 해소
+//   3) 전략 1: TCGdex API (세트 코드 변형 순서대로 시도)
+//   4) 전략 2: 우리 DB의 기존 tcgdex_{lang}_* 레코드에서 이름 보충
+//   5) 세트당 배치 업데이트 (prisma.$transaction, 청크 100건)
+//   6) TCGdex 미지원 세트와 매칭 실패를 별도 카운터로 분리
 
-async function enrichPokemonNames(lang: 'ko' | 'ja', res: Response) {
+async function enrichPokemonNames(lang: 'ko' | 'ja', req: AuthRequest, res: Response) {
   const field = lang === 'ko' ? 'nameKo' : 'nameJa'
 
-  const cards = await prisma.card.findMany({
-    where: {
-      tcgType: 'POKEMON',
-      setCode: { not: null },
-      cardNumber: { not: null },
-      [field]: null,
-    },
-    select: { id: true, setCode: true, cardNumber: true },
-    take: 5000,
-  })
+  // SSE 헤더 설정
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.setHeader('X-Accel-Buffering', 'no')
+  res.flushHeaders()
 
-  if (cards.length === 0) {
-    res.json({ updated: 0, failed: 0, total: 0, message: '보강할 카드가 없습니다.' })
-    return
+  let closed = false
+  req.on('close', () => { closed = true })
+
+  const send = (data: Record<string, unknown>) => {
+    if (!closed && !res.writableEnded) res.write(`data: ${JSON.stringify(data)}\n\n`)
   }
 
-  // 세트별 그룹화
-  const bySet = new Map<string, Array<{ id: string; cardNumber: string }>>()
-  for (const card of cards) {
-    if (!card.setCode || !card.cardNumber) continue
-    const group = bySet.get(card.setCode) ?? []
-    group.push({ id: card.id, cardNumber: card.cardNumber })
-    bySet.set(card.setCode, group)
-  }
+  const heartbeat = setInterval(() => {
+    if (!closed && !res.writableEnded) res.write(': heartbeat\n\n')
+  }, 15_000)
 
-  let updated = 0, failed = 0
+  try {
+    // 이름 없는 기본(EN) 포켓몬 카드 전체 조회 (언어 전용 레코드 제외)
+    const cards = await prisma.card.findMany({
+      where: {
+        tcgType: 'POKEMON',
+        setCode:    { not: null },
+        cardNumber: { not: null },
+        [field]: null,
+        NOT: { OR: LANG_PREFIXES.map(p => ({ externalId: { startsWith: p } })) },
+      },
+      select: { id: true, setCode: true, cardNumber: true },
+    })
 
-  for (const [setCode, setCards] of bySet) {
-    const variants = pokemonSetCodeVariants(setCode)
-    let tcgdexCards: TcgdexCard[] | null = null
-
-    // 세트 코드 변형 순서대로 TCGdex 세트 조회 시도
-    for (const code of variants) {
-      try {
-        const data = await fetchWithRetry<TcgdexSetDetail>(
-          `https://api.tcgdex.net/v2/${lang}/sets/${code}`,
-          { timeoutMs: 10_000, retries: 1, cacheTtlMs: SET_CACHE },
-        )
-        if (Array.isArray(data.cards) && data.cards.length > 0) {
-          tcgdexCards = data.cards
-          break
-        }
-      } catch { /* 다음 변형 시도 */ }
+    if (cards.length === 0) {
+      send({ type: 'done', updated: 0, failed: 0, notInTcgdex: 0, total: 0, message: '보강할 카드가 없습니다.' })
+      return
     }
 
-    if (!tcgdexCards) {
-      failed += setCards.length
-      await sleep(80)
-      continue
+    // 세트별 그룹화
+    const bySet = new Map<string, Array<{ id: string; cardNumber: string }>>()
+    for (const card of cards) {
+      if (!card.setCode || !card.cardNumber) continue
+      const arr = bySet.get(card.setCode) ?? []
+      arr.push({ id: card.id, cardNumber: card.cardNumber })
+      bySet.set(card.setCode, arr)
     }
 
-    const byLocalId = new Map(tcgdexCards.map(c => [c.localId, c]))
+    send({ type: 'start', total: cards.length, sets: bySet.size })
 
-    for (const card of setCards) {
-      const tcgCard = byLocalId.get(card.cardNumber)
-      if (tcgCard?.name) {
-        await prisma.card.update({ where: { id: card.id }, data: { [field]: tcgCard.name } })
-        updated++
-      } else {
-        failed++
+    let totalUpdated = 0, totalFailed = 0, totalNotInTcgdex = 0
+
+    for (const [setCode, setCards] of bySet) {
+      if (closed) break
+
+      const codeVariants = pokemonSetCodeVariants(setCode)
+
+      // ── 전략 1: TCGdex API ──────────────────────────────────────────────
+      let tcgdexCards: TcgdexCard[] | null = null
+      for (const code of codeVariants) {
+        if (closed) break
+        try {
+          const data = await fetchWithRetry<TcgdexSetDetail>(
+            `https://api.tcgdex.net/v2/${lang}/sets/${code}`,
+            { timeoutMs: 10_000, retries: 1, cacheTtlMs: SET_CACHE },
+          )
+          if (Array.isArray(data.cards) && data.cards.length > 0) {
+            tcgdexCards = data.cards
+            break
+          }
+        } catch { /* 다음 변형 */ }
       }
+
+      if (tcgdexCards) {
+        // 정규화된 카드번호 맵 구성
+        const byNum = new Map<string, string>() // normalizedNum → name
+        for (const c of tcgdexCards) {
+          if (!c.name) continue
+          for (const v of normalizeCardNumber(c.localId)) {
+            byNum.set(v.toLowerCase(), c.name)
+          }
+        }
+
+        const toUpdate: Array<{ id: string; name: string }> = []
+        let setFailed = 0
+
+        for (const card of setCards) {
+          const name = normalizeCardNumber(card.cardNumber)
+            .reduce((found: string | undefined, v) => found ?? byNum.get(v.toLowerCase()), undefined)
+          if (name) {
+            toUpdate.push({ id: card.id, name })
+          } else {
+            setFailed++
+          }
+        }
+
+        // 청크 단위 배치 업데이트
+        const CHUNK = 100
+        for (let i = 0; i < toUpdate.length; i += CHUNK) {
+          const chunk = toUpdate.slice(i, i + CHUNK)
+          await prisma.$transaction(
+            chunk.map(u => prisma.card.update({ where: { id: u.id }, data: { [field]: u.name } }))
+          )
+        }
+
+        totalUpdated  += toUpdate.length
+        totalFailed   += setFailed
+        send({
+          type: 'set-done', strategy: 'tcgdex', setCode,
+          updated: toUpdate.length, failed: setFailed,
+        })
+        await sleep(120)
+        continue
+      }
+
+      // ── 전략 2: 우리 DB의 기존 언어 레코드에서 이름 보충 ───────────────
+      const langPrefix = `tcgdex_${lang}_`
+      const dbLangCards = await prisma.card.findMany({
+        where: {
+          tcgType: 'POKEMON',
+          externalId: { startsWith: langPrefix },
+          setCode: { in: codeVariants },
+          nameKo: lang === 'ko' ? { not: null } : undefined,
+          nameJa: lang === 'ja' ? { not: null } : undefined,
+        },
+        select: { cardNumber: true, nameKo: true, nameJa: true },
+      })
+
+      if (dbLangCards.length > 0) {
+        const byNum = new Map<string, string>()
+        for (const c of dbLangCards) {
+          const name = lang === 'ko' ? c.nameKo : c.nameJa
+          if (!name || !c.cardNumber) continue
+          for (const v of normalizeCardNumber(c.cardNumber)) {
+            byNum.set(v.toLowerCase(), name)
+          }
+        }
+
+        const toUpdate: Array<{ id: string; name: string }> = []
+        let setFailed = 0
+
+        for (const card of setCards) {
+          const name = normalizeCardNumber(card.cardNumber)
+            .reduce((found: string | undefined, v) => found ?? byNum.get(v.toLowerCase()), undefined)
+          if (name) {
+            toUpdate.push({ id: card.id, name })
+          } else {
+            setFailed++
+          }
+        }
+
+        const CHUNK = 100
+        for (let i = 0; i < toUpdate.length; i += CHUNK) {
+          const chunk = toUpdate.slice(i, i + CHUNK)
+          await prisma.$transaction(
+            chunk.map(u => prisma.card.update({ where: { id: u.id }, data: { [field]: u.name } }))
+          )
+        }
+
+        totalUpdated  += toUpdate.length
+        totalFailed   += setFailed
+        send({
+          type: 'set-done', strategy: 'db', setCode,
+          updated: toUpdate.length, failed: setFailed,
+        })
+        await sleep(50)
+        continue
+      }
+
+      // ── 두 전략 모두 실패: TCGdex 미지원 세트 ──────────────────────────
+      totalNotInTcgdex += setCards.length
+      send({ type: 'set-skip', setCode, count: setCards.length })
+      await sleep(50)
     }
 
-    await sleep(150)
+    send({ type: 'done', updated: totalUpdated, failed: totalFailed, notInTcgdex: totalNotInTcgdex, total: cards.length })
+  } catch (err) {
+    console.error('[enrichPokemonNames]', err)
+    send({ type: 'error', message: String(err) })
+  } finally {
+    clearInterval(heartbeat)
+    res.end()
   }
-
-  res.json({ updated, failed, total: cards.length })
 }
 
-export async function enrichPokemonKoNames(_req: AuthRequest, res: Response) { await enrichPokemonNames('ko', res) }
-export async function enrichPokemonJaNames(_req: AuthRequest, res: Response) { await enrichPokemonNames('ja', res) }
+export async function enrichPokemonKoNames(req: AuthRequest, res: Response) { await enrichPokemonNames('ko', req, res) }
+export async function enrichPokemonJaNames(req: AuthRequest, res: Response) { await enrichPokemonNames('ja', req, res) }
 
 // ── 유희왕 YGOProDeck ─────────────────────────────────────────────────────────
 
@@ -635,13 +784,181 @@ export async function importYugiohAll(_req: AuthRequest, res: Response) {
   }
 }
 
+// ── 원피스 카드 게임 (Official Bandai Site) ───────────────────────────────────
+
+const OP_SITE = 'https://en.onepiece-cardgame.com'
+
+// 알려진 세트 목록 (세트가 추가될 때 여기에 추가)
+export const OP_KNOWN_SETS = [
+  // 부스터 팩
+  { id: 'OP-01', name: 'Romance Dawn',                            total: 121, releaseDate: '2022-12-02' },
+  { id: 'OP-02', name: 'Paramount War',                           total: 121, releaseDate: '2023-03-10' },
+  { id: 'OP-03', name: 'Pillars of Strength',                     total: 121, releaseDate: '2023-06-30' },
+  { id: 'OP-04', name: 'Kingdoms of Intrigue',                    total: 122, releaseDate: '2023-09-22' },
+  { id: 'OP-05', name: 'Awakening of the New Era',                total: 120, releaseDate: '2023-12-08' },
+  { id: 'OP-06', name: 'Wings of the Captain',                    total: 120, releaseDate: '2024-03-08' },
+  { id: 'OP-07', name: 'Five Hundred Years in the Future',        total: 119, releaseDate: '2024-06-28' },
+  { id: 'OP-08', name: 'Two Legends',                             total: 120, releaseDate: '2024-10-25' },
+  { id: 'OP-09', name: 'Emperors in the New World',               total: 100, releaseDate: '2025-01-24' },
+  { id: 'OP-10', name: 'Royal Blood',                             total: 100, releaseDate: '2025-04-25' },
+  // 이벤트 / 기념 부스터
+  { id: 'EB-01', name: 'Memorial Collection',                     total: 61,  releaseDate: '2024-08-08' },
+  { id: 'EB-02', name: 'Memorial Collection Vol.2',               total: 55,  releaseDate: '2025-04-25' },
+  // 스타터 덱
+  { id: 'ST-01', name: 'Straw Hat Crew',                          total: 17,  releaseDate: '2022-12-02' },
+  { id: 'ST-02', name: 'Worst Generation',                        total: 17,  releaseDate: '2022-12-02' },
+  { id: 'ST-03', name: 'The Seven Warlords of the Sea',           total: 17,  releaseDate: '2022-12-02' },
+  { id: 'ST-04', name: 'Animal Kingdom Pirates',                  total: 17,  releaseDate: '2023-03-10' },
+  { id: 'ST-05', name: 'FILM Edition',                            total: 18,  releaseDate: '2023-03-10' },
+  { id: 'ST-06', name: 'Absolute Justice',                        total: 18,  releaseDate: '2023-06-30' },
+  { id: 'ST-07', name: 'Big Mom Pirates',                         total: 17,  releaseDate: '2023-06-30' },
+  { id: 'ST-08', name: 'Monkey D. Luffy',                         total: 17,  releaseDate: '2023-09-22' },
+  { id: 'ST-09', name: 'Yamato',                                  total: 17,  releaseDate: '2023-09-22' },
+  { id: 'ST-10', name: 'Bond Episode: Zoro & Sanji',              total: 43,  releaseDate: '2023-09-22' },
+  { id: 'ST-11', name: 'Uta',                                     total: 17,  releaseDate: '2023-09-22' },
+  { id: 'ST-12', name: 'Zoro and Sanji',                          total: 42,  releaseDate: '2023-12-08' },
+  { id: 'ST-13', name: 'The Three Captains',                      total: 42,  releaseDate: '2024-03-08' },
+  { id: 'ST-14', name: 'Big Secret Treasure of the Seven Seas!',  total: 43,  releaseDate: '2024-06-28' },
+  { id: 'ST-15', name: 'Red Purple Luffy',                        total: 43,  releaseDate: '2024-10-25' },
+  { id: 'ST-16', name: 'Green Yellow Charlotte Linlin',           total: 43,  releaseDate: '2024-10-25' },
+  { id: 'ST-17', name: 'Black Yellow Nico Robin',                 total: 43,  releaseDate: '2024-10-25' },
+  { id: 'ST-18', name: 'Purple Blue Monkey D. Garp',              total: 43,  releaseDate: '2025-01-24' },
+  { id: 'ST-19', name: 'Blue Black Monkey D. Luffy',              total: 43,  releaseDate: '2025-01-24' },
+  { id: 'ST-20', name: 'Red Blue Sabo',                           total: 43,  releaseDate: '2025-04-25' },
+]
+
+interface ParsedOpCard { number: string; name: string; rarity: string; imageUrl: string | null }
+
+// 공식 사이트 HTML에서 카드 파싱 (여러 HTML 구조 대응)
+function parseOpHtml(html: string): ParsedOpCard[] {
+  const cards: ParsedOpCard[] = []
+  const seen = new Set<string>()
+
+  // 이미지 경로에서 카드 번호 추출: /images/card/OP01-001.png
+  const imgRe = /\/images\/card\/([A-Z0-9-]+(?:_p\d+)?)\.(?:png|jpg|webp)/gi
+  let m: RegExpExecArray | null
+  while ((m = imgRe.exec(html)) !== null) {
+    const num = m[1].toUpperCase()
+    if (!seen.has(num)) seen.add(num)
+  }
+
+  for (const num of seen) {
+    const esc = num.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+    // 카드 이름: 카드번호 주변 500자 이내에서 name 클래스 탐색
+    const nameRe = new RegExp(`${esc}[\\s\\S]{0,600}<p[^>]*class="[^"]*name[^"]*"[^>]*>\\s*([^<]+)\\s*<\\/p>`, 'i')
+    // 희귀도
+    const rarityRe = new RegExp(`${esc}[\\s\\S]{0,400}<p[^>]*class="[^"]*rarity[^"]*"[^>]*>\\s*([^<]+)\\s*<\\/p>`, 'i')
+
+    const nameMt = nameRe.exec(html)
+    const rarityMt = rarityRe.exec(html)
+
+    cards.push({
+      number: num,
+      name:   nameMt   ? nameMt[1].trim()   : num,
+      rarity: rarityMt ? rarityMt[1].trim() : 'Unknown',
+      imageUrl: `${OP_SITE}/images/card/${num}.png`,
+    })
+  }
+
+  return cards
+}
+
+// 공식 사이트로부터 특정 세트 카드 데이터 취득
+async function fetchOpCardsFromSite(setId: string): Promise<ParsedOpCard[]> {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 20_000)
+
+  try {
+    const body = new URLSearchParams({ 'series[]': setId })
+    const res = await fetch(`${OP_SITE}/cardlist/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent':   'Mozilla/5.0 (compatible; RocketAuctionHouse/1.0)',
+        'Accept':       'text/html,application/xhtml+xml,*/*',
+        'Referer':      `${OP_SITE}/cardlist/`,
+      },
+      body: body.toString(),
+      signal: ctrl.signal,
+    })
+    clearTimeout(timer)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return parseOpHtml(await res.text())
+  } catch {
+    clearTimeout(timer)
+    throw new Error(`원피스 공식 사이트 취득 실패: ${setId}`)
+  }
+}
+
+// 세트 정보에서 카드 번호를 생성해 기본 레코드 구성 (파싱 실패 대비 폴백)
+function generateOpFallbackCards(setId: string, total: number): ParsedOpCard[] {
+  // OP-01 → OP01, ST-01 → ST01, EB-01 → EB01
+  const prefix = setId.replace('-', '')
+  const cards: ParsedOpCard[] = []
+  for (let i = 1; i <= total; i++) {
+    const num = `${prefix}-${String(i).padStart(3, '0')}`
+    cards.push({ number: num, name: num, rarity: 'Unknown', imageUrl: `${OP_SITE}/images/card/${num}.png` })
+  }
+  return cards
+}
+
+export async function getOnePieceSets(_req: AuthRequest, res: Response) {
+  res.json(OP_KNOWN_SETS)
+}
+
+export async function importOnePiece(req: AuthRequest, res: Response) {
+  const { setId } = req.body as { setId?: string }
+  if (!setId) { res.status(400).json({ message: 'setId가 필요합니다.' }); return }
+
+  const setInfo = OP_KNOWN_SETS.find(s => s.id === setId)
+  if (!setInfo) { res.status(404).json({ message: '알려지지 않은 원피스 TCG 세트입니다.' }); return }
+
+  try {
+    let cards: ParsedOpCard[]
+    let usedFallback = false
+
+    try {
+      cards = await fetchOpCardsFromSite(setId)
+      if (cards.length === 0) throw new Error('파싱 결과 0건')
+    } catch {
+      // 공식 사이트 파싱 실패 → 카드 번호 기반 폴백 레코드 생성
+      cards = generateOpFallbackCards(setId, setInfo.total)
+      usedFallback = true
+    }
+
+    const records = cards.map(c => ({
+      externalId: `onepiece_${c.number}`,
+      name:       c.name,
+      tcgType:    'ONEPIECE' as const,
+      setName:    setInfo.name,
+      setCode:    setId,
+      cardNumber: c.number,
+      rarity:     c.rarity,
+      imageUrl:   c.imageUrl,
+    }))
+
+    const result = await prisma.card.createMany({ data: records, skipDuplicates: true })
+    res.json({
+      imported: result.count,
+      total:    records.length,
+      skipped:  records.length - result.count,
+      fallback: usedFallback,
+      message:  usedFallback ? '공식 사이트 파싱 실패 — 카드 번호 기반 기본 레코드 생성' : undefined,
+    })
+  } catch (err) {
+    console.error('[importOnePiece]', err)
+    res.status(502).json({ message: '원피스 카드 가져오기에 실패했습니다.' })
+  }
+}
+
 // ── 전체 일괄 가져오기 (SSE 스트리밍) ───────────────────────────────────────
 // SSE 형식: data: <JSON>\n\n
 
 export async function importAll(req: AuthRequest, res: Response) {
   const {
-    types = ['POKEMON', 'YUGIOH', 'MTG', 'DIGIMON'],
-    pokemonSrc = 'both',  // 'hq' | 'ko' | 'both'
+    types = ['POKEMON', 'YUGIOH', 'MTG', 'DIGIMON', 'ONEPIECE'],
+    pokemonSrc = 'both',  // 'hq' | 'ko' | 'ja' | 'both' | 'all'
     mtgMaxSets = 50,
     recentMonths = 36,    // 포켓몬/MTG 최근 N개월 (0=전체)
   } = req.body as {
@@ -724,7 +1041,7 @@ export async function importAll(req: AuthRequest, res: Response) {
         }
       }
 
-      if ((pokemonSrc === 'ko' || pokemonSrc === 'both') && !closed) {
+      if ((pokemonSrc === 'ko' || pokemonSrc === 'both' || pokemonSrc === 'all') && !closed) {
         send({ type: 'info', tcg: 'POKEMON', message: 'TCGdex KO 한국어 이름 병합 중...' })
         try {
           const koSets = await fetchWithRetry<TcgdexSet[]>(
@@ -759,6 +1076,47 @@ export async function importAll(req: AuthRequest, res: Response) {
           }
         } catch (err) {
           send({ type: 'error', tcg: 'POKEMON', message: `TCGdex KO 오류: ${String(err)}` })
+        }
+      }
+
+      // ── 포켓몬 JA ────────────────────────────────────────────────────────────
+      if ((pokemonSrc === 'ja' || pokemonSrc === 'all') && !closed) {
+        send({ type: 'info', tcg: 'POKEMON', message: 'TCGdex JA 일본어 이름 병합 중...' })
+        try {
+          const jaSets = await fetchWithRetry<TcgdexSet[]>(
+            'https://api.tcgdex.net/v2/ja/sets',
+            { cacheTtlMs: SET_CACHE, timeoutMs: 12_000 },
+          )
+
+          for (const set of jaSets) {
+            if (closed) break
+            try {
+              const data = await fetchWithRetry<TcgdexSetDetail>(
+                `https://api.tcgdex.net/v2/ja/sets/${set.id}`,
+                { timeoutMs: 10_000, retries: 1 },
+              )
+              const vars = pokemonSetCodeVariants(data.id)
+              const existing = await prisma.card.findMany({
+                where: { tcgType: 'POKEMON', setCode: { in: vars }, nameJa: null,
+                  NOT: { OR: LANG_PREFIXES.map(p => ({ externalId: { startsWith: p } })) } },
+                select: { id: true, cardNumber: true },
+              })
+              const byNum = new Map(existing.map(c => [c.cardNumber, c]))
+              let setMerged = 0
+              for (const c of data.cards) {
+                const ex = byNum.get(c.localId)
+                if (ex && c.name) {
+                  await prisma.card.update({ where: { id: ex.id }, data: { nameJa: c.name } })
+                  totals['POKEMON'].merged++
+                  setMerged++
+                }
+              }
+              send({ type: 'set-done', tcg: 'POKEMON-JA', setId: set.id, setName: set.name, merged: setMerged })
+              await sleep(100)
+            } catch { /* 이 세트 스킵 */ }
+          }
+        } catch (err) {
+          send({ type: 'error', tcg: 'POKEMON', message: `TCGdex JA 오류: ${String(err)}` })
         }
       }
 
@@ -903,6 +1261,40 @@ export async function importAll(req: AuthRequest, res: Response) {
         send({ type: 'error', tcg: 'DIGIMON', message: String(err) })
       }
       send({ type: 'tcg-done', tcg: 'DIGIMON', ...totals['DIGIMON'] })
+    }
+
+    // ── 원피스 ───────────────────────────────────────────────────────────────
+    if (types.includes('ONEPIECE') && !closed) {
+      initTcg('ONEPIECE')
+      send({ type: 'tcg-start', tcg: 'ONEPIECE', message: `원피스 ${OP_KNOWN_SETS.length}개 세트 가져오기 중...` })
+      for (const set of OP_KNOWN_SETS) {
+        if (closed) break
+        try {
+          send({ type: 'set-start', tcg: 'ONEPIECE', setId: set.id, setName: set.name })
+          let cards: ParsedOpCard[]
+          try {
+            cards = await fetchOpCardsFromSite(set.id)
+            if (cards.length === 0) throw new Error('파싱 0건')
+          } catch {
+            cards = generateOpFallbackCards(set.id, set.total)
+          }
+          const records = cards.map(c => ({
+            externalId: `onepiece_${c.number}`,
+            name: c.name, tcgType: 'ONEPIECE' as const,
+            setName: set.name, setCode: set.id,
+            cardNumber: c.number, rarity: c.rarity, imageUrl: c.imageUrl,
+          }))
+          const result = await prisma.card.createMany({ data: records, skipDuplicates: true })
+          totals['ONEPIECE'].imported += result.count
+          totals['ONEPIECE'].skipped  += records.length - result.count
+          send({ type: 'set-done', tcg: 'ONEPIECE', setId: set.id, setName: set.name, imported: result.count, total: records.length })
+          await sleep(300)
+        } catch (err) {
+          totals['ONEPIECE'].errors++
+          send({ type: 'set-error', tcg: 'ONEPIECE', setId: set.id, setName: set.name })
+        }
+      }
+      send({ type: 'tcg-done', tcg: 'ONEPIECE', ...totals['ONEPIECE'] })
     }
 
     send({ type: 'done', totals })

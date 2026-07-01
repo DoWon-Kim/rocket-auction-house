@@ -6,12 +6,13 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export const TCG_LABELS: Record<string, string> = {
-  POKEMON: '포켓몬',
-  YUGIOH: '유희왕',
-  MTG: 'MTG',
-  DIGIMON: '디지몬',
-  WEISS: '바이스',
-  OTHER: '기타',
+  POKEMON:  '포켓몬',
+  YUGIOH:   '유희왕',
+  MTG:      'MTG',
+  DIGIMON:  '디지몬',
+  ONEPIECE: '원피스',
+  WEISS:    '바이스',
+  OTHER:    '기타',
 }
 
 export const CONDITION_LABELS: Record<string, string> = {
@@ -85,13 +86,17 @@ export const RARITY_LABELS: Record<string, string> = {
   'mythic': '미식 레어',
   'special': '스페셜',
   'bonus': '보너스',
-  // ── 디지몬 ────────────────────────────────────────────────────────────────
-  'C': '커먼',
-  'U': '언커먼',
-  'R': '레어',
-  'SR': '슈퍼 레어',
-  'SEC': '시크릿',
-  'P': '프로모',
+  // ── 디지몬 · 원피스 공통 (단문자 코드) ───────────────────────────────────
+  'C':   '커먼',
+  'U':   '언커먼',
+  'UC':  '언커먼',
+  'R':   '레어',
+  'SR':  '슈퍼 레어',
+  'SEC': '시크릿 레어',
+  'P':   '프로모',
+  'SP':  '스페셜',
+  // ── 원피스 전용 ────────────────────────────────────────────────────────────
+  'L':   '리더',
   // ── 공통 ─────────────────────────────────────────────────────────────────
   'Unknown': '알 수 없음',
 }

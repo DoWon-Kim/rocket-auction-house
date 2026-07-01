@@ -15,7 +15,7 @@ export default function Footer() {
             </p>
             <p className="text-[10px] text-[#d4a853]/50 uppercase tracking-widest font-medium mb-3">TCG 전문 경매 거래소</p>
             <p className="text-xs text-[#5a4830] leading-relaxed">
-              포켓몬·유희왕·MTG 등 안전하게 거래하세요.
+              포켓몬·유희왕·MTG·원피스 등 안전하게 거래하세요.
             </p>
           </div>
 

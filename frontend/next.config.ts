@@ -37,8 +37,10 @@ const nextConfig: NextConfig = {
       // 디지몬
       { protocol: 'https', hostname: 'images.digimoncard.io' },
       { protocol: 'https', hostname: 'digimon-card.com' },
-      // TCGdex 한국어 포켓몬
+      // TCGdex 한국어/일본어 포켓몬
       { protocol: 'https', hostname: 'assets.tcgdex.net' },
+      // 포켓몬 카드게임 공식 (일본판)
+      { protocol: 'https', hostname: 'www.pokemon-card.com' },
       // Google 이미지 (썸네일 등 외부 임포트 데이터)
       { protocol: 'https', hostname: '**.gstatic.com' },
       { protocol: 'https', hostname: '**.googleusercontent.com' },

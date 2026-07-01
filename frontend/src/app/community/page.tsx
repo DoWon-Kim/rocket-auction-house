@@ -16,6 +16,7 @@ const TCG_FILTERS = [
   { value: 'YUGIOH',   label: TCG_LABELS.YUGIOH },
   { value: 'MTG',      label: TCG_LABELS.MTG },
   { value: 'DIGIMON',  label: TCG_LABELS.DIGIMON },
+  { value: 'ONEPIECE', label: TCG_LABELS.ONEPIECE },
   { value: 'WEISS',    label: TCG_LABELS.WEISS },
   { value: 'OTHER',    label: TCG_LABELS.OTHER },
 ]
@@ -26,6 +27,7 @@ const TCG_COLORS: Record<string, string> = {
   YUGIOH:   'bg-purple-500/10 text-purple-400 border-purple-500/20',
   MTG:      'bg-red-500/10    text-red-400    border-red-500/20',
   DIGIMON:  'bg-blue-500/10   text-blue-400   border-blue-500/20',
+  ONEPIECE: 'bg-blue-500/10   text-blue-300   border-blue-500/20',
   WEISS:    'bg-pink-500/10   text-pink-400   border-pink-500/20',
   OTHER:    'bg-[#2e2318]     text-[#8a7055]  border-[#4a3520]',
 }

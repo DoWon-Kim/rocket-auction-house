@@ -8,7 +8,7 @@ import { Plus, Pencil, Trash2, X, Check, Download, ChevronDown, ChevronUp, Searc
 import { useAuthStore } from '@/lib/store'
 import Badge from '@/components/ui/Badge'
 
-const TCG_TYPES = ['POKEMON', 'YUGIOH', 'MTG', 'DIGIMON', 'WEISS', 'OTHER'] as const
+const TCG_TYPES = ['POKEMON', 'YUGIOH', 'MTG', 'DIGIMON', 'ONEPIECE', 'WEISS', 'OTHER'] as const
 type TcgType = typeof TCG_TYPES[number]
 
 interface Card {
@@ -33,7 +33,7 @@ const labelCls = 'block text-xs text-[#7a6040] uppercase tracking-wider font-sem
 
 // ── 외부 API 임포트 패널 ───────────────────────────────────────────────────────
 
-type ImportTcg = 'POKEMON' | 'YUGIOH' | 'MTG' | 'DIGIMON'
+type ImportTcg = 'POKEMON' | 'YUGIOH' | 'MTG' | 'DIGIMON' | 'ONEPIECE'
 type PokemonLang = 'tcgdex_en' | 'ko' | 'ja' | 'hq_en'
 type MtgLang = 'en' | 'ko' | 'ja'
 
@@ -60,15 +60,16 @@ function getSetEndpoint(tcg: ImportTcg, pLang: PokemonLang, mLang: MtgLang): str
     const l = pLang === 'tcgdex_en' ? 'en' : pLang
     return `/admin/import/tcgdex/sets?lang=${l}`
   }
-  if (tcg === 'YUGIOH') return '/admin/import/yugioh/sets'
-  if (tcg === 'MTG')    return '/admin/import/mtg/sets'
+  if (tcg === 'YUGIOH')   return '/admin/import/yugioh/sets'
+  if (tcg === 'MTG')      return '/admin/import/mtg/sets'
+  if (tcg === 'ONEPIECE') return '/admin/import/onepiece/sets'
   return null // DIGIMON: no sets
 }
 
 // ── 전체 가져오기 (SSE 스트리밍) ──────────────────────────────────────────────
 
-type BulkTcg = 'POKEMON' | 'YUGIOH' | 'MTG' | 'DIGIMON'
-type PokemonSrc = 'hq' | 'ko' | 'both'
+type BulkTcg = 'POKEMON' | 'YUGIOH' | 'MTG' | 'DIGIMON' | 'ONEPIECE'
+type PokemonSrc = 'hq' | 'ko' | 'ja' | 'both' | 'all'
 
 interface BulkEvent {
   type: string
@@ -85,16 +86,18 @@ interface BulkEvent {
 }
 
 const TCG_LABEL: Record<string, string> = {
-  POKEMON: '포켓몬', 'POKEMON-KO': '포켓몬 KO', YUGIOH: '유희왕', MTG: 'MTG', DIGIMON: '디지몬',
+  POKEMON: '포켓몬', 'POKEMON-KO': '포켓몬 KO', 'POKEMON-JA': '포켓몬 JA',
+  YUGIOH: '유희왕', MTG: 'MTG', DIGIMON: '디지몬', ONEPIECE: '원피스',
 }
 const TCG_COLOR: Record<string, string> = {
-  POKEMON: 'text-yellow-400', 'POKEMON-KO': 'text-teal-400', YUGIOH: 'text-purple-400', MTG: 'text-[#d4a853]', DIGIMON: 'text-orange-400',
+  POKEMON: 'text-yellow-400', 'POKEMON-KO': 'text-teal-400', 'POKEMON-JA': 'text-red-400',
+  YUGIOH: 'text-purple-400', MTG: 'text-[#d4a853]', DIGIMON: 'text-orange-400', ONEPIECE: 'text-blue-400',
 }
 
 function BulkImportPanel({ onImported }: { onImported: () => void }) {
   const { token } = useAuthStore()
   const [open, setOpen] = useState(false)
-  const [types, setTypes] = useState<BulkTcg[]>(['POKEMON', 'YUGIOH', 'MTG', 'DIGIMON'])
+  const [types, setTypes] = useState<BulkTcg[]>(['POKEMON', 'YUGIOH', 'MTG', 'DIGIMON', 'ONEPIECE'])
   const [pokemonSrc, setPokemonSrc] = useState<PokemonSrc>('both')
   const [recentMonths, setRecentMonths] = useState(36)
   const [mtgMaxSets, setMtgMaxSets] = useState(50)
@@ -193,7 +196,7 @@ function BulkImportPanel({ onImported }: { onImported: () => void }) {
             <div className="space-y-2">
               <p className="text-xs font-semibold text-[#7a6040] uppercase tracking-wider">가져올 TCG</p>
               <div className="flex flex-wrap gap-1.5">
-                {(['POKEMON', 'YUGIOH', 'MTG', 'DIGIMON'] as const).map(t => (
+                {(['POKEMON', 'YUGIOH', 'MTG', 'DIGIMON', 'ONEPIECE'] as const).map(t => (
                   <button key={t} onClick={() => toggleType(t)} disabled={running}
                     className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${types.includes(t) ? 'bg-[#f0a832] text-[#0f0b08]' : 'bg-[#1a1208] border border-[#2e2318] text-[#8a7055] hover:text-[#f5ead8]'}`}>
                     {TCG_LABEL[t]}
@@ -206,7 +209,7 @@ function BulkImportPanel({ onImported }: { onImported: () => void }) {
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-[#7a6040] uppercase tracking-wider">포켓몬 소스</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {([['hq', 'HQ EN만'], ['ko', 'KO 병합만'], ['both', 'HQ EN + KO']] as const).map(([v, l]) => (
+                  {([['hq', 'HQ EN만'], ['ko', 'KO 병합만'], ['ja', 'JA 병합만'], ['both', 'HQ EN + KO'], ['all', 'HQ + KO + JA']] as const).map(([v, l]) => (
                     <button key={v} onClick={() => setPokemonSrc(v)} disabled={running}
                       className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${pokemonSrc === v ? 'bg-teal-600 text-white' : 'bg-[#1a1208] border border-[#2e2318] text-[#8a7055] hover:text-[#f5ead8]'}`}>
                       {l}
@@ -332,7 +335,20 @@ function BulkImportPanel({ onImported }: { onImported: () => void }) {
 
 // ── 외부 API 임포트 패널 ───────────────────────────────────────────────────────
 
+interface EnrichProgress {
+  running: boolean
+  lang: 'ko' | 'ja' | null
+  sets: number
+  totalSets: number
+  updated: number
+  notInTcgdex: number
+  currentSet: string
+}
+
+const ENRICH_IDLE: EnrichProgress = { running: false, lang: null, sets: 0, totalSets: 0, updated: 0, notInTcgdex: 0, currentSet: '' }
+
 function ImportPanel({ onImported }: { onImported: () => void }) {
+  const { token } = useAuthStore()
   const [open, setOpen]           = useState(false)
   const [tcg, setTcg]             = useState<ImportTcg>('POKEMON')
   const [pLang, setPLang]         = useState<PokemonLang>('ko')
@@ -344,8 +360,7 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
   const [loading, setLoading]     = useState(false)
   const [result, setResult]       = useState<ImportResult | null>(null)
   const [error, setError]         = useState<string | null>(null)
-  const [enrichKoLoading, setEnrichKoLoading] = useState(false)
-  const [enrichJaLoading, setEnrichJaLoading] = useState(false)
+  const [enrichProgress, setEnrichProgress] = useState<EnrichProgress>(ENRICH_IDLE)
   const [enrichResult, setEnrichResult] = useState<EnrichResult | null>(null)
   const [mergeLoading, setMergeLoading] = useState(false)
   const [mergeResult, setMergeResult] = useState<MergeResult | null>(null)
@@ -421,6 +436,8 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
         res = await api.post('/admin/import/yugioh', { setName: selectedSet!.id })
       } else if (tcg === 'MTG') {
         res = await api.post('/admin/import/mtg', { setCode: selectedSet!.id, lang: mLang })
+      } else if (tcg === 'ONEPIECE') {
+        res = await api.post('/admin/import/onepiece', { setId: selectedSet!.id })
       } else {
         res = await api.post('/admin/import/digimon', { all: true })
       }
@@ -450,17 +467,65 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
   }
 
   async function handleEnrich(lang: 'ko' | 'ja') {
-    const setLoadingFn = lang === 'ko' ? setEnrichKoLoading : setEnrichJaLoading
-    setLoadingFn(true)
+    if (enrichProgress.running) return
+    setEnrichProgress({ ...ENRICH_IDLE, running: true, lang })
     setEnrichResult(null)
+    setError(null)
+
     try {
-      const r = await api.post(`/admin/import/pokemon/enrich-${lang}`)
-      setEnrichResult(r.data)
-      onImported()
-    } catch {
-      setError(`${lang === 'ko' ? '한국어' : '일본어'} 이름 보강에 실패했습니다.`)
+      const apiBase = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api'
+      const response = await fetch(`${apiBase}/admin/import/pokemon/enrich-${lang}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      })
+
+      if (!response.ok || !response.body) {
+        setError(`보강 요청 실패 (HTTP ${response.status})`)
+        return
+      }
+
+      const reader  = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buf = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buf += decoder.decode(value, { stream: true })
+        const lines = buf.split('\n')
+        buf = lines.pop() ?? ''
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          try {
+            const ev = JSON.parse(line.slice(6)) as Record<string, unknown>
+            if (ev.type === 'start') {
+              setEnrichProgress(p => ({ ...p, totalSets: ev.sets as number }))
+            } else if (ev.type === 'set-done' || ev.type === 'set-skip') {
+              setEnrichProgress(p => ({
+                ...p,
+                sets:        p.sets + 1,
+                updated:     p.updated + ((ev.updated as number) ?? 0),
+                notInTcgdex: p.notInTcgdex + ((ev.type === 'set-skip' ? ev.count : 0) as number),
+                currentSet:  ev.setCode as string,
+              }))
+            } else if (ev.type === 'done') {
+              setEnrichResult({
+                updated: ev.updated as number,
+                failed:  ev.failed  as number,
+                total:   ev.total   as number,
+                message: ev.message as string | undefined,
+              })
+              onImported()
+            } else if (ev.type === 'error') {
+              setError(`보강 오류: ${ev.message}`)
+            }
+          } catch { /* 파싱 실패 무시 */ }
+        }
+      }
+    } catch (err) {
+      setError(`연결 오류: ${String(err)}`)
     } finally {
-      setLoadingFn(false)
+      setEnrichProgress(p => ({ ...p, running: false }))
     }
   }
 
@@ -484,13 +549,13 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
         <div className="border-t border-[#2e2318] p-5 space-y-4">
 
           {/* 1단: TCG 종류 */}
-          <div className="flex gap-1.5">
-            {(['POKEMON', 'YUGIOH', 'MTG', 'DIGIMON'] as const).map(t => (
+          <div className="flex flex-wrap gap-1.5">
+            {(['POKEMON', 'YUGIOH', 'MTG', 'DIGIMON', 'ONEPIECE'] as const).map(t => (
               <button key={t} onClick={() => switchTcg(t)}
                 className={`px-3.5 py-1.5 rounded-xl text-sm font-semibold transition-colors ${
                   tcg === t ? 'bg-[#d4a853] text-white' : 'bg-[#1a1410] border border-[#2e2318] text-[#8a7055] hover:border-[#4a3520] hover:text-[#f5ead8]'
                 }`}>
-                {t === 'POKEMON' ? '포켓몬' : t === 'YUGIOH' ? '유희왕' : t === 'DIGIMON' ? '디지몬' : 'MTG'}
+                {t === 'POKEMON' ? '포켓몬' : t === 'YUGIOH' ? '유희왕' : t === 'DIGIMON' ? '디지몬' : t === 'ONEPIECE' ? '원피스' : 'MTG'}
               </button>
             ))}
           </div>
@@ -533,6 +598,12 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
           )}
           {tcg === 'DIGIMON' && (
             <p className="text-xs text-[#8a7055]">digimoncard.io API · 전체 디지몬 카드 5,000+장을 한 번에 가져옵니다.</p>
+          )}
+          {tcg === 'ONEPIECE' && (
+            <div className="space-y-1">
+              <p className="text-xs text-[#8a7055]">원피스 카드 게임 (Bandai) · 공식 사이트에서 카드 정보를 가져옵니다.</p>
+              <p className="text-xs text-[#5a4830]">OP-01~10, ST-01~20, EB-01~02 총 32개 세트 지원 · 파싱 실패 시 카드 번호 기반 기본 레코드 생성</p>
+            </div>
           )}
 
           {/* 세트 선택 */}
@@ -589,31 +660,65 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
             </button>
           </div>
 
-          {/* 포켓몬 다국어 이름 보강 (항상 표시) */}
+          {/* 포켓몬 다국어 이름 보강 */}
           {tcg === 'POKEMON' && (
             <div className="border-t border-[#2e2318] pt-4 space-y-3">
               <div>
                 <p className="text-xs font-semibold text-[#7a6040] uppercase tracking-wider mb-0.5">한국어·일본어 이름 채우기</p>
-                <p className="text-xs text-[#5a4830]">한국어 이름이 없는 포켓몬 카드를 TCGdex KO/JA API로 일괄 보강합니다. (최대 5,000장 처리)</p>
+                <p className="text-xs text-[#5a4830]">
+                  이름이 없는 포켓몬 카드를 세트별로 TCGdex API → DB 기존 레코드 순으로 조회해 자동 보강합니다.
+                </p>
               </div>
               <div className="flex gap-2">
-                <button onClick={() => handleEnrich('ko')} disabled={enrichKoLoading}
+                <button onClick={() => handleEnrich('ko')} disabled={enrichProgress.running}
                   className="flex items-center gap-1.5 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] hover:text-[#e8d5b0] disabled:opacity-40 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors">
-                  {enrichKoLoading ? <div className="w-3 h-3 rounded-full border-2 border-[#2e2318] border-t-[#d4a853] animate-spin" /> : <Download size={12} />}
+                  {enrichProgress.running && enrichProgress.lang === 'ko'
+                    ? <div className="w-3 h-3 rounded-full border-2 border-[#2e2318] border-t-[#d4a853] animate-spin" />
+                    : <Download size={12} />}
                   한국어 이름 채우기
                 </button>
-                <button onClick={() => handleEnrich('ja')} disabled={enrichJaLoading}
+                <button onClick={() => handleEnrich('ja')} disabled={enrichProgress.running}
                   className="flex items-center gap-1.5 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] hover:text-[#e8d5b0] disabled:opacity-40 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors">
-                  {enrichJaLoading ? <div className="w-3 h-3 rounded-full border-2 border-[#2e2318] border-t-[#d4a853] animate-spin" /> : <Download size={12} />}
+                  {enrichProgress.running && enrichProgress.lang === 'ja'
+                    ? <div className="w-3 h-3 rounded-full border-2 border-[#2e2318] border-t-[#d4a853] animate-spin" />
+                    : <Download size={12} />}
                   일본어 이름 채우기
                 </button>
               </div>
-              {enrichResult && (
-                <div className="bg-emerald-950/30 border border-emerald-800/40 rounded-xl px-4 py-2.5 text-sm">
+
+              {/* 실시간 진행 상황 */}
+              {enrichProgress.running && enrichProgress.totalSets > 0 && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs text-[#8a7055]">
+                    <span>세트 {enrichProgress.sets} / {enrichProgress.totalSets}</span>
+                    <span className="text-emerald-400">+{enrichProgress.updated}개</span>
+                  </div>
+                  <div className="w-full bg-[#2e2318] rounded-full h-1">
+                    <div
+                      className="bg-teal-500 h-1 rounded-full transition-all duration-300"
+                      style={{ width: `${Math.min(100, (enrichProgress.sets / enrichProgress.totalSets) * 100)}%` }}
+                    />
+                  </div>
+                  {enrichProgress.currentSet && (
+                    <p className="text-xs text-[#5a4830] font-mono truncate">{enrichProgress.currentSet}</p>
+                  )}
+                </div>
+              )}
+
+              {/* 완료 결과 */}
+              {enrichResult && !enrichProgress.running && (
+                <div className="bg-emerald-950/30 border border-emerald-800/40 rounded-xl px-4 py-2.5 text-sm space-y-0.5">
                   {enrichResult.message
                     ? <span className="text-[#8a7055]">{enrichResult.message}</span>
-                    : <><span className="text-emerald-400 font-semibold">✓ {enrichResult.updated}개 이름 추가됨</span>
-                       {enrichResult.failed > 0 && <span className="text-[#5a4830] ml-2">({enrichResult.failed}개 TCGdex 미지원)</span>}</>
+                    : <>
+                        <div>
+                          <span className="text-emerald-400 font-semibold">✓ {enrichResult.updated.toLocaleString()}개 이름 추가됨</span>
+                          <span className="text-[#5a4830] ml-2">/ 총 {enrichResult.total.toLocaleString()}장</span>
+                        </div>
+                        {enrichResult.failed > 0 && (
+                          <div className="text-[#5a4830] text-xs">미매칭 {enrichResult.failed.toLocaleString()}건 · TCGdex 미지원 세트 {enrichProgress.notInTcgdex.toLocaleString()}장</div>
+                        )}
+                      </>
                   }
                 </div>
               )}

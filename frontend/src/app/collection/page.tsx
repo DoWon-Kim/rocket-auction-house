@@ -29,7 +29,7 @@ interface CollectionData {
   overall: Overall
 }
 
-const TCG_ORDER = ['POKEMON', 'YUGIOH', 'MTG', 'DIGIMON', 'WEISS', 'OTHER']
+const TCG_ORDER = ['POKEMON', 'YUGIOH', 'MTG', 'DIGIMON', 'ONEPIECE', 'WEISS', 'OTHER']
 
 export default function CollectionPage() {
   const { user } = useAuthStore()

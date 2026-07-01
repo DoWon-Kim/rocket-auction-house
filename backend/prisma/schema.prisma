@@ -126,6 +126,7 @@ enum TcgType {
   YUGIOH
   MTG
   DIGIMON
+  ONEPIECE
   WEISS
   OTHER
 }

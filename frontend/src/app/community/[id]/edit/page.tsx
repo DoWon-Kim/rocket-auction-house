@@ -10,12 +10,13 @@ import { ImageUpload } from '@/components/ImageUpload'
 import { TCG_LABELS } from '@/lib/utils'
 
 const TCG_OPTIONS = [
-  { value: 'POKEMON', label: TCG_LABELS.POKEMON },
-  { value: 'YUGIOH',  label: TCG_LABELS.YUGIOH },
-  { value: 'MTG',     label: TCG_LABELS.MTG },
-  { value: 'DIGIMON', label: TCG_LABELS.DIGIMON },
-  { value: 'WEISS',   label: TCG_LABELS.WEISS },
-  { value: 'OTHER',   label: TCG_LABELS.OTHER },
+  { value: 'POKEMON',  label: TCG_LABELS.POKEMON },
+  { value: 'YUGIOH',   label: TCG_LABELS.YUGIOH },
+  { value: 'MTG',      label: TCG_LABELS.MTG },
+  { value: 'DIGIMON',  label: TCG_LABELS.DIGIMON },
+  { value: 'ONEPIECE', label: TCG_LABELS.ONEPIECE },
+  { value: 'WEISS',    label: TCG_LABELS.WEISS },
+  { value: 'OTHER',    label: TCG_LABELS.OTHER },
 ]
 
 const inputCls = 'w-full bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] focus:border-[#d4a853]/40 rounded-xl px-4 py-2.5 text-sm text-[#f5ead8] placeholder:text-[#5a4830] focus:outline-none transition-colors'

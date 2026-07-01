@@ -13,7 +13,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "Rocket Auction House | TCG 거래소",
-  description: "포켓몬, 유희왕, MTG 등 모든 TCG 카드 경매 거래소",
+  description: "포켓몬, 유희왕, MTG, 원피스 등 모든 TCG 카드 경매 거래소",
 };
 
 export default function RootLayout({

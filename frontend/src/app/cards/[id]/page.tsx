@@ -74,7 +74,7 @@ interface ListingsResponse {
 // ─── 유틸 ─────────────────────────────────────────────────────────────────────
 
 const TCG_ICONS: Record<string, string> = {
-  POKEMON: '🎴', YUGIOH: '⚡', MTG: '🪄', DIGIMON: '💻', WEISS: '🃏', OTHER: '📦',
+  POKEMON: '🎴', YUGIOH: '⚡', MTG: '🪄', DIGIMON: '💻', ONEPIECE: '⚓', WEISS: '🃏', OTHER: '📦',
 }
 
 function rarityColorClass(rarity: string): string {

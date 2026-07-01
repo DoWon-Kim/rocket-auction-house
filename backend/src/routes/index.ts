@@ -45,6 +45,7 @@ import {
   getYugiohSets, importYugioh, importYugiohAll,
   getMtgSets, importMtg,
   importDigimon,
+  getOnePieceSets, importOnePiece,
   mergeLanguageDuplicates,
   importAll,
 } from '../controllers/import.controller'
@@ -289,6 +290,8 @@ router.post('/admin/import/yugioh',        authenticate, requireSuperAdmin, impo
 router.get('/admin/import/mtg/sets',       authenticate, requireSuperAdmin, getMtgSets)
 router.post('/admin/import/mtg',           authenticate, requireSuperAdmin, importMtg)
 router.post('/admin/import/digimon',       authenticate, requireSuperAdmin, importDigimon)
+router.get('/admin/import/onepiece/sets',  authenticate, requireSuperAdmin, getOnePieceSets)
+router.post('/admin/import/onepiece',      authenticate, requireSuperAdmin, importOnePiece)
 router.post('/admin/import/merge-duplicates', authenticate, requireSuperAdmin, mergeLanguageDuplicates)
 router.post('/admin/import/yugioh-all',    authenticate, requireSuperAdmin, importYugiohAll)
 router.post('/admin/import/all',           authenticate, requireSuperAdmin, importAll)

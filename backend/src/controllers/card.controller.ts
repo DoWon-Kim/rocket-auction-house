@@ -17,10 +17,19 @@ export async function searchCards(req: Request, res: Response) {
     const tcgType  = parseTcgType(req.query.tcgType)
     const rarity   = (req.query.rarity as string | undefined)?.trim()
     const setName  = (req.query.setName as string | undefined)?.trim()
+    const lang     = (req.query.lang as string | undefined)?.trim()
     const sort     = (req.query.sort as string | undefined) ?? 'name'
     const page     = Math.max(1, Number(req.query.page ?? 1))
     const limit    = Math.min(60, Math.max(1, Number(req.query.limit ?? 24)))
     const skip     = (page - 1) * limit
+
+    const langFilter =
+      lang === 'ja' ? { OR: [
+        { externalId: { startsWith: 'tcgdex_ja_' } },
+        { externalId: { startsWith: 'pkmncardgame_ja_' } },
+      ] } :
+      lang === 'ko' ? { nameKo: { not: null } } :
+      {}
 
     const where = {
       ...(q ? {
@@ -36,6 +45,7 @@ export async function searchCards(req: Request, res: Response) {
       ...(tcgType  ? { tcgType }  : {}),
       ...(rarity   ? { rarity: { contains: rarity, mode: 'insensitive' as const } } : {}),
       ...(setName  ? { setName: { contains: setName, mode: 'insensitive' as const } } : {}),
+      ...langFilter,
     }
 
     const orderBy: object[] =
@@ -75,7 +85,15 @@ export async function searchCards(req: Request, res: Response) {
 export async function getCardMeta(req: Request, res: Response) {
   try {
     const tcgType = parseTcgType(req.query.tcgType)
-    const where   = tcgType ? { tcgType } : {}
+    const lang    = (req.query.lang as string | undefined)?.trim()
+    const langFilter =
+      lang === 'ja' ? { OR: [
+        { externalId: { startsWith: 'tcgdex_ja_' } },
+        { externalId: { startsWith: 'pkmncardgame_ja_' } },
+      ] } :
+      lang === 'ko' ? { nameKo: { not: null } } :
+      {}
+    const where = { ...(tcgType ? { tcgType } : {}), ...langFilter }
 
     const [sets, rarities] = await prisma.$transaction([
       prisma.card.groupBy({

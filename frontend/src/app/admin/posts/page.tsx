@@ -13,12 +13,13 @@ import { TCG_LABELS } from '@/lib/utils'
 type PostType = 'NOTICE' | 'EVENT' | 'COMMUNITY'
 
 const TCG_OPTIONS = [
-  { value: 'POKEMON', label: TCG_LABELS.POKEMON },
-  { value: 'YUGIOH',  label: TCG_LABELS.YUGIOH },
-  { value: 'MTG',     label: TCG_LABELS.MTG },
-  { value: 'DIGIMON', label: TCG_LABELS.DIGIMON },
-  { value: 'WEISS',   label: TCG_LABELS.WEISS },
-  { value: 'OTHER',   label: TCG_LABELS.OTHER },
+  { value: 'POKEMON',  label: TCG_LABELS.POKEMON },
+  { value: 'YUGIOH',   label: TCG_LABELS.YUGIOH },
+  { value: 'MTG',      label: TCG_LABELS.MTG },
+  { value: 'DIGIMON',  label: TCG_LABELS.DIGIMON },
+  { value: 'ONEPIECE', label: TCG_LABELS.ONEPIECE },
+  { value: 'WEISS',    label: TCG_LABELS.WEISS },
+  { value: 'OTHER',    label: TCG_LABELS.OTHER },
 ]
 
 interface Post {

@@ -4,7 +4,7 @@ import { prisma } from '../lib/prisma'
 import { AuthRequest } from '../middleware/auth'
 
 const VALID_TYPES   = ['NOTICE', 'EVENT', 'COMMUNITY'] as const
-const VALID_TCGTYPES = ['POKEMON', 'YUGIOH', 'MTG', 'DIGIMON', 'WEISS', 'OTHER'] as const
+const VALID_TCGTYPES = ['POKEMON', 'YUGIOH', 'MTG', 'DIGIMON', 'ONEPIECE', 'WEISS', 'OTHER'] as const
 type PostTypeStr = typeof VALID_TYPES[number]
 
 const createPostSchema = z.object({

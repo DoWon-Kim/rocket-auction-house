@@ -10,7 +10,7 @@ import { Suspense, useState } from 'react'
 import { SlidersHorizontal, X, PlusCircle, LayoutGrid, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
 
-const TCG_TYPES = ['POKEMON', 'YUGIOH', 'MTG', 'DIGIMON', 'WEISS', 'OTHER']
+const TCG_TYPES = ['POKEMON', 'YUGIOH', 'MTG', 'DIGIMON', 'ONEPIECE', 'WEISS', 'OTHER']
 const LISTING_TYPES = [
   { value: '', label: '전체' },
   { value: 'BUY_NOW', label: '즉시구매' },

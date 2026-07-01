@@ -47,6 +47,7 @@ const TCG_LIST = [
   { name: '유희왕', emoji: '👁' },
   { name: 'MTG', emoji: '✦' },
   { name: '디지몬', emoji: '🌐' },
+  { name: '원피스', emoji: '⚓' },
   { name: '바이스', emoji: '⚔' },
   { name: '기타', emoji: '🃏' },
 ]

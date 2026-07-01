@@ -10,7 +10,7 @@ import { TCG_LABELS, CONDITION_LABELS, rarityLabel } from '@/lib/utils'
 import Badge from '@/components/ui/Badge'
 import { Search, Tag, Gavel, Handshake, Check, ChevronRight, Info, ImagePlus, X as XIcon, Loader2 } from 'lucide-react'
 
-const TCG_TYPES = ['POKEMON', 'YUGIOH', 'MTG', 'DIGIMON', 'WEISS', 'OTHER'] as const
+const TCG_TYPES = ['POKEMON', 'YUGIOH', 'MTG', 'DIGIMON', 'ONEPIECE', 'WEISS', 'OTHER'] as const
 const CONDITIONS = ['MINT', 'NEAR_MINT', 'EXCELLENT', 'GOOD', 'LIGHT_PLAYED', 'PLAYED', 'POOR'] as const
 const GRADING_COMPANIES = ['PSA', 'BGS', 'CGC', 'SGC', 'HGA', 'ACE', '기타'] as const
 type GradingCompany = typeof GRADING_COMPANIES[number]

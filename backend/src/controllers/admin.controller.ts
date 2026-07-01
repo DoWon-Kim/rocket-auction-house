@@ -74,7 +74,7 @@ export async function getStats(_req: Request, res: Response) {
 
 const cardSchema = z.object({
   name: z.string().min(1),
-  tcgType: z.enum(['POKEMON', 'YUGIOH', 'MTG', 'DIGIMON', 'WEISS', 'OTHER']),
+  tcgType: z.enum(['POKEMON', 'YUGIOH', 'MTG', 'DIGIMON', 'ONEPIECE', 'WEISS', 'OTHER']),
   setName: z.string().min(1),
   setCode: z.string().optional(),
   cardNumber: z.string().optional(),
