@@ -110,6 +110,19 @@ model Card {
   nameJa      String?              // 일본어 카드명 (검색용)
   createdAt   DateTime    @default(now())
 
+  // 포켓몬/TCG 상세 스탯 (pokemontcg.io, YGOProDeck, Scryfall 등)
+  supertype   String?   // "Pokémon" | "Trainer" | "Energy" | "Monster" | "Spell" | "Trap"
+  subtypes    String?   // "Basic,V" 쉼표 구분 서브타입
+  cardTypes   String?   // "Fire,Psychic" 에너지/속성 타입 (쉼표 구분)
+  hp          Int?      // 포켓몬 HP
+  attacks     Json?     // [{name, cost:[], damage, text}]
+  abilities   Json?     // [{name, text, type}]
+  weaknesses  Json?     // [{type, value}]
+  resistances Json?     // [{type, value}]
+  retreatCost Int?      // 후퇴 비용
+  artist      String?   // 일러스트레이터
+  flavorText  String?   // 풀레이버 텍스트
+
   listings        Listing[]
   oripaItems      OripaItem[]
   inventoryItems  InventoryItem[]
@@ -119,6 +132,8 @@ model Card {
   @@index([name])
   @@index([nameKo])
   @@index([nameJa])
+  @@index([supertype])
+  @@index([cardTypes])
 }
 
 enum TcgType {

@@ -13,15 +13,19 @@ function parseTcgType(raw: unknown): TcgType | undefined {
 
 export async function searchCards(req: Request, res: Response) {
   try {
-    const q        = (req.query.q as string | undefined)?.trim()
-    const tcgType  = parseTcgType(req.query.tcgType)
-    const rarity   = (req.query.rarity as string | undefined)?.trim()
-    const setName  = (req.query.setName as string | undefined)?.trim()
-    const lang     = (req.query.lang as string | undefined)?.trim()
-    const sort     = (req.query.sort as string | undefined) ?? 'name'
-    const page     = Math.max(1, Number(req.query.page ?? 1))
-    const limit    = Math.min(60, Math.max(1, Number(req.query.limit ?? 24)))
-    const skip     = (page - 1) * limit
+    const q         = (req.query.q as string | undefined)?.trim()
+    const tcgType   = parseTcgType(req.query.tcgType)
+    const rarity    = (req.query.rarity as string | undefined)?.trim()
+    const setName   = (req.query.setName as string | undefined)?.trim()
+    const lang      = (req.query.lang as string | undefined)?.trim()
+    const supertype = (req.query.supertype as string | undefined)?.trim()  // Pokémon / Trainer / Energy
+    const cardType  = (req.query.cardType as string | undefined)?.trim()   // Fire / Water / Grass ...
+    const hpMin     = req.query.hpMin ? Number(req.query.hpMin) : undefined
+    const hpMax     = req.query.hpMax ? Number(req.query.hpMax) : undefined
+    const sort      = (req.query.sort as string | undefined) ?? 'name'
+    const page      = Math.max(1, Number(req.query.page ?? 1))
+    const limit     = Math.min(60, Math.max(1, Number(req.query.limit ?? 24)))
+    const skip      = (page - 1) * limit
 
     const langFilter =
       lang === 'ja' ? { OR: [
@@ -42,9 +46,13 @@ export async function searchCards(req: Request, res: Response) {
           { cardNumber: { contains: q, mode: 'insensitive' as const } },
         ],
       } : {}),
-      ...(tcgType  ? { tcgType }  : {}),
-      ...(rarity   ? { rarity: { contains: rarity, mode: 'insensitive' as const } } : {}),
-      ...(setName  ? { setName: { contains: setName, mode: 'insensitive' as const } } : {}),
+      ...(tcgType   ? { tcgType }   : {}),
+      ...(rarity    ? { rarity: { contains: rarity, mode: 'insensitive' as const } } : {}),
+      ...(setName   ? { setName: { contains: setName, mode: 'insensitive' as const } } : {}),
+      ...(supertype ? { supertype: { contains: supertype, mode: 'insensitive' as const } } : {}),
+      ...(cardType  ? { cardTypes: { contains: cardType, mode: 'insensitive' as const } } : {}),
+      ...(hpMin !== undefined ? { hp: { gte: hpMin } } : {}),
+      ...(hpMax !== undefined ? { hp: { lte: hpMax } } : {}),
       ...langFilter,
     }
 
@@ -53,6 +61,8 @@ export async function searchCards(req: Request, res: Response) {
         ? [{ createdAt: 'desc' }]
         : sort === 'popular'
         ? [{ listings: { _count: 'desc' } }, { nameKo: { sort: 'asc', nulls: 'last' } }]
+        : sort === 'hp_desc'
+        ? [{ hp: { sort: 'desc', nulls: 'last' } }]
         : /* name (default) */
           [{ nameKo: { sort: 'asc', nulls: 'last' } }, { name: 'asc' }]
 
@@ -63,6 +73,7 @@ export async function searchCards(req: Request, res: Response) {
           id: true, name: true, nameKo: true, nameJa: true,
           tcgType: true, setName: true, setCode: true,
           cardNumber: true, rarity: true, imageUrl: true,
+          supertype: true, subtypes: true, cardTypes: true, hp: true,
           _count: { select: { listings: true } },
         },
         orderBy,
@@ -80,12 +91,13 @@ export async function searchCards(req: Request, res: Response) {
 }
 
 // ── GET /cards/meta ────────────────────────────────────────────────────────────
-// 필터 옵션 (세트 목록, 레어도 목록) — tcgType으로 좁힘
+// 필터 옵션 (세트 목록, 레어도 목록, 에너지 타입 목록) — tcgType으로 좁힘
 
 export async function getCardMeta(req: Request, res: Response) {
   try {
-    const tcgType = parseTcgType(req.query.tcgType)
-    const lang    = (req.query.lang as string | undefined)?.trim()
+    const tcgType   = parseTcgType(req.query.tcgType)
+    const lang      = (req.query.lang as string | undefined)?.trim()
+    const supertype = (req.query.supertype as string | undefined)?.trim()
     const langFilter =
       lang === 'ja' ? { OR: [
         { externalId: { startsWith: 'tcgdex_ja_' } },
@@ -93,9 +105,13 @@ export async function getCardMeta(req: Request, res: Response) {
       ] } :
       lang === 'ko' ? { nameKo: { not: null } } :
       {}
-    const where = { ...(tcgType ? { tcgType } : {}), ...langFilter }
+    const where = {
+      ...(tcgType   ? { tcgType }   : {}),
+      ...(supertype ? { supertype: { contains: supertype, mode: 'insensitive' as const } } : {}),
+      ...langFilter,
+    }
 
-    const [sets, rarities] = await prisma.$transaction([
+    const [sets, rarities, supertypes] = await prisma.$transaction([
       prisma.card.groupBy({
         by: ['setName'],
         where,
@@ -110,15 +126,91 @@ export async function getCardMeta(req: Request, res: Response) {
         orderBy: { _count: { rarity: 'desc' } },
         take: 80,
       }),
+      prisma.card.groupBy({
+        by: ['supertype'],
+        where: { ...where, supertype: { not: null } },
+        _count: { _all: true },
+        orderBy: { _count: { supertype: 'desc' } },
+      }),
     ])
 
     res.json({
-      sets:     sets.map(s => ({ name: s.setName, count: (s._count as { _all: number })._all })),
-      rarities: rarities.map(r => ({ name: r.rarity, count: (r._count as { _all: number })._all })),
+      sets:       sets.map(s => ({ name: s.setName, count: (s._count as { _all: number })._all })),
+      rarities:   rarities.map(r => ({ name: r.rarity, count: (r._count as { _all: number })._all })),
+      supertypes: supertypes.map(s => ({ name: s.supertype!, count: (s._count as { _all: number })._all })),
     })
   } catch (err) {
     console.error('[getCardMeta]', err)
     res.status(500).json({ message: '메타 정보 조회 중 오류가 발생했습니다.' })
+  }
+}
+
+// ── GET /cards/rank ────────────────────────────────────────────────────────────
+// 카드 랭킹 (거래량/가격)
+
+export async function getCardRank(req: Request, res: Response) {
+  try {
+    const mode    = (req.query.mode as string | undefined) ?? 'listings'  // listings | price
+    const tcgType = parseTcgType(req.query.tcgType)
+    const limit   = Math.min(50, Math.max(1, Number(req.query.limit ?? 20)))
+
+    const where = {
+      ...(tcgType ? { tcgType } : {}),
+      status: 'ACTIVE' as const,
+    }
+
+    if (mode === 'price') {
+      // 최고가 카드 (즉시구매 기준)
+      const topByPrice = await prisma.listing.findMany({
+        where: { ...where, listingType: 'BUY_NOW', buyNowPrice: { not: null } },
+        select: {
+          buyNowPrice: true,
+          card: {
+            select: {
+              id: true, name: true, nameKo: true, nameJa: true,
+              tcgType: true, setName: true, rarity: true, imageUrl: true,
+              cardTypes: true, supertype: true, hp: true,
+            },
+          },
+        },
+        orderBy: { buyNowPrice: 'desc' },
+        take: limit,
+      })
+
+      res.json({
+        mode,
+        rank: topByPrice.map((l, i) => ({
+          rank: i + 1,
+          price: l.buyNowPrice,
+          card: l.card,
+        })),
+      })
+    } else {
+      // 거래 많은 카드 (리스팅 수 기준)
+      const topByListings = await prisma.card.findMany({
+        where: tcgType ? { tcgType, listings: { some: { status: 'ACTIVE' } } } : { listings: { some: { status: 'ACTIVE' } } },
+        select: {
+          id: true, name: true, nameKo: true, nameJa: true,
+          tcgType: true, setName: true, rarity: true, imageUrl: true,
+          cardTypes: true, supertype: true, hp: true,
+          _count: { select: { listings: true } },
+        },
+        orderBy: { listings: { _count: 'desc' } },
+        take: limit,
+      })
+
+      res.json({
+        mode,
+        rank: topByListings.map((c, i) => ({
+          rank: i + 1,
+          listingCount: c._count.listings,
+          card: c,
+        })),
+      })
+    }
+  } catch (err) {
+    console.error('[getCardRank]', err)
+    res.status(500).json({ message: '랭킹 조회 중 오류가 발생했습니다.' })
   }
 }
 
@@ -135,6 +227,9 @@ export async function getCard(req: Request, res: Response) {
         id: true, name: true, nameKo: true, nameJa: true,
         tcgType: true, setName: true, setCode: true,
         cardNumber: true, rarity: true, imageUrl: true, description: true,
+        supertype: true, subtypes: true, cardTypes: true, hp: true,
+        attacks: true, abilities: true, weaknesses: true, resistances: true,
+        retreatCost: true, artist: true, flavorText: true,
         createdAt: true,
         _count: {
           select: {

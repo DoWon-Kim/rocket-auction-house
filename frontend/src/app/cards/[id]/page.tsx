@@ -26,6 +26,22 @@ interface MarketStats {
   byType: { BUY_NOW: number; AUCTION: number; OFFER: number }
 }
 
+interface PkmnAttack {
+  name: string
+  cost: string[]
+  convertedEnergyCost: number
+  damage: string
+  text: string
+}
+
+interface PkmnAbility {
+  name: string
+  text: string
+  type: string
+}
+
+interface PkmnWeak { type: string; value: string }
+
 interface CardDetail {
   id: string
   name: string
@@ -38,6 +54,17 @@ interface CardDetail {
   rarity: string
   imageUrl: string | null
   description: string | null
+  supertype: string | null
+  subtypes: string | null
+  cardTypes: string | null
+  hp: number | null
+  attacks: PkmnAttack[] | null
+  abilities: PkmnAbility[] | null
+  weaknesses: PkmnWeak[] | null
+  resistances: PkmnWeak[] | null
+  retreatCost: number | null
+  artist: string | null
+  flavorText: string | null
   createdAt: string
   _count: { listings: number; oripaItems: number }
   marketStats: MarketStats | null
@@ -75,6 +102,46 @@ interface ListingsResponse {
 
 const TCG_ICONS: Record<string, string> = {
   POKEMON: '🎴', YUGIOH: '⚡', MTG: '🪄', DIGIMON: '💻', ONEPIECE: '⚓', WEISS: '🃏', OTHER: '📦',
+}
+
+const ENERGY_TYPE_INFO: Record<string, { color: string; bg: string; icon: string; label: string }> = {
+  Grass:     { color: '#4CAF50', bg: '#1a2e1a', icon: '🌿', label: '풀' },
+  Fire:      { color: '#FF5722', bg: '#2e1a12', icon: '🔥', label: '불꽃' },
+  Water:     { color: '#2196F3', bg: '#121a2e', icon: '💧', label: '물' },
+  Lightning: { color: '#FFC107', bg: '#2e2a12', icon: '⚡', label: '번개' },
+  Psychic:   { color: '#E91E63', bg: '#2e1222', icon: '🔮', label: '초능력' },
+  Fighting:  { color: '#FF9800', bg: '#2e1e12', icon: '🥊', label: '격투' },
+  Darkness:  { color: '#9C27B0', bg: '#1e1228', icon: '🌑', label: '악' },
+  Metal:     { color: '#9E9E9E', bg: '#1e1e1e', icon: '⚙️', label: '강철' },
+  Dragon:    { color: '#6A1B9A', bg: '#1a1228', icon: '🐉', label: '드래곤' },
+  Fairy:     { color: '#F48FB1', bg: '#2e1222', icon: '✨', label: '요정' },
+  Colorless: { color: '#B0BEC5', bg: '#1e1e1e', icon: '⭐', label: '무색' },
+}
+
+// 에너지 아이콘 (작은 배지)
+function EnergyBadge({ type }: { type: string }) {
+  const info = ENERGY_TYPE_INFO[type]
+  if (!info) return <span className="text-[11px] bg-[#1a1208] border border-[#2e2318] px-1.5 py-0.5 rounded text-[#7a6040]">{type}</span>
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md"
+      style={{ backgroundColor: info.bg, color: info.color, border: `1px solid ${info.color}40` }}
+    >
+      {info.icon} {info.label}
+    </span>
+  )
+}
+
+// 후퇴 비용 동그라미
+function RetreatDots({ count }: { count: number }) {
+  return (
+    <div className="flex items-center gap-1">
+      {Array.from({ length: Math.min(count, 5) }).map((_, i) => (
+        <span key={i} className="w-4 h-4 rounded-full bg-[#B0BEC5]/30 border border-[#B0BEC5]/50 inline-flex items-center justify-center text-[8px]">⭐</span>
+      ))}
+      {count > 5 && <span className="text-[10px] text-[#7a6040]">+{count - 5}</span>}
+    </div>
+  )
 }
 
 function rarityColorClass(rarity: string): string {
@@ -413,6 +480,125 @@ export default function CardDetailPage() {
               <InfoRow label="오리파 수록" value={`${card._count.oripaItems}개 오리파`} />
             )}
           </div>
+
+          {/* 포켓몬 TCG 스탯 박스 (icu.gg 스타일) */}
+          {card.tcgType === 'POKEMON' && (card.hp || card.attacks?.length || card.abilities?.length || card.weaknesses?.length || card.retreatCost) && (
+            <div className="bg-[#1a1410] border border-[#2e2318] rounded-xl overflow-hidden">
+              {/* 헤더: HP + 에너지 타입 */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-[#2e2318]">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-semibold text-[#7a6040]">
+                    {card.supertype ?? 'Pokémon'}
+                    {card.subtypes && ` · ${card.subtypes.split(',').join(' · ')}`}
+                  </span>
+                  {card.cardTypes && card.cardTypes.split(',').map(t => (
+                    <EnergyBadge key={t} type={t.trim()} />
+                  ))}
+                </div>
+                {card.hp && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-[#5a4830]">HP</span>
+                    <span className="text-2xl font-black text-red-400 leading-none">{card.hp}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* 특성 (Ability) */}
+              {card.abilities && card.abilities.length > 0 && (
+                <div className="px-4 py-3 border-b border-[#1a1208]">
+                  {card.abilities.map((ab, i) => (
+                    <div key={i} className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded bg-red-900/40 text-red-400 border border-red-700/30">
+                          {ab.type === 'Pokémon Power' ? '포켓몬 파워' : ab.type === 'Ancient Trait' ? '고대 특성' : '특성'}
+                        </span>
+                        <span className="text-sm font-semibold text-[#f5ead8]">{ab.name}</span>
+                      </div>
+                      <p className="text-xs text-[#8a7055] leading-relaxed">{ab.text}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* 기술 (Attacks) */}
+              {card.attacks && card.attacks.length > 0 && (
+                <div className="divide-y divide-[#1a1208]">
+                  {card.attacks.map((atk, i) => (
+                    <div key={i} className="px-4 py-3 space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {/* 에너지 비용 */}
+                          {atk.cost.map((c, j) => (
+                            <EnergyBadge key={j} type={c} />
+                          ))}
+                          <span className="text-sm font-semibold text-[#f5ead8]">{atk.name}</span>
+                        </div>
+                        {atk.damage && (
+                          <span className="text-lg font-black text-[#f0a832] whitespace-nowrap">{atk.damage}</span>
+                        )}
+                      </div>
+                      {atk.text && (
+                        <p className="text-xs text-[#8a7055] leading-relaxed">{atk.text}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* 약점 · 저항력 · 후퇴비용 */}
+              {(card.weaknesses?.length || card.resistances?.length || card.retreatCost != null) && (
+                <div className="flex items-center gap-4 px-4 py-3 border-t border-[#2e2318] bg-[#150f0c]">
+                  {card.weaknesses && card.weaknesses.length > 0 && (
+                    <div className="space-y-0.5">
+                      <p className="text-[9px] text-[#4a3820] uppercase tracking-wider">약점</p>
+                      <div className="flex items-center gap-1">
+                        {card.weaknesses.map((w, i) => (
+                          <span key={i} className="flex items-center gap-0.5">
+                            <EnergyBadge type={w.type} />
+                            <span className="text-[10px] text-red-400 font-bold">{w.value}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {card.resistances && card.resistances.length > 0 && (
+                    <div className="space-y-0.5">
+                      <p className="text-[9px] text-[#4a3820] uppercase tracking-wider">저항력</p>
+                      <div className="flex items-center gap-1">
+                        {card.resistances.map((r, i) => (
+                          <span key={i} className="flex items-center gap-0.5">
+                            <EnergyBadge type={r.type} />
+                            <span className="text-[10px] text-emerald-400 font-bold">{r.value}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {card.retreatCost != null && (
+                    <div className="space-y-0.5 ml-auto">
+                      <p className="text-[9px] text-[#4a3820] uppercase tracking-wider">후퇴비용</p>
+                      <RetreatDots count={card.retreatCost} />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 풀레이버 텍스트 */}
+              {card.flavorText && (
+                <div className="px-4 py-3 border-t border-[#1a1208]">
+                  <p className="text-[11px] text-[#5a4830] italic leading-relaxed">&ldquo;{card.flavorText}&rdquo;</p>
+                </div>
+              )}
+
+              {/* 일러스트레이터 */}
+              {card.artist && (
+                <div className="px-4 py-2 border-t border-[#1a1208] flex items-center justify-end gap-1">
+                  <span className="text-[9px] text-[#4a3820]">illus.</span>
+                  <span className="text-[11px] text-[#7a6040]">{card.artist}</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {card.description && (
             <div className="bg-[#1a1410] border border-[#2e2318] rounded-xl p-4">

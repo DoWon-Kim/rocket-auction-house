@@ -185,10 +185,26 @@ export async function importTcgdex(req: AuthRequest, res: Response) {
 // ── 포켓몬 TCG API (EN 고화질, api.pokemontcg.io) ─────────────────────────────
 
 interface PokemonSet { id: string; name: string; total: number; releaseDate: string }
+interface PokemonAttack { name: string; cost: string[]; convertedEnergyCost: number; damage: string; text: string }
+interface PokemonAbility { name: string; text: string; type: string }
+interface PokemonWeakness { type: string; value: string }
+interface PokemonResistance { type: string; value: string }
 interface PokemonCard {
   id: string; name: string; number: string; rarity?: string
   set: { id: string; name: string }
   images?: { small?: string; large?: string }
+  // 상세 스탯 필드
+  supertype?: string
+  subtypes?: string[]
+  types?: string[]
+  hp?: string
+  attacks?: PokemonAttack[]
+  abilities?: PokemonAbility[]
+  weaknesses?: PokemonWeakness[]
+  resistances?: PokemonResistance[]
+  convertedRetreatCost?: number
+  artist?: string
+  flavorText?: string
 }
 
 export async function getPokemonSets(_req: AuthRequest, res: Response) {
@@ -230,6 +246,17 @@ export async function importPokemon(req: AuthRequest, res: Response) {
       cardNumber: c.number,
       rarity: c.rarity ?? 'Unknown',
       imageUrl: c.images?.small ?? null,
+      supertype:   c.supertype ?? null,
+      subtypes:    c.subtypes?.join(',') ?? null,
+      cardTypes:   c.types?.join(',') ?? null,
+      hp:          c.hp ? parseInt(c.hp) : null,
+      attacks:     c.attacks ? c.attacks as unknown as Prisma.InputJsonValue : undefined,
+      abilities:   c.abilities ? c.abilities as unknown as Prisma.InputJsonValue : undefined,
+      weaknesses:  c.weaknesses ? c.weaknesses as unknown as Prisma.InputJsonValue : undefined,
+      resistances: c.resistances ? c.resistances as unknown as Prisma.InputJsonValue : undefined,
+      retreatCost: c.convertedRetreatCost ?? null,
+      artist:      c.artist ?? null,
+      flavorText:  c.flavorText ?? null,
     }))
 
     const result = await prisma.card.createMany({ data: records, skipDuplicates: true })
@@ -1045,6 +1072,14 @@ export async function importAll(req: AuthRequest, res: Response) {
                 externalId: `pokemon_${c.id}`, name: c.name, tcgType: 'POKEMON' as const,
                 setName: c.set.name, setCode: c.set.id, cardNumber: c.number,
                 rarity: c.rarity ?? 'Unknown', imageUrl: c.images?.small ?? null,
+                supertype: c.supertype ?? null, subtypes: c.subtypes?.join(',') ?? null,
+                cardTypes: c.types?.join(',') ?? null, hp: c.hp ? parseInt(c.hp) : null,
+                attacks: c.attacks ? c.attacks as unknown as Prisma.InputJsonValue : undefined,
+                abilities: c.abilities ? c.abilities as unknown as Prisma.InputJsonValue : undefined,
+                weaknesses: c.weaknesses ? c.weaknesses as unknown as Prisma.InputJsonValue : undefined,
+                resistances: c.resistances ? c.resistances as unknown as Prisma.InputJsonValue : undefined,
+                retreatCost: c.convertedRetreatCost ?? null, artist: c.artist ?? null,
+                flavorText: c.flavorText ?? null,
               }))
               const result = await prisma.card.createMany({ data: records, skipDuplicates: true })
               totals['POKEMON'].imported += result.count

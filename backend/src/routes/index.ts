@@ -34,7 +34,7 @@ import {
 } from '../controllers/admin.controller'
 import { authenticate, optionalAuth, requireAdmin, requireSuperAdmin } from '../middleware/auth'
 import { requireSection } from '../middleware/permissions'
-import { searchCards, getCardMeta, getCard, getCardListings, getCardPriceHistory } from '../controllers/card.controller'
+import { searchCards, getCardMeta, getCardRank, getCard, getCardListings, getCardPriceHistory } from '../controllers/card.controller'
 import { upload } from '../middleware/upload'
 import { uploadImage } from '../controllers/upload.controller'
 import { confirmPayment } from '../controllers/payment.controller'
@@ -89,6 +89,7 @@ router.patch('/auth/profile', authenticate, updateProfile)
 
 // 카드 검색 (공개)
 router.get('/cards/meta', getCardMeta)
+router.get('/cards/rank', getCardRank)
 router.get('/cards', searchCards)
 router.get('/cards/:id', getCard)
 router.get('/cards/:id/price-history', getCardPriceHistory)

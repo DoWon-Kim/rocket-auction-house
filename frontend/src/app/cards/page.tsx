@@ -25,6 +25,10 @@ interface Card {
   cardNumber: string | null
   rarity: string
   imageUrl: string | null
+  supertype: string | null
+  subtypes: string | null
+  cardTypes: string | null
+  hp: number | null
   _count: { listings: number }
 }
 
@@ -36,7 +40,7 @@ interface CardsResponse {
 }
 
 interface MetaItem { name: string; count: number }
-interface CardMeta { sets: MetaItem[]; rarities: MetaItem[] }
+interface CardMeta { sets: MetaItem[]; rarities: MetaItem[]; supertypes: MetaItem[] }
 
 // ─── 상수 & 유틸 ──────────────────────────────────────────────────────────────
 
@@ -50,6 +54,29 @@ const SORT_OPTIONS = [
   { value: 'name',    label: '이름순' },
   { value: 'newest',  label: '최신 등록순' },
   { value: 'popular', label: '리스팅 많은순' },
+  { value: 'hp_desc', label: 'HP 높은순' },
+]
+
+// 포켓몬 에너지 타입 (icu.gg 스타일)
+const POKEMON_ENERGY_TYPES = [
+  { value: 'Grass',     label: '풀',    color: '#4CAF50', bg: '#1a2e1a', icon: '🌿' },
+  { value: 'Fire',      label: '불꽃',  color: '#FF5722', bg: '#2e1a12', icon: '🔥' },
+  { value: 'Water',     label: '물',    color: '#2196F3', bg: '#121a2e', icon: '💧' },
+  { value: 'Lightning', label: '번개',  color: '#FFC107', bg: '#2e2a12', icon: '⚡' },
+  { value: 'Psychic',   label: '초능력', color: '#E91E63', bg: '#2e1222', icon: '🔮' },
+  { value: 'Fighting',  label: '격투',  color: '#FF9800', bg: '#2e1e12', icon: '🥊' },
+  { value: 'Darkness',  label: '악',    color: '#9C27B0', bg: '#1e1228', icon: '🌑' },
+  { value: 'Metal',     label: '강철',  color: '#9E9E9E', bg: '#1e1e1e', icon: '⚙️' },
+  { value: 'Dragon',    label: '드래곤', color: '#6A1B9A', bg: '#1a1228', icon: '🐉' },
+  { value: 'Fairy',     label: '요정',  color: '#F48FB1', bg: '#2e1222', icon: '✨' },
+  { value: 'Colorless', label: '무색',  color: '#B0BEC5', bg: '#1e1e1e', icon: '⭐' },
+]
+
+// 포켓몬 카드 분류
+const POKEMON_SUPERTYPES = [
+  { value: 'Pokémon', label: '포켓몬', icon: '🎴' },
+  { value: 'Trainer', label: '트레이너', icon: '🧢' },
+  { value: 'Energy',  label: '에너지', icon: '⚡' },
 ]
 
 function rarityColorClass(rarity: string): string {
@@ -150,6 +177,22 @@ function CardTile({ card, displayLang }: { card: Card; displayLang?: string }) {
         </div>
 
         <div className="mt-auto space-y-0.5">
+          {/* 에너지 타입 + HP */}
+          {(card.cardTypes || card.hp) && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {card.cardTypes && card.cardTypes.split(',').map(t => {
+                const et = POKEMON_ENERGY_TYPES.find(e => e.value === t.trim())
+                return et ? (
+                  <span key={t} className="text-[9px] font-semibold px-1 py-0.5 rounded" style={{ backgroundColor: et.bg, color: et.color }}>
+                    {et.icon} {et.label}
+                  </span>
+                ) : null
+              })}
+              {card.hp && (
+                <span className="text-[9px] font-bold text-red-400">HP {card.hp}</span>
+              )}
+            </div>
+          )}
           <p className="text-[11px] text-[#5a4830] truncate">{card.setName}</p>
           {card.cardNumber && (
             <p className="text-[10px] text-[#4a3820] font-mono">{card.cardNumber}</p>
@@ -343,13 +386,15 @@ function CardsContent() {
   const searchParams = useSearchParams()
   const router       = useRouter()
 
-  const q       = searchParams.get('q')       ?? ''
-  const tcgType = searchParams.get('tcgType') ?? ''
-  const rarity  = searchParams.get('rarity')  ?? ''
-  const setName = searchParams.get('setName') ?? ''
-  const lang    = searchParams.get('lang')    ?? ''
-  const sort    = searchParams.get('sort')    ?? 'name'
-  const page    = Math.max(1, Number(searchParams.get('page') ?? '1'))
+  const q         = searchParams.get('q')         ?? ''
+  const tcgType   = searchParams.get('tcgType')   ?? ''
+  const rarity    = searchParams.get('rarity')    ?? ''
+  const setName   = searchParams.get('setName')   ?? ''
+  const lang      = searchParams.get('lang')      ?? ''
+  const supertype = searchParams.get('supertype') ?? ''
+  const cardType  = searchParams.get('cardType')  ?? ''
+  const sort      = searchParams.get('sort')      ?? 'name'
+  const page      = Math.max(1, Number(searchParams.get('page') ?? '1'))
 
   const [searchInput, setSearchInput] = useState(q)
   const [showInstant, setShowInstant] = useState(false)
@@ -391,7 +436,7 @@ function CardsContent() {
     router.push(`/cards?${params.toString()}`)
   }
 
-  const hasFilter = !!(tcgType || rarity || setName || q || lang)
+  const hasFilter = !!(tcgType || rarity || setName || q || lang || supertype || cardType)
 
   function clearAll() {
     router.push('/cards')
@@ -400,23 +445,26 @@ function CardsContent() {
 
   // 카드 목록 조회
   const { data, isLoading } = useQuery<CardsResponse>({
-    queryKey: ['cards', { q, tcgType, rarity, setName, lang, sort, page }],
+    queryKey: ['cards', { q, tcgType, rarity, setName, lang, supertype, cardType, sort, page }],
     queryFn: () => api.get('/cards', { params: {
       q: q || undefined, tcgType: tcgType || undefined,
       rarity: rarity || undefined, setName: setName || undefined,
       lang: lang || undefined,
+      supertype: supertype || undefined,
+      cardType: cardType || undefined,
       sort, page, limit: 24,
     }}).then(r => r.data),
     staleTime: 30_000,
     placeholderData: prev => prev,
   })
 
-  // 필터 옵션 (레어도, 세트)
+  // 필터 옵션 (레어도, 세트, 수퍼타입)
   const { data: metaData, isLoading: metaLoading } = useQuery<CardMeta>({
-    queryKey: ['cards-meta', tcgType, lang],
+    queryKey: ['cards-meta', tcgType, lang, supertype],
     queryFn: () => api.get('/cards/meta', { params: {
       tcgType: tcgType || undefined,
       lang: lang || undefined,
+      supertype: supertype || undefined,
     }}).then(r => r.data),
     staleTime: 60_000,
   })
@@ -510,7 +558,7 @@ function CardsContent() {
       </div>
 
       {/* ── 언어 필터 탭 ── */}
-      <div className="flex gap-1.5 items-center">
+      <div className="flex gap-1.5 items-center flex-wrap">
         <span className="text-[11px] text-[#5a4830] font-medium mr-1">언어</span>
         {[
           { value: '', label: '전체' },
@@ -530,6 +578,71 @@ function CardsContent() {
           </button>
         ))}
       </div>
+
+      {/* ── 포켓몬 카드 분류 필터 ── */}
+      {(tcgType === 'POKEMON' || (!tcgType && (metaData?.supertypes?.length ?? 0) > 0)) && (
+        <div className="flex gap-1.5 items-center flex-wrap">
+          <span className="text-[11px] text-[#5a4830] font-medium mr-1">분류</span>
+          <button
+            onClick={() => setParam('supertype', '')}
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+              !supertype
+                ? 'bg-[#2a1c08] text-[#e0b878] border-[#3d2a0c]'
+                : 'bg-transparent text-[#7a6040] border-[#2e2318] hover:border-[#4a3520] hover:text-[#9e8a6a]'
+            }`}
+          >
+            전체
+          </button>
+          {POKEMON_SUPERTYPES.map(st => (
+            <button
+              key={st.value}
+              onClick={() => setParam('supertype', supertype === st.value ? '' : st.value)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                supertype === st.value
+                  ? 'bg-[#2a1c08] text-[#e0b878] border-[#3d2a0c]'
+                  : 'bg-transparent text-[#7a6040] border-[#2e2318] hover:border-[#4a3520] hover:text-[#9e8a6a]'
+              }`}
+            >
+              <span>{st.icon}</span>{st.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ── 포켓몬 에너지 타입 필터 ── */}
+      {(tcgType === 'POKEMON' || supertype === 'Pokémon') && (
+        <div className="flex gap-1.5 items-center flex-wrap">
+          <span className="text-[11px] text-[#5a4830] font-medium mr-1">타입</span>
+          {POKEMON_ENERGY_TYPES.map(et => (
+            <button
+              key={et.value}
+              onClick={() => setParam('cardType', cardType === et.value ? '' : et.value)}
+              title={et.label}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                cardType === et.value
+                  ? `border-opacity-60 text-white`
+                  : 'bg-transparent text-[#7a6040] border-[#2e2318] hover:border-[#4a3520]'
+              }`}
+              style={cardType === et.value ? {
+                backgroundColor: et.bg,
+                borderColor: et.color,
+                color: et.color,
+              } : undefined}
+            >
+              <span>{et.icon}</span>
+              <span className="hidden sm:inline">{et.label}</span>
+            </button>
+          ))}
+          {cardType && (
+            <button
+              onClick={() => setParam('cardType', '')}
+              className="text-[11px] text-[#7a6040] hover:text-[#e0b878] transition-colors ml-1"
+            >
+              초기화 ×
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="flex gap-6">
         {/* ── 데스크탑 사이드바 ── */}
@@ -562,6 +675,22 @@ function CardsContent() {
                   <button onClick={() => setParam('lang', '')}><X size={9} /></button>
                 </span>
               )}
+              {supertype && (
+                <span className="flex items-center gap-1 text-[11px] bg-[#2a1c08] border border-[#3d2a0c] text-[#e0b878] px-2.5 py-1 rounded-lg">
+                  {POKEMON_SUPERTYPES.find(s => s.value === supertype)?.icon} {supertype}
+                  <button onClick={() => setParam('supertype', '')}><X size={9} /></button>
+                </span>
+              )}
+              {cardType && (() => {
+                const et = POKEMON_ENERGY_TYPES.find(e => e.value === cardType)
+                return et ? (
+                  <span className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg border"
+                    style={{ backgroundColor: et.bg, borderColor: et.color, color: et.color }}>
+                    {et.icon} {et.label}
+                    <button onClick={() => setParam('cardType', '')}><X size={9} /></button>
+                  </span>
+                ) : null
+              })()}
               {rarity && (
                 <span className="flex items-center gap-1 text-[11px] bg-[#2a1c08] border border-[#3d2a0c] text-[#e0b878] px-2.5 py-1 rounded-lg">
                   {rarityLabel(rarity)}
