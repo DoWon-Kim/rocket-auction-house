@@ -8,7 +8,7 @@ import {
   Zap, Menu, X, MessageCircle, Users, Bell, Heart, Layers, Settings,
 } from 'lucide-react'
 import { NotificationBell } from '@/components/NotificationBell'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { connectSocket, reconnectWithToken } from '@/lib/socket'
@@ -38,6 +38,33 @@ export default function Navbar() {
   const [search, setSearch] = useState('')
   const [mobileOpen, setMobileOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const [searchFocused, setSearchFocused] = useState(false)
+  const [debouncedQ, setDebouncedQ] = useState('')
+  const searchRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(search.trim()), 200)
+    return () => clearTimeout(t)
+  }, [search])
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setSearchFocused(false)
+      }
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [])
+
+  const { data: suggestData } = useQuery({
+    queryKey: ['card-suggest', debouncedQ],
+    queryFn: () => api.get('/cards', { params: { q: debouncedQ, limit: 6 } }).then(r => r.data),
+    enabled: debouncedQ.length >= 2,
+    staleTime: 30_000,
+  })
+  const suggestions: { id: string; name: string; nameKo?: string | null; tcgType: string; imageUrl?: string | null; setName: string }[] = suggestData?.cards ?? []
+  const showSuggestions = searchFocused && debouncedQ.length >= 2 && suggestions.length > 0
 
   const { data: menusData } = useQuery({
     queryKey: ['site-menus'],
@@ -78,13 +105,20 @@ export default function Navbar() {
     refetchInterval: 30000,
   })
 
-  function handleSearch(e: React.FormEvent) {
+  const handleSearch = useCallback((e: React.FormEvent) => {
     e.preventDefault()
     if (search.trim()) {
       router.push(`/cards?q=${encodeURIComponent(search.trim())}`)
       setMobileOpen(false)
+      setSearchFocused(false)
     }
-  }
+  }, [search, router])
+
+  const handleSuggestionClick = useCallback((cardId: string) => {
+    router.push(`/cards/${cardId}`)
+    setSearch('')
+    setSearchFocused(false)
+  }, [router])
 
   function handleLogout() {
     clearAuth()
@@ -114,17 +148,59 @@ export default function Navbar() {
           </Link>
 
           {/* Search */}
-          <form onSubmit={handleSearch} className="flex-1 max-w-xs">
-            <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5a4830] pointer-events-none" />
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="카드명 · 카드번호 검색..."
-                className="w-full pl-9 pr-4 py-[7px] bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] focus:border-[#d4a853]/40 rounded-lg text-sm text-[#f5ead8] placeholder:text-[#5a4830] focus:outline-none transition-colors duration-200"
-              />
-            </div>
-          </form>
+          <div ref={searchRef} className="flex-1 max-w-xs relative">
+            <form onSubmit={handleSearch}>
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5a4830] pointer-events-none" />
+                <input
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  onFocus={() => setSearchFocused(true)}
+                  placeholder="카드명 · 카드번호 검색..."
+                  className="w-full pl-9 pr-4 py-[7px] bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] focus:border-[#d4a853]/40 rounded-lg text-sm text-[#f5ead8] placeholder:text-[#5a4830] focus:outline-none transition-colors duration-200"
+                />
+              </div>
+            </form>
+            {/* Autocomplete dropdown */}
+            {showSuggestions && (
+              <div className="absolute top-full mt-1.5 left-0 w-full bg-[#1a1410] border border-[#2e2318] rounded-xl shadow-2xl shadow-black/60 z-50 overflow-hidden">
+                {suggestions.map(card => (
+                  <button
+                    key={card.id}
+                    onMouseDown={() => handleSuggestionClick(card.id)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-[#221810] transition-colors text-left"
+                  >
+                    {card.imageUrl ? (
+                      <img
+                        src={card.imageUrl}
+                        alt={card.name}
+                        className="w-7 h-10 object-contain rounded shrink-0"
+                        onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                      />
+                    ) : (
+                      <div className="w-7 h-10 rounded bg-[#100c08] shrink-0 flex items-center justify-center text-[8px]">🃏</div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[12px] font-medium text-[#e8d5b0] truncate">
+                        {card.nameKo ?? card.name}
+                      </p>
+                      <p className="text-[10px] text-[#5a4830] truncate">{card.setName}</p>
+                    </div>
+                    <span className="text-[9px] text-[#4a3820] shrink-0">{card.tcgType}</span>
+                  </button>
+                ))}
+                <div className="border-t border-[#2e2318]">
+                  <button
+                    onMouseDown={() => { router.push(`/cards?q=${encodeURIComponent(search.trim())}`); setSearchFocused(false) }}
+                    className="w-full px-3 py-2 text-[11px] text-[#7a6040] hover:text-[#d4a853] text-left flex items-center gap-1.5 hover:bg-[#1e1810] transition-colors"
+                  >
+                    <Search size={11} />
+                    &ldquo;{search}&rdquo; 전체 검색
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-0.5">

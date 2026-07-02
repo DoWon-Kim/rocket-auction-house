@@ -445,47 +445,220 @@ export async function placeBid(req: AuthRequest, res: Response) {
       }
     }
 
-    await prisma.$transaction([
-      prisma.bid.updateMany({ where: { listingId: listing.id }, data: { isWinning: false } }),
-      prisma.bid.create({ data: { listingId: listing.id, bidderId: req.userId!, amount, isWinning: true } }),
-      prisma.listing.update({
+    // ── 자동 입찰 정산 ────────────────────────────────────────────────────────
+    const autoBids = await prisma.autoBid.findMany({
+      where: { listingId: listing.id, isActive: true },
+      orderBy: { maxAmount: 'desc' },
+      include: { bidder: { select: { id: true, nickname: true } } },
+    })
+
+    const myAutoBid    = autoBids.find(ab => ab.bidderId === req.userId)
+    const otherAutoBid = autoBids.find(ab => ab.bidderId !== req.userId)
+
+    let finalPrice    = amount
+    let finalWinnerId = req.userId!
+    let autoWinnerNickname: string | null = null
+    let outbidUserId: string | null = null
+
+    if (otherAutoBid && otherAutoBid.maxAmount > amount) {
+      if (myAutoBid && myAutoBid.maxAmount >= otherAutoBid.maxAmount) {
+        // 내 자동 입찰이 더 높음 → 내가 승리
+        finalPrice    = Math.min(otherAutoBid.maxAmount + 1, myAutoBid.maxAmount)
+        finalWinnerId = req.userId!
+        outbidUserId  = otherAutoBid.bidderId
+      } else {
+        // 경쟁자 자동 입찰이 더 높음 → 경쟁자 승리
+        finalPrice         = myAutoBid ? Math.min(myAutoBid.maxAmount + 1, otherAutoBid.maxAmount) : amount + 1
+        finalWinnerId      = otherAutoBid.bidderId
+        autoWinnerNickname = otherAutoBid.bidder.nickname
+        outbidUserId       = req.userId!
+      }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.bid.updateMany({ where: { listingId: listing.id }, data: { isWinning: false } })
+      await tx.bid.create({
+        data: {
+          listingId: listing.id,
+          bidderId:  req.userId!,
+          amount,
+          isWinning: finalWinnerId === req.userId && finalPrice === amount,
+        },
+      })
+      if (finalPrice !== amount) {
+        await tx.bid.create({
+          data: {
+            listingId: listing.id,
+            bidderId:  finalWinnerId,
+            amount:    finalPrice,
+            isAuto:    true,
+            isWinning: true,
+          },
+        })
+      } else {
+        await tx.bid.updateMany({
+          where: { listingId: listing.id, bidderId: req.userId!, amount },
+          data: { isWinning: true },
+        })
+      }
+      await tx.listing.update({
         where: { id: listing.id },
         data: {
-          currentPrice: amount,
+          currentPrice: finalPrice,
           ...(extended
             ? { auctionEndsAt: newEndsAt, autoExtendCount: { increment: 1 } }
             : {}),
         },
-      }),
-    ])
+      })
+    })
 
-    if (prevWinningBid && prevWinningBid.bidderId !== req.userId) {
+    // 밀린 입찰자 알림
+    const outbidTarget = outbidUserId ?? (prevWinningBid?.bidderId !== req.userId ? prevWinningBid?.bidderId : null)
+    if (outbidTarget) {
       notify({
-        userId: prevWinningBid.bidderId,
+        userId: outbidTarget,
         type: 'BID_OUTBID',
         title: '입찰이 밀렸습니다',
-        body: `${bidder?.nickname ?? '다른 사용자'}님이 ${amount.toLocaleString()}P에 재입찰했습니다.`,
+        body: autoWinnerNickname
+          ? `자동 입찰로 ${finalPrice.toLocaleString()}P에 재입찰되었습니다.`
+          : `${bidder?.nickname ?? '다른 사용자'}님이 ${finalPrice.toLocaleString()}P에 재입찰했습니다.`,
         link: `/listings/${listing.id}`,
       }).catch(e => console.error('[notify BID_OUTBID]', e))
     }
 
     getIo()?.to(`listing:${listing.id}`).emit('bid:placed', {
       listingId: listing.id,
-      amount,
-      currentPrice: amount,
-      bidderNickname: bidder?.nickname ?? '익명',
+      amount: finalPrice,
+      currentPrice: finalPrice,
+      bidderNickname: autoWinnerNickname ?? bidder?.nickname ?? '익명',
+      isAuto: finalPrice !== amount,
       ...(extended ? { newEndsAt: newEndsAt?.toISOString(), extended: true, extendMinutes: listing.autoExtendMinutes } : {}),
     })
 
+    const isAutoWin = finalWinnerId !== req.userId
     res.json({
-      message: extended
-        ? `입찰 완료! 경매가 ${listing.autoExtendMinutes}분 연장되었습니다.`
-        : '입찰이 완료되었습니다.',
-      currentPrice: amount,
+      message: isAutoWin
+        ? `자동 입찰에 의해 ${finalPrice.toLocaleString()}P로 밀렸습니다. 금액을 높여 재입찰하세요.`
+        : extended
+          ? `입찰 완료! 경매가 ${listing.autoExtendMinutes}분 연장되었습니다.`
+          : '입찰이 완료되었습니다.',
+      currentPrice: finalPrice,
+      outbid: isAutoWin,
       ...(extended ? { newEndsAt: newEndsAt?.toISOString(), extended: true } : {}),
     })
   } catch (err) {
     console.error('[placeBid]', err)
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' })
+  }
+}
+
+// ── POST /listings/:id/auto-bid ────────────────────────────────────────────────
+export async function setAutoBid(req: AuthRequest, res: Response) {
+  const { maxAmount } = req.body
+  if (!maxAmount || typeof maxAmount !== 'number' || maxAmount < 1) {
+    res.status(400).json({ message: '최대 입찰 금액을 입력해주세요.' })
+    return
+  }
+
+  try {
+    const listing = await prisma.listing.findUnique({ where: { id: String(req.params['id']) } })
+    if (!listing || listing.listingType !== 'AUCTION' || listing.status !== 'ACTIVE') {
+      res.status(400).json({ message: '자동 입찰 설정이 불가한 리스팅입니다.' })
+      return
+    }
+    if (listing.sellerId === req.userId) {
+      res.status(400).json({ message: '본인 리스팅에는 자동 입찰을 설정할 수 없습니다.' })
+      return
+    }
+    const currentPrice = listing.currentPrice ?? listing.startingPrice ?? 0
+    if (maxAmount <= currentPrice) {
+      res.status(400).json({ message: `현재가(${currentPrice.toLocaleString()}P)보다 높은 금액을 설정해주세요.` })
+      return
+    }
+
+    // 자동 입찰 등록/업데이트
+    const autoBid = await prisma.autoBid.upsert({
+      where: { listingId_bidderId: { listingId: listing.id, bidderId: req.userId! } },
+      create: { listingId: listing.id, bidderId: req.userId!, maxAmount, isActive: true },
+      update: { maxAmount, isActive: true },
+    })
+
+    // 즉시 자동 입찰 발동: 현재가보다 내 최대가가 높으면 바로 입찰
+    const otherAutoBids = await prisma.autoBid.findMany({
+      where: { listingId: listing.id, isActive: true, bidderId: { not: req.userId! } },
+      orderBy: { maxAmount: 'desc' },
+    })
+    const prevWinner = await prisma.bid.findFirst({
+      where: { listingId: listing.id, isWinning: true },
+      select: { bidderId: true, amount: true },
+    })
+
+    let fireAmount = currentPrice + 1
+    let iWin = true
+    const bestOther = otherAutoBids[0]
+
+    if (bestOther && bestOther.maxAmount >= maxAmount) {
+      // 경쟁 자동 입찰이 더 높음 → 나는 지금 1P 높여봤자 질 운명
+      fireAmount = Math.min(maxAmount, bestOther.maxAmount + 1)
+      if (fireAmount > maxAmount) { iWin = false }
+    } else if (bestOther) {
+      fireAmount = Math.min(bestOther.maxAmount + 1, maxAmount)
+    }
+
+    if (iWin && fireAmount > currentPrice) {
+      await prisma.$transaction([
+        prisma.bid.updateMany({ where: { listingId: listing.id }, data: { isWinning: false } }),
+        prisma.bid.create({ data: { listingId: listing.id, bidderId: req.userId!, amount: fireAmount, isAuto: true, isWinning: true } }),
+        prisma.listing.update({ where: { id: listing.id }, data: { currentPrice: fireAmount } }),
+      ])
+
+      if (prevWinner && prevWinner.bidderId !== req.userId) {
+        const bidder = await prisma.user.findUnique({ where: { id: req.userId! }, select: { nickname: true } })
+        notify({
+          userId: prevWinner.bidderId,
+          type: 'BID_OUTBID',
+          title: '자동 입찰에 밀렸습니다',
+          body: `${bidder?.nickname ?? '다른 사용자'}님의 자동 입찰로 현재가가 ${fireAmount.toLocaleString()}P가 되었습니다.`,
+          link: `/listings/${listing.id}`,
+        }).catch(() => {})
+      }
+
+      getIo()?.to(`listing:${listing.id}`).emit('bid:placed', {
+        listingId: listing.id, amount: fireAmount, currentPrice: fireAmount, isAuto: true,
+        bidderNickname: '자동입찰',
+      })
+    }
+
+    res.json({ autoBid, message: `자동 입찰이 설정되었습니다. 최대 ${maxAmount.toLocaleString()}P까지 자동으로 입찰됩니다.` })
+  } catch (err) {
+    console.error('[setAutoBid]', err)
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' })
+  }
+}
+
+// ── DELETE /listings/:id/auto-bid ──────────────────────────────────────────────
+export async function cancelAutoBid(req: AuthRequest, res: Response) {
+  try {
+    await prisma.autoBid.updateMany({
+      where: { listingId: String(req.params['id']), bidderId: req.userId! },
+      data: { isActive: false },
+    })
+    res.json({ message: '자동 입찰이 취소되었습니다.' })
+  } catch (err) {
+    console.error('[cancelAutoBid]', err)
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' })
+  }
+}
+
+// ── GET /listings/:id/auto-bid ─────────────────────────────────────────────────
+export async function getAutoBid(req: AuthRequest, res: Response) {
+  try {
+    const autoBid = await prisma.autoBid.findUnique({
+      where: { listingId_bidderId: { listingId: String(req.params['id']), bidderId: req.userId! } },
+    })
+    res.json({ autoBid: autoBid?.isActive ? autoBid : null })
+  } catch (err) {
+    console.error('[getAutoBid]', err)
     res.status(500).json({ message: '서버 오류가 발생했습니다.' })
   }
 }

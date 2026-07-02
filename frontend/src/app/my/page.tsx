@@ -14,6 +14,7 @@ import {
   User, Wallet, ShoppingBag, ArrowDownCircle, ArrowUpCircle,
   Handshake, Gavel, Package, X, Check, AlertCircle,
   Archive, Truck, Trash2, ChevronDown, ChevronUp, Banknote, MessageCircle, Store, Star,
+  TrendingUp, BarChart2,
 } from 'lucide-react'
 import Image from 'next/image'
 import { ReviewModal } from '@/components/ReviewModal'
@@ -198,6 +199,67 @@ function ProfileTab() {
           </Link>
         ))}
       </div>
+
+      {/* 판매자 분석 */}
+      <SellerStatsDashboard />
+    </div>
+  )
+}
+
+function SellerStatsDashboard() {
+  const { data, isLoading } = useQuery({
+    queryKey: ['my-stats'],
+    queryFn: () => api.get('/my/stats').then(r => r.data),
+    staleTime: 60_000,
+  })
+  const s = data?.seller
+
+  return (
+    <div className="bg-[#150f0c] border border-[#2e2318] rounded-2xl p-5 space-y-4">
+      <div className="flex items-center gap-2">
+        <BarChart2 size={14} className="text-[#d4a853]" />
+        <p className="text-sm font-semibold text-[#e8d5b0]">판매 분석</p>
+      </div>
+
+      {isLoading ? (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-14 rounded-xl bg-[#1a1410] animate-pulse" />
+          ))}
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: '활성 리스팅', value: s?.activeListings?.toLocaleString() ?? '0', icon: <ShoppingBag size={13} className="text-[#d4a853]" /> },
+              { label: '전체 판매', value: `${s?.totalSales?.toLocaleString() ?? '0'}건`, icon: <TrendingUp size={13} className="text-emerald-400" /> },
+              { label: '30일 거래액', value: s?.revenue30d ? `${(s.revenue30d / 10000).toFixed(1)}만P` : '—', icon: <Wallet size={13} className="text-blue-400" /> },
+              { label: '7일 판매', value: `${s?.txCount7d?.toLocaleString() ?? '0'}건`, icon: <ArrowUpCircle size={13} className="text-purple-400" /> },
+            ].map(stat => (
+              <div key={stat.label} className="bg-[#1a1410] border border-[#2e2318] rounded-xl px-3 py-3 flex flex-col gap-1.5">
+                <div className="flex items-center gap-1.5">{stat.icon}<p className="text-[10px] text-[#5a4830] uppercase tracking-wide">{stat.label}</p></div>
+                <p className="text-base font-bold text-[#f5ead8] tabular-nums">{stat.value}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 pt-1 border-t border-[#2e2318]">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[#5a4830]">평균 판매가</span>
+              <span className="text-xs font-semibold text-[#e8d5b0] tabular-nums">
+                {s?.avgSalePrice ? `${s.avgSalePrice.toLocaleString()}P` : '—'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[#5a4830]">평균 평점</span>
+              <span className="flex items-center gap-1 text-xs font-semibold text-[#f0a832]">
+                <Star size={10} fill="currentColor" strokeWidth={0} />
+                {s?.avgRating ? `${s.avgRating} (${s.reviewCount}건)` : '없음'}
+              </span>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }

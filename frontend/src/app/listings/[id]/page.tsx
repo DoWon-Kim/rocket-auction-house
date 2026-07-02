@@ -12,7 +12,7 @@ import Image from 'next/image'
 import {
   Clock, Gavel, Tag, Handshake, ChevronLeft, ChevronRight,
   Zap, ShieldAlert, Flame, MessageCircle, ShieldCheck, AlertCircle, Check, Flag,
-  Star, Reply, TrendingUp, TrendingDown, Minus, BarChart2, ArrowRight,
+  Star, Reply, TrendingUp, TrendingDown, Minus, BarChart2, ArrowRight, Bot, Expand,
 } from 'lucide-react'
 import Link from 'next/link'
 import { io, Socket } from 'socket.io-client'
@@ -316,27 +316,68 @@ function SellerReviews({ sellerId, viewerId }: { sellerId: string; viewerId: str
   )
 }
 
+/* ─── Image Lightbox ─────────────────────────── */
+function Lightbox({ src, onClose }: { src: string; onClose: () => void }) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div className="relative max-w-3xl max-h-[90vh] w-full" onClick={e => e.stopPropagation()}>
+        <Image
+          src={src}
+          alt="확대 이미지"
+          width={800}
+          height={1120}
+          className="object-contain rounded-2xl max-h-[90vh] w-auto mx-auto"
+          unoptimized
+        />
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 w-9 h-9 flex items-center justify-center bg-[#0f0b08]/80 text-white border border-[#2e2318] rounded-full hover:bg-[#1a1410] transition-colors text-lg"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+  )
+}
+
 /* ─── Image gallery ───────────────────────────── */
-function ImageGallery({ images }: { images: string[] }) {
+function ImageGallery({ images, onLightbox }: { images: string[]; onLightbox: (src: string) => void }) {
   const [active, setActive] = useState(0)
   if (!images.length) return null
   return (
     <div className="space-y-3">
-      <div className="relative aspect-[3/4] bg-[#100c08] rounded-2xl overflow-hidden border border-[#2e2318]">
+      <div
+        className="relative aspect-[3/4] bg-[#100c08] rounded-2xl overflow-hidden border border-[#2e2318] cursor-zoom-in group"
+        onClick={() => onLightbox(images[active])}
+      >
         <Image src={images[active]} alt={`사진 ${active + 1}`} fill className="object-contain" />
+        {/* 확대 힌트 */}
+        <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+          <span className="flex items-center gap-1 px-2 py-1 bg-[#0f0b08]/80 text-white text-[10px] rounded-lg border border-[#2e2318] backdrop-blur-sm">
+            <Expand size={10} /> 확대
+          </span>
+        </div>
         {images.length > 1 && (
           <>
-            <button onClick={() => setActive(a => (a - 1 + images.length) % images.length)}
+            <button onClick={e => { e.stopPropagation(); setActive(a => (a - 1 + images.length) % images.length) }}
               className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center bg-[#0f0b08]/80 hover:bg-[#1a1410] backdrop-blur-sm text-white rounded-full border border-[#2e2318] transition-colors">
               <ChevronLeft size={16} />
             </button>
-            <button onClick={() => setActive(a => (a + 1) % images.length)}
+            <button onClick={e => { e.stopPropagation(); setActive(a => (a + 1) % images.length) }}
               className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center bg-[#0f0b08]/80 hover:bg-[#1a1410] backdrop-blur-sm text-white rounded-full border border-[#2e2318] transition-colors">
               <ChevronRight size={16} />
             </button>
             <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
               {images.map((_, i) => (
-                <button key={i} onClick={() => setActive(i)}
+                <button key={i} onClick={e => { e.stopPropagation(); setActive(i) }}
                   className={`rounded-full transition-all ${i === active ? 'w-4 h-1.5 bg-white' : 'w-1.5 h-1.5 bg-white/35 hover:bg-white/60'}`} />
               ))}
             </div>
@@ -407,6 +448,10 @@ export default function ListingDetailPage() {
   const [extendMsg, setExtendMsg] = useState<string | null>(null)
   const extendTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [bidAmount, setBidAmount] = useState('')
+  const [autoBidAmount, setAutoBidAmount] = useState('')
+  const [showAutoBid, setShowAutoBid] = useState(false)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
+  const [lightboxImg, setLightboxImg] = useState('')
   const [offerAmount, setOfferAmount] = useState('')
   const [offerMessage, setOfferMessage] = useState('')
   const [actionMsg, setActionMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
@@ -472,8 +517,12 @@ export default function ListingDetailPage() {
   const bidMut = useMutation({
     mutationFn: (amount: number) => api.post(`/listings/${id}/bid`, { amount }),
     onSuccess: res => {
-      const msg = res.data.instantBuy ? '즉시낙찰 완료!' : res.data.extended ? `입찰 완료! 경매가 연장되었습니다.` : `입찰 완료! 현재가: ${res.data.currentPrice.toLocaleString()}P`
-      setActionMsg({ type: 'ok', text: msg })
+      const msg = res.data.outbid
+        ? res.data.message
+        : res.data.instantBuy ? '즉시낙찰 완료!'
+        : res.data.extended ? `입찰 완료! 경매가 연장되었습니다.`
+        : `입찰 완료! 현재가: ${res.data.currentPrice.toLocaleString()}P`
+      setActionMsg({ type: res.data.outbid ? 'err' : 'ok', text: msg })
       setBidAmount(''); invalidate()
     },
     onError: (e: unknown) => {
@@ -481,6 +530,31 @@ export default function ListingDetailPage() {
       setActionMsg({ type: 'err', text: err.response?.data?.message ?? '입찰에 실패했습니다.' })
     },
   })
+
+  const autoBidMut = useMutation({
+    mutationFn: (maxAmount: number) => api.post(`/listings/${id}/auto-bid`, { maxAmount }),
+    onSuccess: res => {
+      setActionMsg({ type: 'ok', text: res.data.message })
+      setAutoBidAmount(''); setShowAutoBid(false); invalidate()
+    },
+    onError: (e: unknown) => {
+      const err = e as { response?: { data?: { message?: string } } }
+      setActionMsg({ type: 'err', text: err.response?.data?.message ?? '자동 입찰 설정에 실패했습니다.' })
+    },
+  })
+
+  const cancelAutoBidMut = useMutation({
+    mutationFn: () => api.delete(`/listings/${id}/auto-bid`),
+    onSuccess: () => { setActionMsg({ type: 'ok', text: '자동 입찰이 취소되었습니다.' }); invalidate() },
+    onError: () => setActionMsg({ type: 'err', text: '자동 입찰 취소에 실패했습니다.' }),
+  })
+
+  const { data: autoBidData } = useQuery({
+    queryKey: ['auto-bid', id],
+    queryFn: () => api.get(`/listings/${id}/auto-bid`).then(r => r.data),
+    enabled: !!user && !isSeller,
+  })
+  const myAutoBid = autoBidData?.autoBid
 
   const reportMut = useMutation({
     mutationFn: () => api.post('/reports', {
@@ -559,8 +633,9 @@ export default function ListingDetailPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* ── Left: Image ── */}
         <div className="relative">
+          {lightboxOpen && <Lightbox src={lightboxImg} onClose={() => setLightboxOpen(false)} />}
           {galleryImages.length > 0 ? (
-            <ImageGallery images={galleryImages} />
+            <ImageGallery images={galleryImages} onLightbox={src => { setLightboxImg(src); setLightboxOpen(true) }} />
           ) : (
             <div className="aspect-[3/4] bg-[#100c08] rounded-2xl border border-[#2e2318] flex items-center justify-center">
               <div className="text-center">
@@ -751,6 +826,7 @@ export default function ListingDetailPage() {
 
                 {!isSeller && isActive && auctionLive && (
                   <div className="space-y-2.5 pt-1">
+                    {/* 수동 입찰 */}
                     <input type="number" value={bidAmount} onChange={e => setBidAmount(e.target.value)}
                       placeholder={`${((currentPrice ?? 0) + 1).toLocaleString()}P 이상`}
                       className={inputCls} />
@@ -768,6 +844,59 @@ export default function ListingDetailPage() {
                           className="flex items-center gap-1.5 px-4 h-12 bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-bold rounded-xl text-sm transition-all whitespace-nowrap">
                           <Flame size={14} /> 즉시낙찰
                         </button>
+                      )}
+                    </div>
+
+                    {/* 자동 입찰 패널 */}
+                    <div className="border-t border-[#2e2318] pt-2.5">
+                      {myAutoBid ? (
+                        <div className="flex items-center justify-between bg-[#1a1000] border border-[#3d2e0c]/60 rounded-xl px-3 py-2.5">
+                          <div className="flex items-center gap-2 text-xs text-[#f0a832]">
+                            <Bot size={13} />
+                            <span>자동 입찰 설정됨: <strong className="tabular-nums">{myAutoBid.maxAmount.toLocaleString()}P</strong> 한도</span>
+                          </div>
+                          <button
+                            onClick={() => cancelAutoBidMut.mutate()}
+                            disabled={cancelAutoBidMut.isPending}
+                            className="text-[10px] text-red-400 hover:text-red-300 border border-red-700/40 px-2 py-1 rounded-lg transition-colors"
+                          >
+                            취소
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setShowAutoBid(v => !v)}
+                          className={`w-full flex items-center justify-center gap-1.5 h-9 rounded-xl text-xs font-medium border transition-all ${
+                            showAutoBid
+                              ? 'bg-[#1a1000] border-[#3d2e0c] text-[#f0a832]'
+                              : 'bg-transparent border-[#2e2318] text-[#5a4830] hover:border-[#4a3520] hover:text-[#9e8a6a]'
+                          }`}
+                        >
+                          <Bot size={13} /> 자동 입찰 설정
+                        </button>
+                      )}
+                      {showAutoBid && !myAutoBid && (
+                        <div className="mt-2 space-y-2">
+                          <p className="text-[10px] text-[#5a4830] leading-relaxed">
+                            최대 입찰 한도를 설정하면 다른 입찰자가 나타날 때 자동으로 1P씩 올려 입찰합니다.
+                          </p>
+                          <div className="flex gap-2">
+                            <input
+                              type="number"
+                              value={autoBidAmount}
+                              onChange={e => setAutoBidAmount(e.target.value)}
+                              placeholder={`최대 한도 (최소 ${((currentPrice ?? 0) + 1).toLocaleString()}P)`}
+                              className={inputCls}
+                            />
+                            <button
+                              onClick={() => { if (!user) { router.push('/login'); return } autoBidMut.mutate(Number(autoBidAmount)) }}
+                              disabled={autoBidMut.isPending || !autoBidAmount}
+                              className="px-4 h-11 bg-[#f0a832] hover:bg-[#d4922a] disabled:opacity-50 text-[#0f0b08] font-bold rounded-xl text-sm transition-all whitespace-nowrap"
+                            >
+                              {autoBidMut.isPending ? '...' : '설정'}
+                            </button>
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>

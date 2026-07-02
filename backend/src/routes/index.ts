@@ -9,6 +9,9 @@ import {
   makeOffer,
   respondToOffer,
   getMarketSummary,
+  setAutoBid,
+  cancelAutoBid,
+  getAutoBid,
 } from '../controllers/listing.controller'
 import { getOripaList, getOripa, getOripaHistory, drawOripa } from '../controllers/oripa.controller'
 import { getInventory, deleteInventoryItem } from '../controllers/inventory.controller'
@@ -24,7 +27,7 @@ import {
   getMyListings, cancelListing,
   getMyPurchases, getMySales,
   getReceivedOffers, getSentOffers, withdrawOffer,
-  getMyBids, getMyOripaHistory,
+  getMyBids, getMyOripaHistory, getMyStats,
 } from '../controllers/my.controller'
 import {
   getStats,
@@ -109,6 +112,9 @@ router.get('/listings/:id', getListing)
 router.post('/listings', authenticate, createListing)
 router.post('/listings/:id/buy', authenticate, buyNow)
 router.post('/listings/:id/bid', authenticate, placeBid)
+router.get('/listings/:id/auto-bid', authenticate, getAutoBid)
+router.post('/listings/:id/auto-bid', authenticate, setAutoBid)
+router.delete('/listings/:id/auto-bid', authenticate, cancelAutoBid)
 router.post('/listings/:id/offer', authenticate, makeOffer)
 router.patch('/offers/:offerId/respond', authenticate, respondToOffer)
 
@@ -134,6 +140,7 @@ router.get('/oripas/:id/history', getOripaHistory)
 router.post('/oripas/:id/draw', authenticate, drawOripa)
 
 // 마이페이지
+router.get('/my/stats', authenticate, getMyStats)
 router.get('/my/listings', authenticate, getMyListings)
 router.delete('/my/listings/:id', authenticate, cancelListing)
 router.get('/my/purchases', authenticate, getMyPurchases)

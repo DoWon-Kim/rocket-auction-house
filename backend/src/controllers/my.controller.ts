@@ -216,6 +216,70 @@ export async function getMyBids(req: AuthRequest, res: Response) {
   }
 }
 
+export async function getMyStats(req: AuthRequest, res: Response) {
+  try {
+    const userId = req.userId!
+    const now = new Date()
+    const since30d = new Date(now.getTime() - 30 * 86400 * 1000)
+    const since7d  = new Date(now.getTime() - 7  * 86400 * 1000)
+
+    const [
+      activeListings,
+      totalSales,
+      sales30d,
+      salesAll,
+      totalPurchases,
+      avgRating,
+    ] = await Promise.all([
+      prisma.listing.count({ where: { sellerId: userId, status: 'ACTIVE' } }),
+      prisma.transaction.count({ where: { sellerId: userId } }),
+      prisma.transaction.aggregate({
+        where: { sellerId: userId, completedAt: { gte: since30d } },
+        _sum: { finalPrice: true },
+        _count: true,
+      }),
+      prisma.transaction.aggregate({
+        where: { sellerId: userId },
+        _sum: { finalPrice: true },
+        _avg: { finalPrice: true },
+      }),
+      prisma.transaction.count({ where: { buyerId: userId } }),
+      prisma.review.aggregate({
+        where: { revieweeId: userId },
+        _avg: { rating: true },
+        _count: true,
+      }),
+    ])
+
+    const sales7d = await prisma.transaction.aggregate({
+      where: { sellerId: userId, completedAt: { gte: since7d } },
+      _sum: { finalPrice: true },
+      _count: true,
+    })
+
+    res.json({
+      seller: {
+        activeListings,
+        totalSales,
+        revenue30d: sales30d._sum.finalPrice ?? 0,
+        txCount30d: sales30d._count,
+        revenue7d: sales7d._sum.finalPrice ?? 0,
+        txCount7d: sales7d._count,
+        totalRevenue: salesAll._sum.finalPrice ?? 0,
+        avgSalePrice: salesAll._avg.finalPrice ? Math.round(salesAll._avg.finalPrice) : null,
+        avgRating: avgRating._avg.rating ? Math.round(avgRating._avg.rating * 10) / 10 : null,
+        reviewCount: avgRating._count,
+      },
+      buyer: {
+        totalPurchases,
+      },
+    })
+  } catch (err) {
+    console.error('[getMyStats]', err)
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' })
+  }
+}
+
 export async function getMyOripaHistory(req: AuthRequest, res: Response) {
   const { page, limit, skip } = paginate(req.query)
   try {

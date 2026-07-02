@@ -25,6 +25,7 @@ model User {
 
   listings        Listing[]
   bids            Bid[]
+  autoBids        AutoBid[]
   offersGiven     Offer[]         @relation("OfferBuyer")
   transactions    Transaction[]   @relation("TransactionBuyer")
   sales           Transaction[]   @relation("TransactionSeller")
@@ -185,6 +186,7 @@ model Listing {
   updatedAt     DateTime      @updatedAt
 
   bids          Bid[]
+  autoBids      AutoBid[]
   offers        Offer[]
   transaction   Transaction?
   chatRooms     ChatRoom[]
@@ -234,10 +236,29 @@ model Bid {
   bidder    User     @relation(fields: [bidderId], references: [id])
   bidderId  String
   amount    Int
+  isAuto    Boolean  @default(false)
   isWinning Boolean  @default(false)
   createdAt DateTime @default(now())
 
   @@index([listingId])
+  @@index([bidderId])
+}
+
+// ─── 자동 입찰 ────────────────────────────────────────────────────────────────
+
+model AutoBid {
+  id        String   @id @default(uuid())
+  listing   Listing  @relation(fields: [listingId], references: [id])
+  listingId String
+  bidder    User     @relation(fields: [bidderId], references: [id])
+  bidderId  String
+  maxAmount Int
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([listingId, bidderId])
+  @@index([listingId, isActive])
   @@index([bidderId])
 }
 

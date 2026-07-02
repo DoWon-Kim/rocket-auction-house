@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
 import ListingCard from '@/components/ListingCard'
+import SkeletonCard from '@/components/SkeletonCard'
 import SellForm from '@/components/SellForm'
 import { TCG_LABELS, CONDITION_LABELS } from '@/lib/utils'
 import { Suspense, useState } from 'react'
@@ -465,7 +466,7 @@ function ListingsContent() {
           {isLoading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {Array.from({ length: 10 }).map((_, i) => (
-                <div key={i} className="bg-[#1a1410] border border-[#2e2318] rounded-2xl aspect-[3/4] animate-pulse" />
+                <SkeletonCard key={i} />
               ))}
             </div>
           ) : data?.listings?.length === 0 ? (
