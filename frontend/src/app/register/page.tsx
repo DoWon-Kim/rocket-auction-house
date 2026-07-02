@@ -41,7 +41,7 @@ export default function RegisterPage() {
         email: form.email, nickname: form.nickname, password: form.password,
         ...(phone ? { phone } : {}),
       })
-      setAuth(data.user, data.token)
+      setAuth(data.user, data.token, data.refreshToken)
       router.push('/')
     } catch (err: unknown) {
       const e = err as { response?: { status?: number; data?: { message?: string; errors?: { fieldErrors?: Record<string, string[]> } } } }

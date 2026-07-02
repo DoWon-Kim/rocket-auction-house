@@ -121,6 +121,8 @@ export default function Navbar() {
   }, [router])
 
   function handleLogout() {
+    const { refreshToken } = useAuthStore.getState()
+    api.post('/auth/logout', { refreshToken }).catch(() => {})
     clearAuth()
     router.push('/')
     setMobileOpen(false)

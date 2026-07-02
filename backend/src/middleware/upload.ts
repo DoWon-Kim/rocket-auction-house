@@ -5,17 +5,25 @@ import { v4 as uuidv4 } from 'uuid'
 import { s3, S3_BUCKET } from '../lib/s3'
 
 // 허용 MIME + magic bytes (파일 첫 바이트로 실제 형식 확인)
-const ALLOWED_SIGNATURES: { mime: string; bytes: number[]; offset?: number }[] = [
-  { mime: 'image/jpeg', bytes: [0xFF, 0xD8, 0xFF] },
-  { mime: 'image/png',  bytes: [0x89, 0x50, 0x4E, 0x47] },
-  { mime: 'image/gif',  bytes: [0x47, 0x49, 0x46] },
-  { mime: 'image/webp', bytes: [0x52, 0x49, 0x46, 0x46], offset: 0 },
+type Sig = { bytes: number[]; offset?: number; extra?: { offset: number; bytes: number[] } }
+
+const ALLOWED_SIGNATURES: Sig[] = [
+  { bytes: [0xFF, 0xD8, 0xFF] },                          // JPEG
+  { bytes: [0x89, 0x50, 0x4E, 0x47] },                    // PNG
+  { bytes: [0x47, 0x49, 0x46] },                          // GIF
+  {                                                         // WebP: RIFF at 0 + WEBP at 8
+    bytes: [0x52, 0x49, 0x46, 0x46],
+    extra: { offset: 8, bytes: [0x57, 0x45, 0x42, 0x50] },
+  },
 ]
 
 function checkMagicBytes(buffer: Buffer): boolean {
   return ALLOWED_SIGNATURES.some(sig => {
     const offset = sig.offset ?? 0
-    return sig.bytes.every((b, i) => buffer[offset + i] === b)
+    const headerMatch = sig.bytes.every((b, i) => buffer[offset + i] === b)
+    if (!headerMatch) return false
+    if (sig.extra) return sig.extra.bytes.every((b, i) => buffer[sig.extra!.offset + i] === b)
+    return true
   })
 }
 

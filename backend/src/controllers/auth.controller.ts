@@ -26,12 +26,29 @@ function signAccessToken(userId: string, role: string) {
   return jwt.sign({ userId, role }, process.env.JWT_SECRET!, { expiresIn: '15m' })
 }
 
+const MAX_REFRESH_TOKENS_PER_USER = 5
+
 async function issueRefreshToken(userId: string): Promise<string> {
   const raw = crypto.randomBytes(40).toString('hex')
   const tokenHash = crypto.createHash('sha256').update(raw).digest('hex')
-  await prisma.refreshToken.create({
-    data: { userId, tokenHash, expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) },
+
+  await prisma.$transaction(async (tx) => {
+    await tx.refreshToken.create({
+      data: { userId, tokenHash, expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) },
+    })
+    // 만료 토큰 정리 + 사용자당 최대 개수 초과 시 오래된 것 삭제
+    await tx.refreshToken.deleteMany({ where: { userId, expiresAt: { lt: new Date() } } })
+    const tokens = await tx.refreshToken.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    })
+    if (tokens.length > MAX_REFRESH_TOKENS_PER_USER) {
+      const toDelete = tokens.slice(MAX_REFRESH_TOKENS_PER_USER).map(t => t.id)
+      await tx.refreshToken.deleteMany({ where: { id: { in: toDelete } } })
+    }
   })
+
   return raw
 }
 
@@ -237,7 +254,7 @@ export async function getMe(req: Request & { userId?: string }, res: Response) {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.userId },
-      select: { id: true, email: true, nickname: true, avatarUrl: true, balance: true, role: true, emailNotifications: true },
+      select: { id: true, email: true, nickname: true, avatarUrl: true, balance: true, role: true, emailNotifications: true, emailVerified: true },
     })
     if (!user) {
       res.status(404).json({ message: '유저를 찾을 수 없습니다.' })

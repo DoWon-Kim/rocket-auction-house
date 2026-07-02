@@ -32,14 +32,15 @@ async function trySettleWithBidder(
   bidderId: string,
   amount: number,
 ): Promise<boolean> {
-  const deducted = await prisma.user.updateMany({
-    where: { id: bidderId, balance: { gte: amount } },
-    data: { balance: { decrement: amount } },
-  })
-  if (deducted.count === 0) return false
-
   try {
     await prisma.$transaction(async (tx) => {
+      // 잔액 차감을 트랜잭션 안에서 원자적으로 처리
+      const deducted = await tx.user.updateMany({
+        where: { id: bidderId, balance: { gte: amount } },
+        data: { balance: { decrement: amount } },
+      })
+      if (deducted.count === 0) throw new Error('INSUFFICIENT_BALANCE')
+
       await tx.listing.update({ where: { id: listing.id }, data: { status: 'SOLD' } })
       const txRecord = await tx.transaction.create({
         data: {
@@ -63,8 +64,9 @@ async function trySettleWithBidder(
     })
     return true
   } catch (err) {
-    await prisma.user.update({ where: { id: bidderId }, data: { balance: { increment: amount } } })
-    console.error(`[AuctionExpiry] listingId=${listing.id} 정산 실패:`, err)
+    if (err instanceof Error && err.message !== 'INSUFFICIENT_BALANCE') {
+      console.error(`[AuctionExpiry] listingId=${listing.id} 정산 실패:`, err)
+    }
     return false
   }
 }

@@ -22,7 +22,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const { data } = await api.post('/auth/login', form)
-      setAuth(data.user, data.token)
+      setAuth(data.user, data.token, data.refreshToken)
       router.push('/')
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } }

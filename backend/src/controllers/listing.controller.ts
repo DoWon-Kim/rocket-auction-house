@@ -384,47 +384,43 @@ export async function placeBid(req: AuthRequest, res: Response) {
 
     // ── 즉시낙찰 처리 ────────────────────────────────────────────────────────
     if (listing.instantBuyPrice != null && amount >= listing.instantBuyPrice) {
-      if (!bidder || bidder.balance < amount) {
-        res.status(400).json({ message: '잔액이 부족합니다.' })
-        return
-      }
-      const deducted = await prisma.user.updateMany({
-        where: { id: req.userId!, balance: { gte: amount } },
-        data: { balance: { decrement: amount } },
-      })
-      if (deducted.count === 0) {
-        res.status(400).json({ message: '잔액이 부족합니다.' })
-        return
-      }
-      try {
-        await prisma.$transaction(async (tx) => {
-          await tx.bid.updateMany({ where: { listingId: listing.id }, data: { isWinning: false } })
-          await tx.bid.create({ data: { listingId: listing.id, bidderId: req.userId!, amount, isWinning: true } })
-          await tx.listing.update({ where: { id: listing.id }, data: { currentPrice: amount, status: 'SOLD' } })
-          const txRecord = await tx.transaction.create({
-            data: {
-              listingId: listing.id, buyerId: req.userId!, sellerId: listing.sellerId,
-              finalPrice: amount, escrowStatus: 'HELD',
-            },
-          })
-          await tx.inventoryItem.create({
-            data: {
-              userId: req.userId!, cardId: listing.cardId, quantity: listing.quantity,
-              source: 'PURCHASE', sourceId: txRecord.id,
-              condition: listing.condition, gradingCompany: listing.gradingCompany,
-              gradingGrade: listing.gradingGrade, imageUrls: listing.imageUrls,
-            },
-          })
-          await tx.chatRoom.upsert({
-            where: { listingId_buyerId: { listingId: listing.id, buyerId: req.userId! } },
-            create: { listingId: listing.id, buyerId: req.userId!, sellerId: listing.sellerId, transactionId: txRecord.id },
-            update: { transactionId: txRecord.id },
-          })
+      await prisma.$transaction(async (tx) => {
+        const deducted = await tx.user.updateMany({
+          where: { id: req.userId!, balance: { gte: amount } },
+          data: { balance: { decrement: amount } },
         })
-      } catch (txErr) {
-        await prisma.user.update({ where: { id: req.userId! }, data: { balance: { increment: amount } } })
-        throw txErr
-      }
+        if (deducted.count === 0) {
+          throw Object.assign(new Error('INSUFFICIENT_BALANCE'), { status: 400, message: '잔액이 부족합니다.' })
+        }
+        const sold = await tx.listing.updateMany({
+          where: { id: listing.id, status: 'ACTIVE' },
+          data: { currentPrice: amount, status: 'SOLD' },
+        })
+        if (sold.count === 0) {
+          throw Object.assign(new Error('ALREADY_SOLD'), { status: 400, message: '이미 판매된 리스팅입니다.' })
+        }
+        await tx.bid.updateMany({ where: { listingId: listing.id }, data: { isWinning: false } })
+        await tx.bid.create({ data: { listingId: listing.id, bidderId: req.userId!, amount, isWinning: true } })
+        const txRecord = await tx.transaction.create({
+          data: {
+            listingId: listing.id, buyerId: req.userId!, sellerId: listing.sellerId,
+            finalPrice: amount, escrowStatus: 'HELD',
+          },
+        })
+        await tx.inventoryItem.create({
+          data: {
+            userId: req.userId!, cardId: listing.cardId, quantity: listing.quantity,
+            source: 'PURCHASE', sourceId: txRecord.id,
+            condition: listing.condition, gradingCompany: listing.gradingCompany,
+            gradingGrade: listing.gradingGrade, imageUrls: listing.imageUrls,
+          },
+        })
+        await tx.chatRoom.upsert({
+          where: { listingId_buyerId: { listingId: listing.id, buyerId: req.userId! } },
+          create: { listingId: listing.id, buyerId: req.userId!, sellerId: listing.sellerId, transactionId: txRecord.id },
+          update: { transactionId: txRecord.id },
+        })
+      })
       getIo()?.to(`listing:${listing.id}`).emit('auction:sold', {
         listingId: listing.id, winnerId: req.userId, finalPrice: amount, isInstantBuy: true,
       })

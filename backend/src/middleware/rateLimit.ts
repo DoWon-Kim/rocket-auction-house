@@ -1,33 +1,68 @@
-import rateLimit from 'express-rate-limit'
+import rateLimit, { Store, IncrementResponse, Options } from 'express-rate-limit'
 import { RedisStore } from 'rate-limit-redis'
 import Redis from 'ioredis'
 
-// Redis 가용 시 분산 rate-limit, 없으면 메모리 fallback
 let redisClient: Redis | null = null
-let redisConnected = false
 
 if (process.env.REDIS_URL) {
-  redisClient = new Redis(process.env.REDIS_URL, { lazyConnect: true, maxRetriesPerRequest: 1 })
-  redisClient.connect()
-    .then(() => { redisConnected = true; console.log('[Redis] rate-limit store 연결됨') })
-    .catch((err: Error) => console.warn('[Redis] 연결 실패 — 메모리 store로 fallback:', err.message))
+  redisClient = new Redis(process.env.REDIS_URL, { maxRetriesPerRequest: 1, enableOfflineQueue: false })
+  redisClient.on('connect', () => console.log('[Redis] rate-limit store 연결됨'))
+  redisClient.on('error', (err: Error) => console.warn('[Redis] 오류:', err.message))
 }
 
-function makeStore(prefix: string) {
-  if (redisConnected && redisClient) {
-    return new RedisStore({
-      sendCommand: (...args: string[]) => redisClient!.call(args[0], ...args.slice(1)) as Promise<number>,
-      prefix,
-    })
+// Redis 가용 여부를 요청 시점에 판단하는 lazy store
+// — Redis가 준비되면 자동으로 RedisStore를 사용, 아니면 MemoryStore fallback
+class LazyStore implements Store {
+  prefix: string
+  private _redisStore: RedisStore | null = null
+
+  constructor(keyPrefix: string) { this.prefix = keyPrefix }
+
+  private getDelegate(): Store {
+    if (redisClient?.status === 'ready') {
+      if (!this._redisStore) {
+        this._redisStore = new RedisStore({
+          sendCommand: (...args: string[]) => redisClient!.call(args[0], ...args.slice(1)) as Promise<number>,
+          prefix: this.prefix,
+        })
+      }
+      return this._redisStore
+    }
+    // Redis 미준비 — 요청마다 새 MemoryStore 인스턴스를 만들면 카운터가 리셋되므로
+    // 단일 인스턴스를 유지해야 하지만, RedisStore가 init 될 때까지만 임시 사용
+    return this.memStore
   }
-  return undefined // express-rate-limit 기본 메모리 store
+
+  private memStore = new (class implements Store {
+    private counts: Map<string, { count: number; resetTime: Date }> = new Map()
+    async increment(key: string): Promise<IncrementResponse> {
+      const now = Date.now()
+      const entry = this.counts.get(key)
+      if (!entry || entry.resetTime.getTime() < now) {
+        const resetTime = new Date(now + 60_000)
+        this.counts.set(key, { count: 1, resetTime })
+        return { totalHits: 1, resetTime }
+      }
+      entry.count++
+      return { totalHits: entry.count, resetTime: entry.resetTime }
+    }
+    async decrement(key: string) { const e = this.counts.get(key); if (e) e.count = Math.max(0, e.count - 1) }
+    async resetKey(key: string) { this.counts.delete(key) }
+    async resetAll() { this.counts.clear() }
+    init(_options: Options) {}
+  })()
+
+  init(options: Options) { this.memStore.init?.(options) }
+  async increment(key: string): Promise<IncrementResponse> { return this.getDelegate().increment(key) }
+  async decrement(key: string) { return this.getDelegate().decrement?.(key) }
+  async resetKey(key: string) { return this.getDelegate().resetKey(key) }
 }
 
 // 로그인/회원가입: IP당 15분에 10회
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
-  store: makeStore('rl:auth:'),
+  store: new LazyStore('rl:auth:'),
   message: { message: '요청이 너무 많습니다. 15분 후 다시 시도해주세요.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -37,7 +72,7 @@ export const authLimiter = rateLimit({
 export const paymentLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 10,
-  store: makeStore('rl:payment:'),
+  store: new LazyStore('rl:payment:'),
   message: { message: '결제 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -47,7 +82,7 @@ export const paymentLimiter = rateLimit({
 export const uploadLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 20,
-  store: makeStore('rl:upload:'),
+  store: new LazyStore('rl:upload:'),
   message: { message: '업로드 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -57,7 +92,7 @@ export const uploadLimiter = rateLimit({
 export const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 120,
-  store: makeStore('rl:api:'),
+  store: new LazyStore('rl:api:'),
   message: { message: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' },
   standardHeaders: true,
   legacyHeaders: false,
