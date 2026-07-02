@@ -39,7 +39,7 @@ interface MarketSummary {
   activeCount: number
   activeAuctions: number
   tx24h: { count: number; volume: number; avgPrice: number | null }
-  tx7d: { count: number; volume: number }
+  tx7d: { count: number; volume: number; avgPrice?: number | null }
   topCards: TopCard[]
   recentDeals: RecentDeal[]
 }

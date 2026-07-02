@@ -9,8 +9,9 @@ import { api } from '@/lib/api'
 import { TCG_LABELS, rarityLabel } from '@/lib/utils'
 import {
   Search, SlidersHorizontal, X, ChevronLeft, ChevronRight,
-  LayoutGrid, Layers, TrendingUp, Sparkles, ChevronDown,
+  LayoutGrid, Layers, TrendingUp, Sparkles, ChevronDown, Clock,
 } from 'lucide-react'
+import { useRecentlyViewed } from '@/hooks/useRecentlyViewed'
 
 // ─── 타입 ─────────────────────────────────────────────────────────────────────
 
@@ -382,6 +383,41 @@ function FilterSidebar({
 
 // ─── 메인 콘텐츠 ──────────────────────────────────────────────────────────────
 
+function RecentlyViewedBar({ onNavigate }: { onNavigate: (id: string) => void }) {
+  const { cards, clearAll } = useRecentlyViewed()
+  if (cards.length === 0) return null
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="flex items-center gap-1.5 text-[11px] text-[#5a4830] font-semibold uppercase tracking-wider">
+          <Clock size={10} className="text-[#d4a853]" /> 최근 본 카드
+        </p>
+        <button onClick={clearAll} className="text-[10px] text-[#4a3820] hover:text-[#7a6040] transition-colors">지우기</button>
+      </div>
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
+        {cards.map(card => (
+          <button
+            key={card.id}
+            onClick={() => onNavigate(card.id)}
+            className="shrink-0 group flex flex-col items-center gap-1.5 w-16"
+          >
+            <div className="relative w-16 h-[85px] rounded-xl overflow-hidden border border-[#2e2318] group-hover:border-[#d4a853]/40 transition-colors bg-[#1a1410]">
+              {card.imageUrl ? (
+                <Image src={card.imageUrl} alt={card.nameKo ?? card.name} fill sizes="64px" className="object-contain" />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center text-2xl">🃏</div>
+              )}
+            </div>
+            <p className="text-[9px] text-[#7a6040] group-hover:text-[#c9a860] line-clamp-2 text-center leading-tight w-full transition-colors">
+              {card.nameKo ?? card.name}
+            </p>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function CardsContent() {
   const searchParams = useSearchParams()
   const router       = useRouter()
@@ -528,6 +564,9 @@ function CardsContent() {
           />
         )}
       </div>
+
+      {/* ── 최근 본 카드 ── */}
+      {!q && <RecentlyViewedBar onNavigate={id => router.push(`/cards/${id}`)} />}
 
       {/* ── TCG 타입 탭 ── */}
       <div className="flex gap-1.5 flex-wrap">

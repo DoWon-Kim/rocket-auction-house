@@ -13,6 +13,7 @@ import {
   Clock, Gavel, Tag, Handshake, ChevronLeft, ChevronRight,
   Zap, ShieldAlert, Flame, MessageCircle, ShieldCheck, AlertCircle, Check, Flag,
   Star, Reply, TrendingUp, TrendingDown, Minus, BarChart2, ArrowRight, Bot, Expand,
+  Share2, Eye,
 } from 'lucide-react'
 import Link from 'next/link'
 import { io, Socket } from 'socket.io-client'
@@ -452,6 +453,7 @@ export default function ListingDetailPage() {
   const [showAutoBid, setShowAutoBid] = useState(false)
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [lightboxImg, setLightboxImg] = useState('')
+  const [copied, setCopied] = useState(false)
   const [offerAmount, setOfferAmount] = useState('')
   const [offerMessage, setOfferMessage] = useState('')
   const [actionMsg, setActionMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
@@ -552,7 +554,7 @@ export default function ListingDetailPage() {
   const { data: autoBidData } = useQuery({
     queryKey: ['auto-bid', id],
     queryFn: () => api.get(`/listings/${id}/auto-bid`).then(r => r.data),
-    enabled: !!user && !isSeller,
+    enabled: !!user && user.id !== listing?.sellerId,
   })
   const myAutoBid = autoBidData?.autoBid
 
@@ -677,7 +679,20 @@ export default function ListingDetailPage() {
               <h1 className="text-2xl font-bold text-white tracking-tight flex-1">
                 {listing.card.nameKo ?? listing.card.name}
               </h1>
-              <WishlistButton cardId={listing.card.id} cardName={listing.card.nameKo ?? listing.card.name} />
+              <div className="flex items-center gap-2 shrink-0 mt-1">
+                <WishlistButton cardId={listing.card.id} cardName={listing.card.nameKo ?? listing.card.name} />
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(window.location.href)
+                    setCopied(true)
+                    setTimeout(() => setCopied(false), 2000)
+                  }}
+                  title="링크 복사"
+                  className="flex items-center gap-1 h-8 px-2.5 rounded-lg border border-[#2e2318] bg-[#1a1410] hover:border-[#4a3520] text-[#7a6040] hover:text-[#c9a860] transition-all text-[11px] font-medium"
+                >
+                  {copied ? <><Check size={11} className="text-emerald-400" /> 복사됨</> : <><Share2 size={11} /> 공유</>}
+                </button>
+              </div>
             </div>
             {listing.card.nameKo && listing.card.nameKo !== listing.card.name && (
               <p className="text-sm text-[#5a4830] mb-1">{listing.card.name}</p>
@@ -709,6 +724,13 @@ export default function ListingDetailPage() {
               </span>
             </InfoRow>
             <InfoRow label="등록일">{format(new Date(listing.createdAt), 'yyyy.MM.dd HH:mm')}</InfoRow>
+            {listing.viewCount > 0 && (
+              <InfoRow label="조회수">
+                <span className="flex items-center gap-1 text-[#7a6040]">
+                  <Eye size={11} /> {listing.viewCount.toLocaleString()}명이 봤어요
+                </span>
+              </InfoRow>
+            )}
           </div>
 
           {/* Description */}
@@ -907,10 +929,11 @@ export default function ListingDetailPage() {
                     <p className="text-xs text-[#5a4830] font-semibold uppercase tracking-wider mb-2">
                       입찰 내역 ({listing.bids.length}건)
                     </p>
-                    {listing.bids.slice(0, 5).map((bid: { id: string; bidder: { nickname: string }; amount: number; createdAt: string; isWinning: boolean }) => (
+                    {listing.bids.slice(0, 5).map((bid: { id: string; bidder: { nickname: string }; amount: number; createdAt: string; isWinning: boolean; isAuto?: boolean }) => (
                       <div key={bid.id} className={`flex justify-between items-center py-1.5 text-xs ${bid.isWinning ? 'text-[#f0a832]' : 'text-[#7a6040]'}`}>
                         <span className="flex items-center gap-1.5">
                           {bid.isWinning && <Check size={10} className="text-[#f0a832]" />}
+                          {bid.isAuto && <Bot size={10} className="text-[#7a6040]" />}
                           {bid.bidder.nickname}
                         </span>
                         <span className="font-semibold tabular-nums">{bid.amount.toLocaleString()}P</span>

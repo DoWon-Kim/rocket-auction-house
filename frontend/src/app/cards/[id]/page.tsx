@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { PriceHistoryChart } from '@/components/PriceHistoryChart'
 import { WishlistButton } from '@/components/WishlistButton'
+import { useRecentlyViewed } from '@/hooks/useRecentlyViewed'
 
 // ─── 타입 ─────────────────────────────────────────────────────────────────────
 
@@ -287,11 +288,16 @@ export default function CardDetailPage() {
   const [listingType, setListingType] = useState('')
   const [listingPage, setListingPage] = useState(1)
   const [imgError, setImgError] = useState(false)
+  const { addCard } = useRecentlyViewed()
 
   const { data: card, isLoading } = useQuery<CardDetail>({
     queryKey: ['card', id],
     queryFn: () => api.get(`/cards/${id}`).then(r => r.data),
   })
+
+  useEffect(() => {
+    if (card) addCard({ id: card.id, name: card.name, nameKo: card.nameKo, imageUrl: card.imageUrl ?? null, tcgType: card.tcgType, setName: card.setName })
+  }, [card?.id])
 
   const { data: listingsData, isLoading: listingsLoading } = useQuery<ListingsResponse>({
     queryKey: ['card-listings', id, listingSort, listingType, listingPage],
@@ -332,26 +338,29 @@ export default function CardDetailPage() {
     )
   }
 
-  const displayName  = card.nameKo ?? card.nameJa ?? card.name
-  const rColor       = rarityColorClass(card.rarity)
-  const listings     = listingsData?.listings ?? []
+  const displayName    = card.nameKo ?? card.nameJa ?? card.name
+  const rColor         = rarityColorClass(card.rarity)
+  const listings       = listingsData?.listings ?? []
+  const cheapestBuyNow = listings
+    .filter(l => l.listingType === 'BUY_NOW' && l.buyNowPrice != null)
+    .sort((a, b) => (a.buyNowPrice ?? 0) - (b.buyNowPrice ?? 0))[0] ?? null
 
   // 외부 데이터베이스 링크 생성
-  function externalLink(): { label: string; url: string } | null {
-    switch (card.tcgType) {
+  function externalLink(c: CardDetail): { label: string; url: string } | null {
+    switch (c.tcgType) {
       case 'YUGIOH':
-        return { label: 'YGOProDeck', url: `https://ygoprodeck.com/card/?search=${encodeURIComponent(card.name)}` }
+        return { label: 'YGOProDeck', url: `https://ygoprodeck.com/card/?search=${encodeURIComponent(c.name)}` }
       case 'MTG':
-        return { label: 'Scryfall', url: `https://scryfall.com/search?q=${encodeURIComponent(card.name)}+set:${card.setCode ?? ''}` }
+        return { label: 'Scryfall', url: `https://scryfall.com/search?q=${encodeURIComponent(c.name)}+set:${c.setCode ?? ''}` }
       case 'POKEMON':
-        return { label: 'Pokémon TCG DB', url: `https://www.pokemon.com/us/pokemon-tcg/pokemon-cards/?cardName=${encodeURIComponent(card.name)}` }
+        return { label: 'Pokémon TCG DB', url: `https://www.pokemon.com/us/pokemon-tcg/pokemon-cards/?cardName=${encodeURIComponent(c.name)}` }
       case 'DIGIMON':
         return { label: 'Digimon Card DB', url: `https://www.digimoncard.com/products/card_game/card/` }
       default:
         return null
     }
   }
-  const extLink = externalLink()
+  const extLink = externalLink(card)
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -388,10 +397,24 @@ export default function CardDetailPage() {
             )}
           </div>
 
+          {/* 최저가 즉시구매 CTA */}
+          {cheapestBuyNow && (
+            <Link
+              href={`/listings/${cheapestBuyNow.id}`}
+              className="w-full max-w-[260px] flex items-center justify-center gap-2 py-3 bg-[#d4a853] hover:bg-[#c49440] text-[#0f0b08] font-bold text-sm rounded-xl transition-all shadow-lg shadow-[#d4a853]/25"
+            >
+              <Tag size={15} /> 최저가 {cheapestBuyNow.buyNowPrice!.toLocaleString()}P 즉시구매
+            </Link>
+          )}
+
           {/* 판매 버튼 */}
           <Link
             href={`/listings?tab=sell&cardId=${card.id}`}
-            className="w-full max-w-[260px] flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-[#d4a853] to-[#b8860b] hover:from-[#e0b878] hover:to-[#c8960b] text-[#0f0b08] font-bold text-sm rounded-xl transition-all shadow-lg shadow-[#d4a853]/20"
+            className={`w-full max-w-[260px] flex items-center justify-center gap-2 py-2.5 transition-all ${
+              cheapestBuyNow
+                ? 'border border-[#3d2a0c] text-[#d4a853] hover:bg-[#1a1208] rounded-xl text-sm font-semibold'
+                : 'bg-gradient-to-r from-[#d4a853] to-[#b8860b] hover:from-[#e0b878] hover:to-[#c8960b] text-[#0f0b08] font-bold text-sm rounded-xl shadow-lg shadow-[#d4a853]/20'
+            }`}
           >
             <ShoppingBag size={15} /> 이 카드 판매하기
           </Link>

@@ -59,7 +59,7 @@ function MarketStatsBanner({ data }: { data: MarketSummary | undefined }) {
     { label: '진행 중 경매', value: data.activeAuctions.toLocaleString(), suffix: '개', color: 'text-[#f0a832]' },
     { label: '24h 체결', value: data.tx24h.count.toLocaleString(), suffix: '건', color: 'text-emerald-400' },
     { label: '7일 거래량', value: data.tx7d.count.toLocaleString(), suffix: '건', color: 'text-blue-400' },
-    { label: '24h 거래액', value: data.tx24h.volume > 0 ? `${(data.tx24h.volume / 10000).toFixed(1)}만`, suffix: 'P', color: 'text-purple-400' },
+    { label: '24h 거래액', value: data.tx24h.volume > 0 ? `${(data.tx24h.volume / 10000).toFixed(1)}만` : '0', suffix: 'P', color: 'text-purple-400' },
   ]
   return (
     <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">

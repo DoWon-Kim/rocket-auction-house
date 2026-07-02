@@ -70,7 +70,6 @@ export const RARITY_LABELS: Record<string, string> = {
   // ── 유희왕 (YGOProDeck) ───────────────────────────────────────────────────
   'Normal Rare': '노말 레어',
   'Super Rare': '슈퍼 레어',
-  'Ultra Rare': '울트라 레어',
   'Secret Rare': '시크릿 레어',
   'Ultimate Rare': '얼티밋 레어',
   'Ghost Rare': '고스트 레어',
@@ -95,8 +94,6 @@ export const RARITY_LABELS: Record<string, string> = {
   'Shatterfoil Rare': '샤터포일 레어',
   'Gold Secret Rare': '골드 시크릿 레어',
   'Premium Gold Rare': '프리미엄 골드 레어',
-  'Rare': '레어',
-  'Common': '커먼',
   // ── MTG (Scryfall, 소문자) ────────────────────────────────────────────────
   'common': '커먼',
   'uncommon': '언커먼',
