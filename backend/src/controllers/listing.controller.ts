@@ -287,59 +287,62 @@ export async function createListing(req: AuthRequest, res: Response) {
 
 export async function buyNow(req: AuthRequest, res: Response) {
   try {
+    // 사전 빠른 유효성 검사 (트랜잭션 밖에서)
     const listing = await prisma.listing.findUnique({ where: { id: String(req.params['id']) } })
     if (!listing || listing.listingType !== 'BUY_NOW' || listing.status !== 'ACTIVE') {
-      res.status(400).json({ message: '구매할 수 없는 리스팅입니다.' })
-      return
+      res.status(400).json({ message: '구매할 수 없는 리스팅입니다.' }); return
     }
     if (listing.sellerId === req.userId) {
-      res.status(400).json({ message: '본인 리스팅은 구매할 수 없습니다.' })
-      return
+      res.status(400).json({ message: '본인 리스팅은 구매할 수 없습니다.' }); return
     }
 
     const price = listing.buyNowPrice!
-    const deducted = await prisma.user.updateMany({
-      where: { id: req.userId!, balance: { gte: price } },
-      data: { balance: { decrement: price } },
-    })
-    if (deducted.count === 0) {
-      res.status(400).json({ message: '잔액이 부족합니다.' })
-      return
-    }
 
-    try {
-      await prisma.$transaction(async (tx) => {
-        await tx.listing.update({ where: { id: listing.id }, data: { status: 'SOLD' } })
-        const txRecord = await tx.transaction.create({
-          data: {
-            listingId: listing.id, buyerId: req.userId!, sellerId: listing.sellerId,
-            finalPrice: price, escrowStatus: 'HELD',
-          },
-        })
-        await tx.inventoryItem.create({
-          data: {
-            userId: req.userId!, cardId: listing.cardId, quantity: listing.quantity,
-            source: 'PURCHASE', sourceId: txRecord.id,
-            condition: listing.condition, gradingCompany: listing.gradingCompany,
-            gradingGrade: listing.gradingGrade, imageUrls: listing.imageUrls,
-          },
-        })
-        await tx.chatRoom.upsert({
-          where: { listingId_buyerId: { listingId: listing.id, buyerId: req.userId! } },
-          create: {
-            listingId: listing.id, buyerId: req.userId!,
-            sellerId: listing.sellerId, transactionId: txRecord.id,
-          },
-          update: { transactionId: txRecord.id },
-        })
+    // 모든 작업을 단일 트랜잭션으로 — 실패 시 자동 롤백 (잔액 포함)
+    await prisma.$transaction(async (tx) => {
+      // 잔액 차감 + 충분한지 원자적 확인
+      const deducted = await tx.user.updateMany({
+        where: { id: req.userId!, balance: { gte: price } },
+        data: { balance: { decrement: price } },
       })
-    } catch (txErr) {
-      await prisma.user.update({ where: { id: req.userId! }, data: { balance: { increment: price } } })
-      throw txErr
-    }
+      if (deducted.count === 0) {
+        throw Object.assign(new Error('INSUFFICIENT_BALANCE'), { status: 400, message: '잔액이 부족합니다.' })
+      }
+
+      // 리스팅 상태 변경 — ACTIVE인 경우만 (동시 구매 방지)
+      const updated = await tx.listing.updateMany({
+        where: { id: listing.id, status: 'ACTIVE' },
+        data: { status: 'SOLD' },
+      })
+      if (updated.count === 0) {
+        throw Object.assign(new Error('ALREADY_SOLD'), { status: 400, message: '이미 판매된 리스팅입니다.' })
+      }
+
+      const txRecord = await tx.transaction.create({
+        data: {
+          listingId: listing.id, buyerId: req.userId!, sellerId: listing.sellerId,
+          finalPrice: price, escrowStatus: 'HELD',
+        },
+      })
+      await tx.inventoryItem.create({
+        data: {
+          userId: req.userId!, cardId: listing.cardId, quantity: listing.quantity,
+          source: 'PURCHASE', sourceId: txRecord.id,
+          condition: listing.condition, gradingCompany: listing.gradingCompany,
+          gradingGrade: listing.gradingGrade, imageUrls: listing.imageUrls,
+        },
+      })
+      await tx.chatRoom.upsert({
+        where: { listingId_buyerId: { listingId: listing.id, buyerId: req.userId! } },
+        create: { listingId: listing.id, buyerId: req.userId!, sellerId: listing.sellerId, transactionId: txRecord.id },
+        update: { transactionId: txRecord.id },
+      })
+    })
 
     res.json({ message: '구매가 완료되었습니다. 물품 수령 후 수령 확인을 눌러주세요.' })
   } catch (err) {
+    const e = err as { status?: number; message?: string }
+    if (e.status === 400) { res.status(400).json({ message: e.message }); return }
     console.error('[buyNow]', err)
     res.status(500).json({ message: '서버 오류가 발생했습니다.' })
   }

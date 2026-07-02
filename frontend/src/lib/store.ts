@@ -9,12 +9,15 @@ interface User {
   balance: number
   role: string
   emailNotifications?: boolean
+  emailVerified?: boolean
 }
 
 interface AuthStore {
   user: User | null
   token: string | null
-  setAuth: (user: User, token: string) => void
+  refreshToken: string | null
+  setAuth: (user: User, token: string, refreshToken?: string) => void
+  setTokens: (token: string, refreshToken: string) => void
   clearAuth: () => void
   updateBalance: (balance: number) => void
   updateUser: (patch: Partial<User>) => void
@@ -25,11 +28,15 @@ export const useAuthStore = create<AuthStore>()(
     (set) => ({
       user: null,
       token: null,
-      setAuth: (user, token) => {
-        set({ user, token })
+      refreshToken: null,
+      setAuth: (user, token, refreshToken) => {
+        set({ user, token, refreshToken: refreshToken ?? null })
+      },
+      setTokens: (token, refreshToken) => {
+        set({ token, refreshToken })
       },
       clearAuth: () => {
-        set({ user: null, token: null })
+        set({ user: null, token: null, refreshToken: null })
       },
       updateBalance: (balance) =>
         set((state) => ({ user: state.user ? { ...state.user, balance } : null })),

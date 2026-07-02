@@ -1,4 +1,15 @@
 import 'dotenv/config'
+import * as Sentry from '@sentry/node'
+
+// Sentry 초기화 (DSN 없으면 비활성화)
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV ?? 'development',
+    tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.2 : 1.0,
+  })
+}
+
 import path from 'path'
 import express from 'express'
 import cors from 'cors'

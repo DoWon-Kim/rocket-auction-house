@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express'
+import * as Sentry from '@sentry/node'
 
-export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction) {
+export function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunction) {
   const error = err as { status?: number; message?: string; code?: string }
 
   // Prisma 에러 분류
@@ -18,6 +19,13 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
 
   if (status >= 500) {
     console.error('[ERROR]', err)
+    if (process.env.SENTRY_DSN) {
+      Sentry.withScope(scope => {
+        scope.setTag('url', req.url)
+        scope.setTag('method', req.method)
+        Sentry.captureException(err)
+      })
+    }
   }
 
   res.status(status).json({ message })

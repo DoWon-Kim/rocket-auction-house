@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from '@sentry/nextjs'
 
 // 프로덕션 백엔드 URL에서 호스트명 추출 (Vercel 빌드 시 env 주입됨)
 // 예: https://api.my-app.up.railway.app/api → api.my-app.up.railway.app
@@ -47,8 +48,19 @@ const nextConfig: NextConfig = {
       // 기타 범용 CDN
       { protocol: 'https', hostname: '**.cloudinary.com' },
       { protocol: 'https', hostname: 'i.imgur.com' },
+      // S3 / Cloudflare R2 업로드 이미지
+      { protocol: 'https', hostname: '**.amazonaws.com' },
+      { protocol: 'https', hostname: '**.r2.cloudflarestorage.com' },
+      { protocol: 'https', hostname: '**.r2.dev' },
     ],
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  silent: true,
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  widenClientFileUpload: true,
+  disableLogger: true,
+});

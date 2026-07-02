@@ -61,8 +61,27 @@ model User {
   notifications        Notification[]
   emailNotifications   Boolean  @default(true)  // 이메일 알림 수신 여부
 
+  // 이메일 인증
+  emailVerified        Boolean  @default(false)
+  emailVerifyToken     String?  @unique
+  emailVerifyExpires   DateTime?
+
+  // 리프레시 토큰
+  refreshTokens        RefreshToken[]
+
   // 위시리스트
   wishlists       Wishlist[]
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model PasswordResetToken {

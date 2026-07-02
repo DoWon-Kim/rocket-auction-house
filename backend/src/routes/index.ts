@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { register, login, getMe, findId, requestPasswordReset, resetPassword, updateEmailNotifications, updateProfile, requestPhoneOtp, verifyPhoneOtpAndReset } from '../controllers/auth.controller'
+import { register, login, getMe, findId, requestPasswordReset, resetPassword, updateEmailNotifications, updateProfile, requestPhoneOtp, verifyPhoneOtpAndReset, verifyEmail, resendVerificationEmail, refreshTokens, logout } from '../controllers/auth.controller'
 import {
   getListings,
   getListing,
@@ -90,6 +90,10 @@ router.post('/auth/request-phone-otp', authLimiter, requestPhoneOtp)
 router.post('/auth/verify-phone-otp', authLimiter, verifyPhoneOtpAndReset)
 router.patch('/auth/email-notifications', authenticate, updateEmailNotifications)
 router.patch('/auth/profile', authenticate, updateProfile)
+router.get('/auth/verify-email/:token', verifyEmail)
+router.post('/auth/resend-verification', authenticate, resendVerificationEmail)
+router.post('/auth/refresh', refreshTokens)
+router.post('/auth/logout', authenticate, logout)
 
 // 카드 검색 (공개)
 router.get('/cards/meta', getCardMeta)

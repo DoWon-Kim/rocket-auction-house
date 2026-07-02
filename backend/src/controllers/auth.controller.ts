@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
-import { sendPasswordResetEmail } from '../services/mailer'
+import { sendPasswordResetEmail, sendVerificationEmail } from '../services/mailer'
 import { AuthRequest } from '../middleware/auth'
 import { sendSms, generateOtp } from '../lib/sms'
 
@@ -22,8 +22,17 @@ const loginSchema = z.object({
   password: z.string(),
 })
 
-function signToken(userId: string, role: string) {
-  return jwt.sign({ userId, role }, process.env.JWT_SECRET!, { expiresIn: '7d' })
+function signAccessToken(userId: string, role: string) {
+  return jwt.sign({ userId, role }, process.env.JWT_SECRET!, { expiresIn: '15m' })
+}
+
+async function issueRefreshToken(userId: string): Promise<string> {
+  const raw = crypto.randomBytes(40).toString('hex')
+  const tokenHash = crypto.createHash('sha256').update(raw).digest('hex')
+  await prisma.refreshToken.create({
+    data: { userId, tokenHash, expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) },
+  })
+  return raw
 }
 
 export async function register(req: Request, res: Response) {
@@ -44,12 +53,27 @@ export async function register(req: Request, res: Response) {
     }
 
     const passwordHash = await bcrypt.hash(password, 12)
+    const verifyToken = crypto.randomBytes(32).toString('hex')
     const user = await prisma.user.create({
-      data: { email, nickname, passwordHash, phone: result.data.phone ?? null },
-      select: { id: true, email: true, nickname: true, avatarUrl: true, balance: true, role: true },
+      data: {
+        email, nickname, passwordHash, phone: result.data.phone ?? null,
+        emailVerifyToken: verifyToken,
+        emailVerifyExpires: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+      select: { id: true, email: true, nickname: true, avatarUrl: true, balance: true, role: true, emailVerified: true },
     })
 
-    res.status(201).json({ token: signToken(user.id, user.role), user })
+    // 인증 메일 발송 (실패해도 가입은 완료)
+    sendVerificationEmail(email, nickname, verifyToken).catch(e =>
+      console.error('[register] 인증 메일 발송 실패:', e)
+    )
+
+    const [accessToken, refreshToken] = await Promise.all([
+      signAccessToken(user.id, user.role),
+      issueRefreshToken(user.id),
+    ])
+
+    res.status(201).json({ token: accessToken, refreshToken, user })
   } catch (err) {
     console.error('[register]', err)
     res.status(500).json({ message: '서버 오류가 발생했습니다.' })
@@ -67,22 +91,25 @@ export async function login(req: Request, res: Response) {
   try {
     const user = await prisma.user.findUnique({
       where: { email },
-      select: { id: true, email: true, nickname: true, avatarUrl: true, balance: true, role: true, passwordHash: true },
+      select: { id: true, email: true, nickname: true, avatarUrl: true, balance: true, role: true, passwordHash: true, emailVerified: true },
     })
     if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
       res.status(401).json({ message: '이메일 또는 비밀번호가 올바르지 않습니다.' })
       return
     }
 
+    const [accessToken, refreshToken] = await Promise.all([
+      signAccessToken(user.id, user.role),
+      issueRefreshToken(user.id),
+    ])
+
     res.json({
-      token: signToken(user.id, user.role),
+      token: accessToken,
+      refreshToken,
       user: {
-        id: user.id,
-        email: user.email,
-        nickname: user.nickname,
-        avatarUrl: user.avatarUrl,
-        balance: user.balance,
-        role: user.role,
+        id: user.id, email: user.email, nickname: user.nickname,
+        avatarUrl: user.avatarUrl, balance: user.balance, role: user.role,
+        emailVerified: user.emailVerified,
       },
     })
   } catch (err) {
@@ -339,6 +366,94 @@ const phoneResetSchema = z.object({
   otp:         z.string().length(6),
   newPassword: z.string().min(8, '비밀번호는 최소 8자 이상이어야 합니다.'),
 })
+
+// ── 이메일 인증 ──────────────────────────────────────────────────────────────
+
+export async function verifyEmail(req: Request, res: Response) {
+  const token = z.string().min(1).safeParse(req.params['token'])
+  if (!token.success) { res.status(400).json({ message: '유효하지 않은 링크입니다.' }); return }
+
+  try {
+    const user = await prisma.user.findFirst({
+      where: { emailVerifyToken: token.data, emailVerifyExpires: { gt: new Date() } },
+    })
+    if (!user) {
+      res.status(400).json({ message: '인증 링크가 만료되었거나 유효하지 않습니다. 재발송 후 시도해주세요.' })
+      return
+    }
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerified: true, emailVerifyToken: null, emailVerifyExpires: null },
+    })
+    res.json({ message: '이메일 인증이 완료되었습니다!' })
+  } catch (err) {
+    console.error('[verifyEmail]', err)
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' })
+  }
+}
+
+export async function resendVerificationEmail(req: AuthRequest, res: Response) {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId! },
+      select: { email: true, nickname: true, emailVerified: true },
+    })
+    if (!user) { res.status(404).json({ message: '사용자를 찾을 수 없습니다.' }); return }
+    if (user.emailVerified) { res.status(400).json({ message: '이미 인증된 이메일입니다.' }); return }
+
+    const verifyToken = crypto.randomBytes(32).toString('hex')
+    await prisma.user.update({
+      where: { id: req.userId! },
+      data: { emailVerifyToken: verifyToken, emailVerifyExpires: new Date(Date.now() + 24 * 60 * 60 * 1000) },
+    })
+    await sendVerificationEmail(user.email, user.nickname, verifyToken)
+    res.json({ message: '인증 이메일을 재발송했습니다.' })
+  } catch (err) {
+    console.error('[resendVerificationEmail]', err)
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' })
+  }
+}
+
+// ── 리프레시 토큰 ────────────────────────────────────────────────────────────
+
+export async function refreshTokens(req: Request, res: Response) {
+  const { refreshToken } = req.body
+  if (!refreshToken || typeof refreshToken !== 'string') {
+    res.status(401).json({ message: '리프레시 토큰이 없습니다.' }); return
+  }
+
+  try {
+    const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex')
+    const record = await prisma.refreshToken.findUnique({ where: { tokenHash }, include: { user: { select: { id: true, role: true } } } })
+
+    if (!record || record.expiresAt < new Date()) {
+      if (record) await prisma.refreshToken.delete({ where: { tokenHash } })
+      res.status(401).json({ message: '만료된 세션입니다. 다시 로그인해주세요.' }); return
+    }
+
+    // 기존 토큰 교체 (rotation)
+    await prisma.refreshToken.delete({ where: { tokenHash } })
+    const [newAccess, newRefresh] = await Promise.all([
+      signAccessToken(record.user.id, record.user.role),
+      issueRefreshToken(record.user.id),
+    ])
+    res.json({ token: newAccess, refreshToken: newRefresh })
+  } catch (err) {
+    console.error('[refreshTokens]', err)
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' })
+  }
+}
+
+// ── 로그아웃 ─────────────────────────────────────────────────────────────────
+
+export async function logout(req: AuthRequest, res: Response) {
+  const { refreshToken } = req.body
+  if (refreshToken && typeof refreshToken === 'string') {
+    const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex')
+    await prisma.refreshToken.deleteMany({ where: { tokenHash } }).catch(() => {})
+  }
+  res.json({ message: '로그아웃되었습니다.' })
+}
 
 export async function verifyPhoneOtpAndReset(req: Request, res: Response) {
   const parsed = phoneResetSchema.safeParse(req.body)
