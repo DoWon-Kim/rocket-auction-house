@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma'
 import { AuthRequest } from '../middleware/auth'
 import { getIo } from '../lib/socketio'
 import { notify } from '../lib/notify'
+import { detectAbnormalBidding, analyzeUserRisk, issueWarning } from '../lib/fraudDetection'
 
 const GRADING_COMPANIES = ['PSA', 'BGS', 'CGC', 'SGC', 'HGA', 'ACE', '기타'] as const
 
@@ -287,6 +288,20 @@ export async function createListing(req: AuthRequest, res: Response) {
 
 export async function buyNow(req: AuthRequest, res: Response) {
   try {
+    // 계정 정지 / 고위험 유저 차단
+    const buyer = await prisma.user.findUnique({
+      where: { id: req.userId! },
+      select: { isSuspended: true },
+    })
+    if (buyer?.isSuspended) {
+      res.status(403).json({ message: '계정이 정지되어 구매할 수 없습니다.' }); return
+    }
+    const risk = await analyzeUserRisk(req.userId!)
+    if (risk.risk === 'HIGH') {
+      await issueWarning(req.userId!, `고위험 구매 시도: ${risk.reasons.join(', ')}`)
+      res.status(403).json({ message: '계정 위험도가 높아 일시적으로 구매가 제한됩니다. 고객센터에 문의해 주세요.' }); return
+    }
+
     // 사전 빠른 유효성 검사 (트랜잭션 밖에서)
     const listing = await prisma.listing.findUnique({ where: { id: String(req.params['id']) } })
     if (!listing || listing.listingType !== 'BUY_NOW' || listing.status !== 'ACTIVE') {
@@ -356,6 +371,22 @@ export async function placeBid(req: AuthRequest, res: Response) {
   }
 
   try {
+    // 계정 정지 확인
+    const bidder = await prisma.user.findUnique({
+      where: { id: req.userId! },
+      select: { isSuspended: true },
+    })
+    if (bidder?.isSuspended) {
+      res.status(403).json({ message: '계정이 정지되어 입찰할 수 없습니다.' }); return
+    }
+
+    // 이상 입찰 감지 — 5분 20회 초과 시 경고
+    const isAbnormal = await detectAbnormalBidding(req.userId!)
+    if (isAbnormal) {
+      await issueWarning(req.userId!, '단시간 대량 입찰 (5분 내 20회 초과)')
+      res.status(429).json({ message: '너무 많은 입찰 시도가 감지되었습니다. 잠시 후 다시 시도해 주세요.' }); return
+    }
+
     const listing = await prisma.listing.findUnique({ where: { id: String(req.params['id']) } })
     if (!listing || listing.listingType !== 'AUCTION' || listing.status !== 'ACTIVE') {
       res.status(400).json({ message: '입찰할 수 없는 리스팅입니다.' })

@@ -1,5 +1,7 @@
 import { Router } from 'express'
 import { register, login, getMe, findId, requestPasswordReset, resetPassword, updateEmailNotifications, updateProfile, requestPhoneOtp, verifyPhoneOtpAndReset, verifyEmail, resendVerificationEmail, refreshTokens, logout } from '../controllers/auth.controller'
+import { setup2FA, confirm2FA, disable2FA, get2FAStatus } from '../controllers/twofa.controller'
+import { createDispute, getDispute, getMyDisputes } from '../controllers/dispute.controller'
 import {
   getListings,
   getListing,
@@ -93,7 +95,18 @@ router.patch('/auth/profile', authenticate, updateProfile)
 router.get('/auth/verify-email/:token', verifyEmail)
 router.post('/auth/resend-verification', authenticate, resendVerificationEmail)
 router.post('/auth/refresh', refreshTokens)
-router.post('/auth/logout', authenticate, logout)
+router.post('/auth/logout', logout)
+
+// 2단계 인증 (TOTP)
+router.get('/auth/2fa/status', authenticate, get2FAStatus)
+router.post('/auth/2fa/setup', authenticate, setup2FA)
+router.post('/auth/2fa/confirm', authenticate, confirm2FA)
+router.post('/auth/2fa/disable', authenticate, disable2FA)
+
+// 분쟁 해결
+router.post('/disputes', authenticate, createDispute)
+router.get('/disputes', authenticate, getMyDisputes)
+router.get('/disputes/:id', authenticate, getDispute)
 
 // 카드 검색 (공개)
 router.get('/cards/meta', getCardMeta)

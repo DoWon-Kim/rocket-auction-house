@@ -10,13 +10,46 @@ if (process.env.REDIS_URL) {
   redisClient.on('error', (err: Error) => console.warn('[Redis] 오류:', err.message))
 }
 
+class MemStore implements Store {
+  private windowMs = 60_000
+  private counts: Map<string, { count: number; resetTime: Date }> = new Map()
+
+  init(options: Options) {
+    if (options.windowMs) this.windowMs = options.windowMs
+  }
+
+  async increment(key: string): Promise<IncrementResponse> {
+    const now = Date.now()
+    const entry = this.counts.get(key)
+    if (!entry || entry.resetTime.getTime() < now) {
+      const resetTime = new Date(now + this.windowMs)
+      this.counts.set(key, { count: 1, resetTime })
+      return { totalHits: 1, resetTime }
+    }
+    entry.count++
+    return { totalHits: entry.count, resetTime: entry.resetTime }
+  }
+
+  async decrement(key: string) {
+    const e = this.counts.get(key)
+    if (e) e.count = Math.max(0, e.count - 1)
+  }
+
+  async resetKey(key: string) { this.counts.delete(key) }
+  async resetAll() { this.counts.clear() }
+}
+
 // Redis 가용 여부를 요청 시점에 판단하는 lazy store
 // — Redis가 준비되면 자동으로 RedisStore를 사용, 아니면 MemoryStore fallback
 class LazyStore implements Store {
   prefix: string
   private _redisStore: RedisStore | null = null
+  private memStore: MemStore
 
-  constructor(keyPrefix: string) { this.prefix = keyPrefix }
+  constructor(keyPrefix: string) {
+    this.prefix = keyPrefix
+    this.memStore = new MemStore()
+  }
 
   private getDelegate(): Store {
     if (redisClient?.status === 'ready') {
@@ -28,31 +61,10 @@ class LazyStore implements Store {
       }
       return this._redisStore
     }
-    // Redis 미준비 — 요청마다 새 MemoryStore 인스턴스를 만들면 카운터가 리셋되므로
-    // 단일 인스턴스를 유지해야 하지만, RedisStore가 init 될 때까지만 임시 사용
     return this.memStore
   }
 
-  private memStore = new (class implements Store {
-    private counts: Map<string, { count: number; resetTime: Date }> = new Map()
-    async increment(key: string): Promise<IncrementResponse> {
-      const now = Date.now()
-      const entry = this.counts.get(key)
-      if (!entry || entry.resetTime.getTime() < now) {
-        const resetTime = new Date(now + 60_000)
-        this.counts.set(key, { count: 1, resetTime })
-        return { totalHits: 1, resetTime }
-      }
-      entry.count++
-      return { totalHits: entry.count, resetTime: entry.resetTime }
-    }
-    async decrement(key: string) { const e = this.counts.get(key); if (e) e.count = Math.max(0, e.count - 1) }
-    async resetKey(key: string) { this.counts.delete(key) }
-    async resetAll() { this.counts.clear() }
-    init(_options: Options) {}
-  })()
-
-  init(options: Options) { this.memStore.init?.(options) }
+  init(options: Options) { this.memStore.init(options) }
   async increment(key: string): Promise<IncrementResponse> { return this.getDelegate().increment(key) }
   async decrement(key: string) { return this.getDelegate().decrement?.(key) }
   async resetKey(key: string) { return this.getDelegate().resetKey(key) }

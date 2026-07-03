@@ -66,11 +66,24 @@ model User {
   emailVerifyToken     String?  @unique
   emailVerifyExpires   DateTime?
 
+  // 2단계 인증 (TOTP)
+  twoFaEnabled         Boolean  @default(false)
+  twoFaSecret          String?
+
   // 리프레시 토큰
   refreshTokens        RefreshToken[]
 
   // 위시리스트
   wishlists       Wishlist[]
+
+  // 사기 방지
+  warningCount         Int      @default(0)   // 경고 누적 횟수
+  isSuspended          Boolean  @default(false) // 계정 정지
+  suspendedAt          DateTime?
+  suspendedReason      String?
+
+  disputes             Dispute[] @relation("DisputeBuyer")
+  disputesAsSeller     Dispute[] @relation("DisputeSeller")
 }
 
 model RefreshToken {
@@ -341,6 +354,7 @@ model Transaction {
   chatRoom         ChatRoom?
   reports          Report[]
   reviews          Review[]
+  dispute          Dispute?
 
   @@index([buyerId])
   @@index([sellerId])
@@ -370,7 +384,31 @@ enum EscrowStatus {
 enum DisputeStatus {
   OPEN       // 분쟁 접수
   REVIEWING  // 검토 중
-  RESOLVED   // 해결됨
+  RESOLVED   // 해결됨 (구매자 승)
+  REJECTED   // 기각 (판매자 승)
+  REFUNDED   // 환불 완료
+}
+
+model Dispute {
+  id            String        @id @default(uuid())
+  transaction   Transaction   @relation(fields: [transactionId], references: [id])
+  transactionId String        @unique
+  buyer         User          @relation("DisputeBuyer",  fields: [buyerId],  references: [id])
+  buyerId       String
+  seller        User          @relation("DisputeSeller", fields: [sellerId], references: [id])
+  sellerId      String
+  reason        ReportReason
+  description   String
+  evidenceUrls  String[]      @default([])
+  status        DisputeStatus @default(OPEN)
+  adminNote     String?
+  resolvedAt    DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([status])
 }
 
 enum ReportReason {

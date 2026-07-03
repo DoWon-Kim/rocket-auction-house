@@ -14,7 +14,7 @@ import {
   User, Wallet, ShoppingBag, ArrowDownCircle, ArrowUpCircle,
   Handshake, Gavel, Package, X, Check, AlertCircle,
   Archive, Truck, Trash2, ChevronDown, ChevronUp, Banknote, MessageCircle, Store, Star,
-  TrendingUp, BarChart2,
+  TrendingUp, BarChart2, Shield, Flag, Loader2,
 } from 'lucide-react'
 import Image from 'next/image'
 import { ReviewModal } from '@/components/ReviewModal'
@@ -35,6 +35,7 @@ const TABS = [
   { id: 'oripas',      label: '오리파 내역', icon: <Package size={15} /> },
   { id: 'shop-orders', label: '샵 구매',     icon: <Store size={15} /> },
   { id: 'withdrawal',  label: '포인트 환전', icon: <Banknote size={15} /> },
+  { id: 'disputes',    label: '분쟁 내역',   icon: <Shield size={15} /> },
 ] as const
 type TabId = typeof TABS[number]['id']
 
@@ -185,11 +186,12 @@ function ProfileTab() {
       </div>
 
       {/* 빠른 링크 */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { href: '/wishlist',   icon: '♥', label: '위시리스트',   sub: '저장한 카드' },
-          { href: '/collection', icon: '📦', label: '컬렉션',       sub: '수집 현황'  },
-          { href: '/settings',   icon: '⚙️', label: '설정',         sub: '알림 · 계정' },
+          { href: '/wishlist',     icon: '♥',  label: '위시리스트', sub: '저장한 카드'  },
+          { href: '/collection',   icon: '📦', label: '컬렉션',     sub: '수집 현황'    },
+          { href: '/settings',     icon: '⚙️', label: '설정',       sub: '알림 · 계정'  },
+          { href: '/settings/2fa', icon: '🔐', label: '2단계 인증', sub: '보안 설정'    },
         ].map(item => (
           <Link key={item.href} href={item.href}
             className="bg-[#1a1410] hover:bg-[#201810] border border-[#2e2318] hover:border-[#d4a853]/30 rounded-2xl p-4 flex flex-col items-center gap-1.5 transition-colors text-center">
@@ -490,6 +492,15 @@ function PurchasesTab() {
                   <span className="flex items-center gap-1.5 text-xs text-[#d4a853] bg-[#d4a853]/10 border border-[#d4a853]/20 px-3 py-1.5 rounded-xl">
                     <AlertCircle size={12} /> 판매자 발송을 기다리고 있습니다
                   </span>
+                )}
+                {/* 분쟁 신청 버튼 — 발송 이후 상태 */}
+                {['SHIPPED', 'COMPLETED', 'AUTO_COMPLETED'].includes(tx.txStatus) && (
+                  <Link
+                    href={`/disputes/new?txId=${tx.id}`}
+                    className="flex items-center gap-1.5 border border-red-700/40 text-red-400 hover:bg-red-900/20 px-3 py-1.5 rounded-xl text-xs transition-colors"
+                  >
+                    <Flag size={11} /> 분쟁 신청
+                  </Link>
                 )}
                 {/* 리뷰 버튼 — 완료 거래 + 미작성 */}
                 {['COMPLETED', 'AUTO_COMPLETED'].includes(tx.txStatus) && (
@@ -1688,6 +1699,65 @@ function WithdrawalTab() {
   )
 }
 
+// 분쟁 내역 탭
+const DISPUTE_STATUS: Record<string, { label: string; color: string }> = {
+  OPEN:         { label: '접수',    color: 'bg-yellow-950/50 text-yellow-400' },
+  UNDER_REVIEW: { label: '검토 중', color: 'bg-blue-950/50 text-blue-400'    },
+  RESOLVED:     { label: '해결',    color: 'bg-emerald-950/50 text-emerald-400' },
+  REJECTED:     { label: '거절',    color: 'bg-red-950/50 text-red-400'       },
+  REFUNDED:     { label: '환불',    color: 'bg-purple-950/50 text-purple-400' },
+}
+
+function DisputesTab() {
+  const { data, isLoading } = useQuery({
+    queryKey: ['my', 'disputes'],
+    queryFn: () => api.get('/disputes').then(r => r.data),
+  })
+  const disputes: {
+    id: string
+    status: string
+    description: string
+    createdAt: string
+    transaction: { finalPrice: number; listing: { card: { nameKo: string | null; name: string } } }
+    buyer:  { nickname: string }
+    seller: { nickname: string }
+  }[] = data?.disputes ?? []
+
+  if (isLoading) return <SkeletonList />
+  if (disputes.length === 0) return <EmptyState text="분쟁 내역이 없습니다." />
+
+  return (
+    <div className="space-y-3">
+      {disputes.map(d => {
+        const st = DISPUTE_STATUS[d.status] ?? { label: d.status, color: 'bg-[#2e2318] text-[#8a7055]' }
+        const cardName = d.transaction.listing.card.nameKo ?? d.transaction.listing.card.name
+        return (
+          <div key={d.id} className="bg-[#1a1410] border border-[#2e2318] rounded-2xl p-4 space-y-2">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-semibold text-sm text-[#f5ead8] truncate">{cardName}</p>
+                <p className="text-xs text-[#5a4830] mt-0.5">
+                  {format(new Date(d.createdAt), 'yy.MM.dd', { locale: ko })} ·
+                  구매자 {d.buyer.nickname} / 판매자 {d.seller.nickname}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className={`px-2 py-0.5 rounded-lg text-xs font-medium ${st.color}`}>{st.label}</span>
+                <span className="text-[#f0a832] font-bold text-sm tabular-nums">
+                  {d.transaction.finalPrice.toLocaleString()} P
+                </span>
+              </div>
+            </div>
+            <p className="text-xs text-[#7a6040] line-clamp-2 bg-[#120e0a] border border-[#2e2318] rounded-xl px-3 py-2">
+              {d.description}
+            </p>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ─── 메인 페이지 ──────────────────────────────────────────────────────────
 
 export default function MyPage() {
@@ -1713,6 +1783,7 @@ export default function MyPage() {
     oripas:        <OripasTab />,
     'shop-orders': <ShopOrdersTab />,
     withdrawal:    <WithdrawalTab />,
+    disputes:      <DisputesTab />,
   }
 
   return (

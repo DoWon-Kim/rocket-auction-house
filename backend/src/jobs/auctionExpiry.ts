@@ -30,6 +30,7 @@ type SettleListing = {
 async function trySettleWithBidder(
   listing: SettleListing,
   bidderId: string,
+  bidId: string,
   amount: number,
 ): Promise<boolean> {
   try {
@@ -40,6 +41,10 @@ async function trySettleWithBidder(
         data: { balance: { decrement: amount } },
       })
       if (deducted.count === 0) throw new Error('INSUFFICIENT_BALANCE')
+
+      // isWinning 플래그도 트랜잭션 안에서 처리 — 크래시 시 일관성 보장
+      await tx.bid.updateMany({ where: { listingId: listing.id }, data: { isWinning: false } })
+      await tx.bid.update({ where: { id: bidId }, data: { isWinning: true } })
 
       await tx.listing.update({ where: { id: listing.id }, data: { status: 'SOLD' } })
       const txRecord = await tx.transaction.create({
@@ -107,10 +112,8 @@ async function doProcess() {
     let settled = false
     for (const bid of listing.bids) {
       if (!bid.bidder) continue  // FK 보호로 발생하지 않지만 방어적 처리
-      await prisma.bid.updateMany({ where: { listingId: listing.id }, data: { isWinning: false } })
-      await prisma.bid.update({ where: { id: bid.id }, data: { isWinning: true } })
 
-      const ok = await trySettleWithBidder(settleListing, bid.bidder.id, bid.amount)
+      const ok = await trySettleWithBidder(settleListing, bid.bidder.id, bid.id, bid.amount)
       if (ok) {
         getIo()?.to(`listing:${listing.id}`).emit('auction:sold', {
           listingId: listing.id,
@@ -119,7 +122,6 @@ async function doProcess() {
           finalPrice: bid.amount,
           isRunnerUp: bid !== listing.bids[0],
         })
-        // 낙찰자 알림
         notify({
           userId: bid.bidder.id,
           type: 'BID_WON',

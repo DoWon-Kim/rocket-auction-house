@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 import { z } from 'zod'
+import { authenticator } from 'otplib'
 import { prisma } from '../lib/prisma'
 import { sendPasswordResetEmail, sendVerificationEmail } from '../services/mailer'
 import { AuthRequest } from '../middleware/auth'
@@ -12,7 +13,7 @@ const phoneRegex = /^01[016789]\d{7,8}$/
 
 const registerSchema = z.object({
   email:    z.string().email(),
-  nickname: z.string().min(2).max(20),
+  nickname: z.string().min(2).max(20).regex(/^[^\s<>"'&\\]+$/, '닉네임에 사용할 수 없는 문자가 포함되어 있습니다.'),
   password: z.string().min(8),
   phone:    z.string().regex(phoneRegex, '올바른 휴대폰 번호를 입력해주세요.').optional(),
 })
@@ -108,11 +109,29 @@ export async function login(req: Request, res: Response) {
   try {
     const user = await prisma.user.findUnique({
       where: { email },
-      select: { id: true, email: true, nickname: true, avatarUrl: true, balance: true, role: true, passwordHash: true, emailVerified: true },
+      select: { id: true, email: true, nickname: true, avatarUrl: true, balance: true, role: true, passwordHash: true, emailVerified: true, twoFaEnabled: true, twoFaSecret: true, isSuspended: true },
     })
     if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
       res.status(401).json({ message: '이메일 또는 비밀번호가 올바르지 않습니다.' })
       return
+    }
+    if (user.isSuspended) {
+      res.status(403).json({ message: '계정이 정지되었습니다. 고객센터에 문의해주세요.' })
+      return
+    }
+
+    // 2FA 활성화된 경우 TOTP 코드 요구
+    if (user.twoFaEnabled && user.twoFaSecret) {
+      const { totpCode } = req.body as { totpCode?: string }
+      if (!totpCode) {
+        res.status(200).json({ requiresTwoFa: true })
+        return
+      }
+      const valid = authenticator.verify({ token: totpCode, secret: user.twoFaSecret })
+      if (!valid) {
+        res.status(401).json({ message: '2단계 인증 코드가 올바르지 않습니다.' })
+        return
+      }
     }
 
     const [accessToken, refreshToken] = await Promise.all([
@@ -268,7 +287,7 @@ export async function getMe(req: Request & { userId?: string }, res: Response) {
 }
 
 const profileSchema = z.object({
-  nickname:        z.string().min(2).max(20).optional(),
+  nickname:        z.string().min(2).max(20).regex(/^[^\s<>"'&\\]+$/, '닉네임에 사용할 수 없는 문자가 포함되어 있습니다.').optional(),
   avatarUrl:       z.string().url().optional().or(z.literal('')),
   currentPassword: z.string().optional(),
   newPassword:     z.string().min(8).optional(),
@@ -463,7 +482,7 @@ export async function refreshTokens(req: Request, res: Response) {
 
 // ── 로그아웃 ─────────────────────────────────────────────────────────────────
 
-export async function logout(req: AuthRequest, res: Response) {
+export async function logout(req: Request, res: Response) {
   const { refreshToken } = req.body
   if (refreshToken && typeof refreshToken === 'string') {
     const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex')
