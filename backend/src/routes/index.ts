@@ -3,6 +3,7 @@ import { register, login, getMe, findId, requestPasswordReset, resetPassword, up
 import { setup2FA, confirm2FA, disable2FA, get2FAStatus } from '../controllers/twofa.controller'
 import { createDispute, getDispute, getMyDisputes, adminGetDisputes, adminResolveDispute } from '../controllers/dispute.controller'
 import { calculateSellerGrade } from '../lib/fraudDetection'
+import { prisma } from '../lib/prisma'
 import {
   getListings,
   getListing,
@@ -81,6 +82,16 @@ import {
 } from '../controllers/friend.controller'
 
 const router = Router()
+
+// 헬스체크
+router.get('/health', async (_req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`
+    res.json({ status: 'ok', timestamp: new Date().toISOString() })
+  } catch {
+    res.status(503).json({ status: 'error', timestamp: new Date().toISOString() })
+  }
+})
 
 // 인증
 router.post('/auth/register', authLimiter, register)
