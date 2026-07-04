@@ -127,6 +127,27 @@ function MarketStatsPanel({ cardMarket, currentPrice, listingType }: { cardMarke
   )
 }
 
+/* ─── Seller Grade Badge ────────────────────────── */
+const GRADE_STYLE: Record<string, { label: string; cls: string }> = {
+  BRONZE:   { label: 'BRONZE',   cls: 'text-orange-700 border-orange-800/40 bg-orange-950/30' },
+  SILVER:   { label: 'SILVER',   cls: 'text-slate-400  border-slate-600/40  bg-slate-900/30'  },
+  GOLD:     { label: 'GOLD',     cls: 'text-yellow-400 border-yellow-600/40 bg-yellow-950/30' },
+  PLATINUM: { label: 'PLAT',     cls: 'text-cyan-400   border-cyan-600/40   bg-cyan-950/30'   },
+  DIAMOND:  { label: 'DIAMOND',  cls: 'text-sky-300    border-sky-500/40    bg-sky-950/30'    },
+}
+function SellerGradeBadge({ sellerId }: { sellerId: string }) {
+  const { data } = useQuery({
+    queryKey: ['seller-grade', sellerId],
+    queryFn: () => api.get(`/users/${sellerId}/seller-grade`).then(r => r.data as { grade: string }),
+    staleTime: 5 * 60_000,
+  })
+  if (!data) return null
+  const g = GRADE_STYLE[data.grade] ?? GRADE_STYLE['BRONZE']
+  return (
+    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${g.cls}`}>{g.label}</span>
+  )
+}
+
 /* ─── Comparable Listings ──────────────────────── */
 interface ComparableListing {
   id: string
@@ -721,6 +742,7 @@ export default function ListingDetailPage() {
                   {listing.seller.nickname}
                 </Link>
                 <RatingBadge avgRating={listing.seller.avgRating ?? null} reviewCount={listing.seller.reviewCount ?? 0} />
+                <SellerGradeBadge sellerId={listing.sellerId} />
               </span>
             </InfoRow>
             <InfoRow label="등록일">{format(new Date(listing.createdAt), 'yyyy.MM.dd HH:mm')}</InfoRow>

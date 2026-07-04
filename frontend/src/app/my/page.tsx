@@ -1701,11 +1701,11 @@ function WithdrawalTab() {
 
 // 분쟁 내역 탭
 const DISPUTE_STATUS: Record<string, { label: string; color: string }> = {
-  OPEN:         { label: '접수',    color: 'bg-yellow-950/50 text-yellow-400' },
-  UNDER_REVIEW: { label: '검토 중', color: 'bg-blue-950/50 text-blue-400'    },
-  RESOLVED:     { label: '해결',    color: 'bg-emerald-950/50 text-emerald-400' },
-  REJECTED:     { label: '거절',    color: 'bg-red-950/50 text-red-400'       },
-  REFUNDED:     { label: '환불',    color: 'bg-purple-950/50 text-purple-400' },
+  OPEN:      { label: '접수',    color: 'bg-yellow-950/50 text-yellow-400'    },
+  REVIEWING: { label: '검토 중', color: 'bg-blue-950/50 text-blue-400'        },
+  RESOLVED:  { label: '해결',    color: 'bg-emerald-950/50 text-emerald-400'  },
+  REJECTED:  { label: '기각',    color: 'bg-red-950/50 text-red-400'          },
+  REFUNDED:  { label: '환불',    color: 'bg-purple-950/50 text-purple-400'    },
 }
 
 function DisputesTab() {

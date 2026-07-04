@@ -8,11 +8,12 @@ import { Flag, Loader2, AlertCircle, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 
 const REASONS = [
-  { value: 'FRAUD',          label: '사기 / 허위 상품' },
-  { value: 'NOT_AS_DESCRIBED', label: '상품 상태 불일치' },
-  { value: 'NOT_DELIVERED',  label: '물품 미수령' },
-  { value: 'COUNTERFEIT',    label: '위조품 의심' },
-  { value: 'OTHER',          label: '기타' },
+  { value: 'FRAUD',        label: '사기 의심' },
+  { value: 'FAKE_ITEM',    label: '위조 / 가짜 카드' },
+  { value: 'WRONG_ITEM',   label: '다른 물품 발송' },
+  { value: 'DAMAGED_ITEM', label: '손상 물품 수령' },
+  { value: 'NO_SHIPMENT',  label: '미발송 / 잠수' },
+  { value: 'OTHER',        label: '기타' },
 ] as const
 
 function DisputeForm() {

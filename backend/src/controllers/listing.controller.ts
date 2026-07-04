@@ -371,16 +371,15 @@ export async function placeBid(req: AuthRequest, res: Response) {
   }
 
   try {
-    // 계정 정지 확인
-    const bidder = await prisma.user.findUnique({
+    // 계정 정지 + 이상 입찰 확인
+    const bidderAccount = await prisma.user.findUnique({
       where: { id: req.userId! },
       select: { isSuspended: true },
     })
-    if (bidder?.isSuspended) {
+    if (bidderAccount?.isSuspended) {
       res.status(403).json({ message: '계정이 정지되어 입찰할 수 없습니다.' }); return
     }
 
-    // 이상 입찰 감지 — 5분 20회 초과 시 경고
     const isAbnormal = await detectAbnormalBidding(req.userId!)
     if (isAbnormal) {
       await issueWarning(req.userId!, '단시간 대량 입찰 (5분 내 20회 초과)')

@@ -1,7 +1,8 @@
 import { Router } from 'express'
 import { register, login, getMe, findId, requestPasswordReset, resetPassword, updateEmailNotifications, updateProfile, requestPhoneOtp, verifyPhoneOtpAndReset, verifyEmail, resendVerificationEmail, refreshTokens, logout } from '../controllers/auth.controller'
 import { setup2FA, confirm2FA, disable2FA, get2FAStatus } from '../controllers/twofa.controller'
-import { createDispute, getDispute, getMyDisputes } from '../controllers/dispute.controller'
+import { createDispute, getDispute, getMyDisputes, adminGetDisputes, adminResolveDispute } from '../controllers/dispute.controller'
+import { calculateSellerGrade } from '../lib/fraudDetection'
 import {
   getListings,
   getListing,
@@ -230,6 +231,20 @@ router.post('/admin/withdrawal/:id/transfer', authenticate, requireSection('with
 // 관리자 배송 관리
 router.get('/admin/shipping',    authenticate, requireSection('shipping'), getAdminShippings)
 router.patch('/admin/shipping/:id', authenticate, requireSection('shipping'), updateShippingStatus)
+
+// 관리자 분쟁 관리
+router.get('/admin/disputes',         authenticate, requireAdmin, adminGetDisputes)
+router.patch('/admin/disputes/:id',   authenticate, requireAdmin, adminResolveDispute)
+
+// 셀러 등급 (공개)
+router.get('/users/:id/seller-grade', async (req, res) => {
+  try {
+    const grade = await calculateSellerGrade(req.params['id'])
+    res.json({ grade })
+  } catch {
+    res.status(500).json({ message: '서버 오류' })
+  }
+})
 
 // 사이트 설정 (점검 모드)
 router.get('/site-config/maintenance', getMaintenanceStatus)

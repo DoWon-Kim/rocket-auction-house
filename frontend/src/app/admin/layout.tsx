@@ -14,6 +14,7 @@ const ALL_NAV = [
   { href: '/admin/settings',    label: '사이트 설정', icon: <Settings size={16} />,        section: 'settings',    superOnly: true },
   { href: '/admin/menus',       label: '메뉴 관리',   icon: <MenuIcon size={16} />,        section: 'menus',       superOnly: true },
   { href: '/admin/reports',     label: '신고 관리',   icon: <ShieldAlert size={16} />,     section: 'reports' },
+  { href: '/admin/disputes',    label: '분쟁 관리',   icon: <Shield size={16} />,           section: 'reports' },
   { href: '/admin/posts',       label: '게시글 관리', icon: <Bell size={16} />,            section: 'posts' },
   { href: '/admin/cards',       label: '카드 관리',   icon: <CreditCard size={16} />,      section: 'cards' },
   { href: '/admin/shop',        label: '샵 관리',     icon: <Store size={16} />,           section: 'shop' },

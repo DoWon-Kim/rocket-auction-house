@@ -8,7 +8,7 @@ const APP_NAME = 'Rocket Auction House'
 
 // 2FA 설정 시작 — secret 생성 + QR 코드 반환 (아직 활성화 안 됨)
 export async function setup2FA(req: AuthRequest, res: Response) {
-  const userId = req.user!.userId
+  const userId = req.userId!
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { email: true, twoFaEnabled: true },
@@ -17,7 +17,6 @@ export async function setup2FA(req: AuthRequest, res: Response) {
   if (user.twoFaEnabled) { res.status(400).json({ message: '이미 2단계 인증이 활성화되어 있습니다.' }); return }
 
   const secret = authenticator.generateSecret()
-  // DB에 임시 저장 (아직 enabled=false)
   await prisma.user.update({ where: { id: userId }, data: { twoFaSecret: secret } })
 
   const otpAuthUrl = authenticator.keyuri(user.email, APP_NAME, secret)
@@ -32,7 +31,7 @@ export async function setup2FA(req: AuthRequest, res: Response) {
 
 // 2FA 활성화 확인 — TOTP 코드 검증
 export async function confirm2FA(req: AuthRequest, res: Response) {
-  const userId = req.user!.userId
+  const userId = req.userId!
   const { code } = req.body as { code?: string }
   if (!code) { res.status(400).json({ message: 'TOTP 코드가 필요합니다.' }); return }
 
@@ -52,7 +51,7 @@ export async function confirm2FA(req: AuthRequest, res: Response) {
 
 // 2FA 비활성화
 export async function disable2FA(req: AuthRequest, res: Response) {
-  const userId = req.user!.userId
+  const userId = req.userId!
   const { code } = req.body as { code?: string }
   if (!code) { res.status(400).json({ message: 'TOTP 코드가 필요합니다.' }); return }
 
@@ -76,7 +75,7 @@ export async function disable2FA(req: AuthRequest, res: Response) {
 
 // 2FA 상태 조회
 export async function get2FAStatus(req: AuthRequest, res: Response) {
-  const userId = req.user!.userId
+  const userId = req.userId!
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { twoFaEnabled: true },
