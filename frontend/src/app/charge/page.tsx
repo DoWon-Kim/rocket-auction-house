@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { loadTossPayments } from '@tosspayments/tosspayments-sdk'
 import { useAuthStore } from '@/lib/store'
@@ -16,7 +16,11 @@ export default function ChargePage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  if (!user) { router.replace('/login'); return null }
+  useEffect(() => {
+    if (!user) router.replace('/login')
+  }, [user, router])
+
+  if (!user) return null
 
   const u = user
 

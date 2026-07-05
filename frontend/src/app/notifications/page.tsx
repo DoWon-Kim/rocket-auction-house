@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/lib/store'
@@ -34,13 +34,16 @@ export default function NotificationsPage() {
   const qc = useQueryClient()
   const [page, setPage] = useState(1)
 
-  if (!user) { router.replace('/login'); return null }
+  useEffect(() => {
+    if (!user) router.replace('/login')
+  }, [user, router])
 
   const { data, isLoading } = useQuery({
     queryKey: ['notifications-page', page],
     queryFn: () => api.get('/notifications', { params: { page } }).then(r => r.data as {
       notifications: Notification[]; total: number; totalPages: number; unreadCount: number
     }),
+    enabled: !!user,
   })
 
   const notifications = data?.notifications ?? []
@@ -69,6 +72,8 @@ export default function NotificationsPage() {
       qc.invalidateQueries({ queryKey: ['notifications-page'] })
     },
   })
+
+  if (!user) return null
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">

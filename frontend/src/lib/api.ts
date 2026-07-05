@@ -84,7 +84,7 @@ api.interceptors.response.use(
           // refresh 실패 시 DB의 refresh token 폐기 시도 (실패해도 무시)
           axios.post(`${API_BASE}/auth/logout`, { refreshToken }).catch(() => {})
           clearAuth()
-          if (!isRedirecting) {
+          if (!isRedirecting && typeof window !== 'undefined') {
             isRedirecting = true
             window.location.href = '/login'
             setTimeout(() => { isRedirecting = false }, 3000)
@@ -98,11 +98,13 @@ api.interceptors.response.use(
       // refreshToken 없는 상태에서 401 — 즉시 로그아웃
       const hadToken = !!useAuthStore.getState().token
       useAuthStore.getState().clearAuth()
-      const path = window.location.pathname
-      if (hadToken && path !== '/login' && path !== '/register' && !isRedirecting) {
-        isRedirecting = true
-        window.location.href = '/login'
-        setTimeout(() => { isRedirecting = false }, 3000)
+      if (typeof window !== 'undefined') {
+        const path = window.location.pathname
+        if (hadToken && path !== '/login' && path !== '/register' && !isRedirecting) {
+          isRedirecting = true
+          window.location.href = '/login'
+          setTimeout(() => { isRedirecting = false }, 3000)
+        }
       }
     }
 

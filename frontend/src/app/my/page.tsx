@@ -1765,10 +1765,11 @@ export default function MyPage() {
   const router = useRouter()
   const [tab, setTab] = useState<TabId>('profile')
 
-  if (!user) {
-    router.replace('/login')
-    return null
-  }
+  useEffect(() => {
+    if (!user) router.replace('/login')
+  }, [user, router])
+
+  if (!user) return null
 
   const content: Record<TabId, React.ReactNode> = {
     profile:       <ProfileTab />,

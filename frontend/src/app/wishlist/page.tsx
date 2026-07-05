@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/lib/store'
@@ -46,7 +47,11 @@ export default function WishlistPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['my-wishlist'] }),
   })
 
-  if (!user) { router.replace('/login'); return null }
+  useEffect(() => {
+    if (!user) router.replace('/login')
+  }, [user, router])
+
+  if (!user) return null
 
   if (isLoading) return (
     <div className="max-w-2xl mx-auto space-y-3">

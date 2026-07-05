@@ -1,11 +1,11 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/lib/store'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useState } from 'react'
 import { Layers, Trophy, CheckCircle2, ChevronRight } from 'lucide-react'
 import { TCG_LABELS } from '@/lib/utils'
 
@@ -44,7 +44,11 @@ export default function CollectionPage() {
     enabled: !!user,
   })
 
-  if (!user) { router.replace('/login'); return null }
+  useEffect(() => {
+    if (!user) router.replace('/login')
+  }, [user, router])
+
+  if (!user) return null
 
   const tcgTypes = data
     ? Array.from(new Set(data.sets.map(s => s.tcgType)))

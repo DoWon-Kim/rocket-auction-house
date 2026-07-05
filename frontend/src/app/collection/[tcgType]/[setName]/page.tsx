@@ -1,6 +1,6 @@
 'use client'
 
-import { use } from 'react'
+import { use, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/lib/store'
@@ -46,7 +46,11 @@ export default function CollectionSetPage({ params }: { params: Promise<{ tcgTyp
     enabled: !!user,
   })
 
-  if (!user) { router.replace('/login'); return null }
+  useEffect(() => {
+    if (!user) router.replace('/login')
+  }, [user, router])
+
+  if (!user) return null
 
   const filteredCards = (data?.cards ?? []).filter(c => {
     if (filter === 'OWNED') return c.owned

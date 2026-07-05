@@ -168,7 +168,11 @@ export default function ChatRoomPage() {
     },
   })
 
-  if (!user) { router.replace('/login'); return null }
+  useEffect(() => {
+    if (!user) router.replace('/login')
+  }, [user, router])
+
+  if (!user) return null
 
   const isBuyer = roomData ? roomData.buyer.id === user.id : false
   const other = roomData ? (isBuyer ? roomData.seller : roomData.buyer) : null

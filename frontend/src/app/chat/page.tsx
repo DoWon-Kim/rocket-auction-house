@@ -49,7 +49,11 @@ export default function ChatListPage() {
     refetchInterval: 10000,
   })
 
-  if (!user) { router.replace('/login'); return null }
+  useEffect(() => {
+    if (!user) router.replace('/login')
+  }, [user, router])
+
+  if (!user) return null
 
   return (
     <div className="max-w-xl mx-auto space-y-4">
