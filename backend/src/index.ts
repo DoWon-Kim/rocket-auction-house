@@ -43,8 +43,14 @@ if (process.env.JWT_SECRET === 'rocket-auction-house-super-secret-key-change-in-
 const app = express()
 const httpServer = createServer(app)
 
+const ALLOWED_ORIGINS = [
+  process.env.FRONTEND_URL,
+  'http://localhost:3000',
+  /^https:\/\/.*\.vercel\.app$/,
+].filter(Boolean) as (string | RegExp)[]
+
 const io = new Server(httpServer, {
-  cors: { origin: process.env.FRONTEND_URL, credentials: true },
+  cors: { origin: ALLOWED_ORIGINS, credentials: true },
 })
 
 initIo(io)
@@ -56,7 +62,7 @@ app.use(helmet({
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
 app.use(cors({
-  origin: process.env.FRONTEND_URL,
+  origin: ALLOWED_ORIGINS,
   credentials: true,
 }))
 
