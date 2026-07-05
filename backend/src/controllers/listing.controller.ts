@@ -44,16 +44,16 @@ export async function getListings(req: AuthRequest, res: Response) {
     const page = Number.isFinite(rawPage) && rawPage > 0 ? Math.floor(rawPage) : 1
     const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(Math.floor(rawLimit), 100) : 20
 
-    const where: Record<string, unknown> = { status: 'ACTIVE' }
-    if (type) where.listingType = type
+    const where: Prisma.ListingWhereInput = { status: 'ACTIVE' }
+    if (type) where.listingType = type as Prisma.EnumListingTypeFilter | undefined
     if (sellerId) where.sellerId = sellerId
-    if (condition) where.condition = condition
+    if (condition) where.condition = condition as Prisma.EnumCardConditionFilter | undefined
     if (hasGrading === 'true') where.gradingCompany = { not: null }
     if (gradingCompany) where.gradingCompany = gradingCompany
 
     if (tcgType || cardName) {
       where.card = {
-        ...(tcgType ? { tcgType } : {}),
+        ...(tcgType ? { tcgType: tcgType as Prisma.EnumTcgTypeFilter | undefined } : {}),
         ...(cardName ? {
           OR: [
             { name:       { contains: cardName, mode: 'insensitive' } },
@@ -66,7 +66,7 @@ export async function getListings(req: AuthRequest, res: Response) {
       }
     }
     if (minPrice || maxPrice) {
-      const priceRange: { gte?: number; lte?: number } = {}
+      const priceRange: Prisma.IntNullableFilter = {}
       if (minPrice) priceRange.gte = Number(minPrice)
       if (maxPrice) priceRange.lte = Number(maxPrice)
       if (type === 'BUY_NOW') {
