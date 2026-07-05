@@ -35,7 +35,7 @@ import {
 } from '../controllers/my.controller'
 import {
   getStats,
-  getCards, createCard, updateCard, deleteCard,
+  getCards, createCard, updateCard, deleteCard, deleteAllCards,
   getOripas, createOripa, updateOripa, toggleOripa, addOripaItem, removeOripaItem,
   getUsers, grantBalance, setUserRole, resetUserPassword,
   getMyPermissions, getSubAdmins, updateUserPermissions,
@@ -209,6 +209,7 @@ router.get('/admin/my-permissions', authenticate, requireAdmin, getMyPermissions
 router.get('/admin/cards',        authenticate, requireSection('cards'), getCards)
 router.post('/admin/cards',       authenticate, requireSection('cards'), createCard)
 router.patch('/admin/cards/:id',  authenticate, requireSection('cards'), updateCard)
+router.delete('/admin/cards',     authenticate, requireSection('cards'), deleteAllCards)
 router.delete('/admin/cards/:id', authenticate, requireSection('cards'), deleteCard)
 
 // 관리자 — 오리파

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { TCG_LABELS } from '@/lib/utils'
-import { Plus, Pencil, Trash2, X, Check, Download, ChevronDown, ChevronUp, Search, Loader2, Zap, AlertCircle } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Check, Download, ChevronDown, ChevronUp, Search, Loader2, Zap, AlertCircle, AlertTriangle } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
 import Badge from '@/components/ui/Badge'
 
@@ -865,6 +865,22 @@ export default function AdminCardsPage() {
     onError: (e: unknown) => { const err = e as { response?: { data?: { message?: string } } }; setMsg({ type: 'err', text: err.response?.data?.message ?? '오류가 발생했습니다.' }) },
   })
 
+  const [deleteAllModal, setDeleteAllModal] = useState(false)
+  const [deleteAllConfirm, setDeleteAllConfirm] = useState('')
+  const deleteAllMut = useMutation({
+    mutationFn: () => api.delete('/admin/cards'),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'cards'] })
+      setDeleteAllModal(false)
+      setDeleteAllConfirm('')
+      setMsg({ type: 'ok', text: '카드 및 연관 데이터(리스팅·거래·입찰·인벤토리 등)가 모두 삭제되었습니다.' })
+    },
+    onError: (e: unknown) => {
+      const err = e as { response?: { data?: { message?: string } } }
+      setMsg({ type: 'err', text: err.response?.data?.message ?? '삭제 중 오류가 발생했습니다.' })
+    },
+  })
+
   function openEdit(card: Card) {
     setEditCard(card)
     setForm({ name: card.name, tcgType: card.tcgType, setName: card.setName, setCode: card.setCode ?? '', cardNumber: card.cardNumber ?? '', rarity: card.rarity, imageUrl: card.imageUrl ?? '', description: card.description ?? '' })
@@ -874,11 +890,60 @@ export default function AdminCardsPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-[#f5ead8]">카드 관리</h1>
-        <button onClick={() => { setShowForm(true); setEditCard(null); setForm(emptyForm) }}
-          className="flex items-center gap-1.5 bg-[#d4a853] hover:bg-[#c49440] text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors">
-          <Plus size={16} /> 카드 등록
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => { setDeleteAllModal(true); setDeleteAllConfirm('') }}
+            className="flex items-center gap-1.5 bg-red-950/60 hover:bg-red-900/60 border border-red-800/40 hover:border-red-700/60 text-red-400 hover:text-red-300 px-4 py-2 rounded-xl text-sm font-semibold transition-colors">
+            <Trash2 size={15} /> 전체 삭제
+          </button>
+          <button onClick={() => { setShowForm(true); setEditCard(null); setForm(emptyForm) }}
+            className="flex items-center gap-1.5 bg-[#d4a853] hover:bg-[#c49440] text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors">
+            <Plus size={16} /> 카드 등록
+          </button>
+        </div>
       </div>
+
+      {/* 전체 삭제 확인 모달 */}
+      {deleteAllModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-[#13100d] border border-red-800/40 rounded-2xl p-6 w-full max-w-md mx-4 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-950/60 border border-red-800/40 flex items-center justify-center shrink-0">
+                <AlertTriangle size={20} className="text-red-400" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-white">카드 전체 삭제</h2>
+                <p className="text-xs text-red-400/80 mt-0.5">되돌릴 수 없는 작업입니다</p>
+              </div>
+            </div>
+            <div className="bg-red-950/30 border border-red-800/30 rounded-xl p-3 text-xs text-red-300/90 space-y-1">
+              <p className="font-semibold">다음 데이터가 모두 삭제됩니다:</p>
+              <p className="text-red-400/70">카드 · 리스팅 · 입찰 · 거래 · 분쟁 · 리뷰 · 채팅 · 인벤토리 · 오리파 아이템 · 위시리스트</p>
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-xs text-[#7a6040]">확인하려면 아래에 <span className="text-red-400 font-mono font-bold">전체삭제</span> 를 입력하세요</p>
+              <input
+                value={deleteAllConfirm}
+                onChange={e => setDeleteAllConfirm(e.target.value)}
+                placeholder="전체삭제"
+                className="w-full bg-[#1a1410] border border-red-800/30 focus:border-red-600/50 rounded-xl px-4 py-2.5 text-sm text-[#f5ead8] placeholder:text-[#5a4830] focus:outline-none transition-colors"
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => { setDeleteAllModal(false); setDeleteAllConfirm('') }}
+                className="flex-1 h-10 rounded-xl border border-[#2e2318] text-[#8a7055] hover:text-[#f5ead8] hover:border-[#4a3520] text-sm transition-colors">
+                취소
+              </button>
+              <button
+                onClick={() => deleteAllMut.mutate()}
+                disabled={deleteAllConfirm !== '전체삭제' || deleteAllMut.isPending}
+                className="flex-1 h-10 rounded-xl bg-red-800 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold flex items-center justify-center gap-1.5 transition-colors">
+                {deleteAllMut.isPending ? <><Loader2 size={14} className="animate-spin" /> 삭제 중...</> : '전체 삭제'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <BulkImportPanel onImported={() => qc.invalidateQueries({ queryKey: ['admin', 'cards'] })} />
       <ImportPanel onImported={() => qc.invalidateQueries({ queryKey: ['admin', 'cards'] })} />

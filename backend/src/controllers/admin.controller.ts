@@ -161,6 +161,26 @@ export async function deleteCard(req: Request, res: Response) {
   }
 }
 
+export async function deleteAllCards(_req: Request, res: Response) {
+  try {
+    // 의존성 순서대로 삭제 (FK 제약 회피)
+    await prisma.$executeRawUnsafe(`
+      TRUNCATE "ChatMessage", "ChatRoom",
+               "Bid", "AutoBid", "Offer",
+               "Review", "Dispute",
+               "ShippingRequestItem", "ShippingRequest",
+               "InventoryItem", "Wishlist", "OripaItem",
+               "Transaction", "Listing", "Card"
+      CASCADE
+    `)
+    const cardCount = await prisma.card.count()
+    res.json({ message: '카드 및 연관 데이터가 모두 삭제되었습니다.', remaining: cardCount })
+  } catch (err) {
+    console.error('[deleteAllCards]', err)
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' })
+  }
+}
+
 const oripaSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
