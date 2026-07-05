@@ -1015,7 +1015,7 @@ export default function AdminCardsPage() {
                 <td className="px-4 py-3 text-[#8a7055] text-xs">{card.setName}{card.setCode && <span className="ml-1 text-[#5a4830]">({card.setCode})</span>}</td>
                 <td className="px-4 py-3 hidden md:table-cell">
                   {card.cardNumber
-                    ? <span className="font-mono text-xs text-[#e0b878] bg-[#2a1c08]/60 border border-[#3d2a0c]/50 px-1.5 py-0.5 rounded">{card.cardNumber}</span>
+                    ? <span className="font-mono text-xs text-[#e0b878] bg-[#2a1c08]/60 border border-[#3d2a0c]/50 px-1.5 py-0.5 rounded">[{card.cardNumber}]</span>
                     : <span className="text-[#5a4830]">-</span>}
                 </td>
                 <td className="px-4 py-3 text-[#8a7055]">{card.rarity}</td>

@@ -27,6 +27,11 @@ export async function searchCards(req: Request, res: Response) {
     const limit     = Math.min(60, Math.max(1, Number(req.query.limit ?? 24)))
     const skip      = (page - 1) * limit
 
+    // [EB03-003] 형식 괄호 파싱: 대괄호 안의 텍스트를 카드번호로 직접 검색
+    const bracketMatches = q ? [...q.matchAll(/\[([^\]]+)\]/g)] : []
+    const bracketNumbers = bracketMatches.map(m => m[1])
+    const cleanQ = q ? q.replace(/\[([^\]]+)\]/g, '').trim() : undefined
+
     const langFilter =
       lang === 'ja' ? { OR: [
         { externalId: { startsWith: 'tcgdex_ja_' } },
@@ -35,15 +40,24 @@ export async function searchCards(req: Request, res: Response) {
       lang === 'ko' ? { nameKo: { not: null } } :
       {}
 
+    const buildTextOR = (term: string) => [
+      { name:       { contains: term, mode: 'insensitive' as const } },
+      { nameKo:     { contains: term, mode: 'insensitive' as const } },
+      { nameJa:     { contains: term, mode: 'insensitive' as const } },
+      { setName:    { contains: term, mode: 'insensitive' as const } },
+      { setCode:    { contains: term, mode: 'insensitive' as const } },
+      { cardNumber: { contains: term, mode: 'insensitive' as const } },
+    ]
+
     const where = {
       ...(q ? {
         OR: [
-          { name:       { contains: q, mode: 'insensitive' as const } },
-          { nameKo:     { contains: q, mode: 'insensitive' as const } },
-          { nameJa:     { contains: q, mode: 'insensitive' as const } },
-          { setName:    { contains: q, mode: 'insensitive' as const } },
-          { setCode:    { contains: q, mode: 'insensitive' as const } },
-          { cardNumber: { contains: q, mode: 'insensitive' as const } },
+          // 괄호 제거한 텍스트로 일반 검색 (cleanQ가 있을 때만)
+          ...(cleanQ ? buildTextOR(cleanQ) : []),
+          // [XXX] 안의 텍스트를 카드번호로 직접 검색
+          ...bracketNumbers.map(n => ({ cardNumber: { contains: n, mode: 'insensitive' as const } })),
+          // 원본 q 전체로도 검색 (괄호 없이 입력한 경우 대비)
+          ...(bracketNumbers.length === 0 ? [] : buildTextOR(q!)),
         ],
       } : {}),
       ...(tcgType   ? { tcgType }   : {}),

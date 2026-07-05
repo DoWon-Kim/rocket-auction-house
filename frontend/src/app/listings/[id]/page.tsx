@@ -690,10 +690,8 @@ export default function ListingDetailPage() {
           {/* Title */}
           <div>
             {listing.card.cardNumber && (
-              <span className="inline-block mb-2 px-2 py-[3px] rounded font-mono text-xs font-semibold bg-[#1a1208] border border-[#2e2318] text-[#7a6040] tracking-wider">
-                {listing.card.setCode
-                  ? `${listing.card.setCode}-${listing.card.cardNumber}`
-                  : listing.card.cardNumber}
+              <span className="inline-block mb-2 px-2 py-[3px] rounded font-mono text-xs font-semibold bg-[#1a1208] border border-[#d4a853]/20 text-[#d4a853]/70 tracking-wider">
+                [{listing.card.cardNumber}]
               </span>
             )}
             <div className="flex items-start gap-3 mb-0.5">

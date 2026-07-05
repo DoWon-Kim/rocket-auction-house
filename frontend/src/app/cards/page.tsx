@@ -196,7 +196,7 @@ function CardTile({ card, displayLang }: { card: Card; displayLang?: string }) {
           )}
           <p className="text-[11px] text-[#5a4830] truncate">{card.setName}</p>
           {card.cardNumber && (
-            <p className="text-[10px] text-[#4a3820] font-mono">{card.cardNumber}</p>
+            <p className="text-[10px] text-[#d4a853]/70 font-mono tracking-wide">[{card.cardNumber}]</p>
           )}
         </div>
       </div>
@@ -242,7 +242,10 @@ function SearchDropdown({
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-[#f5ead8] truncate">{card.nameKo ?? card.name}</p>
-                <p className="text-[11px] text-[#5a4830] truncate">{card.setName} · {card.rarity}</p>
+                <p className="text-[11px] text-[#5a4830] truncate">
+                  {card.cardNumber && <span className="text-[#d4a853]/70 font-mono mr-1">[{card.cardNumber}]</span>}
+                  {card.setName} · {card.rarity}
+                </p>
               </div>
               <span className="text-[10px] text-[#7a6040] shrink-0 bg-[#1a1208] border border-[#2e2318] px-1.5 py-0.5 rounded">
                 {TCG_LABELS[card.tcgType] ?? card.tcgType}

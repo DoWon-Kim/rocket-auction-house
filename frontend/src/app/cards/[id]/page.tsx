@@ -492,7 +492,7 @@ export default function CardDetailPage() {
             )}
             <InfoRow label="세트" value={card.setName} />
             <InfoRow label="세트 코드" value={card.setCode} />
-            <InfoRow label="카드 번호" value={card.cardNumber} />
+            <InfoRow label="카드 번호" value={card.cardNumber ? `[${card.cardNumber}]` : null} />
             <InfoRow label="레어도" value={
               <span className={`px-1.5 py-0.5 rounded border text-[10px] font-semibold ${rColor}`}>
                 {rarityLabel(card.rarity)}

@@ -179,7 +179,7 @@ export default function CollectionSetPage({ params }: { params: Promise<{ tcgTyp
                 <div className="px-1.5 py-1.5 bg-[#0e0a07]">
                   <p className="text-[10px] text-[#7a6040] truncate">{name}</p>
                   {card.cardNumber && (
-                    <p className="text-[9px] text-[#4a3820]">{card.cardNumber} · {card.rarity}</p>
+                    <p className="text-[9px] text-[#4a3820]"><span className="text-[#d4a853]/60 font-mono">[{card.cardNumber}]</span> · {card.rarity}</p>
                   )}
                   {!card.owned && (
                     <div className="mt-1 flex justify-center">
