@@ -43,6 +43,9 @@ if (process.env.JWT_SECRET === 'rocket-auction-house-super-secret-key-change-in-
 const app = express()
 const httpServer = createServer(app)
 
+// Railway / Vercel 등 리버스 프록시 뒤에서 실제 클라이언트 IP를 신뢰
+app.set('trust proxy', 1)
+
 const ALLOWED_ORIGINS = [
   process.env.FRONTEND_URL,
   'http://localhost:3000',
