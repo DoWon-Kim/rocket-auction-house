@@ -1,29 +1,7 @@
-import nodemailer from 'nodemailer'
+import { Resend } from 'resend'
 import { NotificationType } from '@prisma/client'
 
-// ── 트랜스포터 (SMTP 설정이 없으면 null) ─────────────────────────────────────
-
-function createTransporter() {
-  const host = process.env.SMTP_HOST?.trim()
-  const user = process.env.SMTP_USER?.trim()
-  const pass = process.env.SMTP_PASS?.trim()
-
-  if (!host || !user || !pass) return null
-
-  return nodemailer.createTransport({
-    host,
-    port: Number(process.env.SMTP_PORT ?? 587),
-    secure: Number(process.env.SMTP_PORT ?? 587) === 465,
-    auth: { user, pass },
-  })
-}
-
-let _transporter: ReturnType<typeof nodemailer.createTransport> | null = null
-
-function getTransporter() {
-  if (!_transporter) _transporter = createTransporter()
-  return _transporter
-}
+const resend = new Resend(process.env.RESEND_API_KEY)
 
 // ── HTML 템플릿 헬퍼 ──────────────────────────────────────────────────────────
 
@@ -204,12 +182,11 @@ export function buildEmailFromNotification(
 export async function sendEmail({
   to, subject, html,
 }: { to: string; subject: string; html: string }) {
-  const transporter = getTransporter()
-  if (!transporter) return  // SMTP 미설정 시 무음 처리
+  if (!process.env.RESEND_API_KEY) return
 
   try {
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM ?? 'Rocket Auction House <noreply@rocket-auction.com>',
+    await resend.emails.send({
+      from: process.env.EMAIL_FROM ?? 'Rocket Auction House <noreply@rocketcard.co.kr>',
       to,
       subject,
       html,
