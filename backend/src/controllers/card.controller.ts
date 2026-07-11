@@ -36,6 +36,7 @@ export async function searchCards(req: Request, res: Response) {
       lang === 'ja' ? { OR: [
         { externalId: { startsWith: 'tcgdex_ja_' } },
         { externalId: { startsWith: 'pkmncardgame_ja_' } },
+        { nameJa: { not: null } },
       ] } :
       lang === 'ko' ? { nameKo: { not: null } } :
       {}
@@ -116,6 +117,7 @@ export async function getCardMeta(req: Request, res: Response) {
       lang === 'ja' ? { OR: [
         { externalId: { startsWith: 'tcgdex_ja_' } },
         { externalId: { startsWith: 'pkmncardgame_ja_' } },
+        { nameJa: { not: null } },
       ] } :
       lang === 'ko' ? { nameKo: { not: null } } :
       {}

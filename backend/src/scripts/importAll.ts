@@ -356,20 +356,33 @@ async function importDigimon() {
 
 // ── 6. 원피스 (공식 Bandai 사이트 + 폴백) ────────────────────────────────────
 
-const OP_SITE = 'https://en.onepiece-cardgame.com'
-const OP_KNOWN_SETS = [
-  { id: 'OP-01', name: 'Romance Dawn',                           total: 121 },
-  { id: 'OP-02', name: 'Paramount War',                          total: 121 },
-  { id: 'OP-03', name: 'Pillars of Strength',                    total: 121 },
-  { id: 'OP-04', name: 'Kingdoms of Intrigue',                   total: 122 },
-  { id: 'OP-05', name: 'Awakening of the New Era',               total: 120 },
-  { id: 'OP-06', name: 'Wings of the Captain',                   total: 120 },
-  { id: 'OP-07', name: 'Five Hundred Years in the Future',       total: 119 },
-  { id: 'OP-08', name: 'Two Legends',                            total: 120 },
-  { id: 'OP-09', name: 'Emperors in the New World',              total: 100 },
-  { id: 'OP-10', name: 'Royal Blood',                            total: 100 },
-  { id: 'EB-01', name: 'Memorial Collection',                    total: 61  },
-  { id: 'EB-02', name: 'Memorial Collection Vol.2',              total: 55  },
+const OP_SITE_EN = 'https://en.onepiece-cardgame.com'
+const OP_SITE_JA = 'https://www.onepiece-cardgame.com'
+const OP_SITE_KO = 'https://asia-en.onepiece-cardgame.com'
+
+interface OpSet {
+  id: string
+  name: string           // 영어명
+  nameJa?: string        // 일본어 세트명
+  nameKo?: string        // 한국어 세트명
+  total: number
+}
+
+const OP_KNOWN_SETS: OpSet[] = [
+  { id: 'OP-01', name: 'Romance Dawn',                           nameJa: 'ROMANCE DAWN',             nameKo: '로맨스 던',           total: 121 },
+  { id: 'OP-02', name: 'Paramount War',                          nameJa: 'PARAMOUNT WAR',            nameKo: '파라마운트 워',        total: 121 },
+  { id: 'OP-03', name: 'Pillars of Strength',                    nameJa: 'PILLARS OF STRENGTH',      nameKo: '필라스 오브 스트렝스', total: 121 },
+  { id: 'OP-04', name: 'Kingdoms of Intrigue',                   nameJa: 'KINGDOMS OF INTRIGUE',     nameKo: '킹덤스 오브 인트리그', total: 122 },
+  { id: 'OP-05', name: 'Awakening of the New Era',               nameJa: 'AWAKENING OF THE NEW ERA', nameKo: '어웨이크닝 오브 뉴 에라', total: 120 },
+  { id: 'OP-06', name: 'Wings of the Captain',                   nameJa: 'WINGS OF THE CAPTAIN',     nameKo: '윙스 오브 더 캡틴',   total: 120 },
+  { id: 'OP-07', name: 'Five Hundred Years in the Future',       nameJa: '500年後の未来',              nameKo: '500년 후의 미래',     total: 119 },
+  { id: 'OP-08', name: 'Two Legends',                            nameJa: 'TWO LEGENDS',              nameKo: '투 레전드',           total: 120 },
+  { id: 'OP-09', name: 'Emperors in the New World',              nameJa: '新たなる皇帝',               nameKo: '새로운 황제',         total: 100 },
+  { id: 'OP-10', name: 'Royal Blood',                            nameJa: 'ROYAL BLOOD',              nameKo: '로얄 블러드',         total: 100 },
+  { id: 'OP-11', name: 'Pillars of the Earth',                   nameJa: '大地の柱',                  nameKo: '대지의 기둥',         total: 100 },
+  { id: 'EB-01', name: 'Memorial Collection',                    nameJa: 'メモリアルコレクション',       nameKo: '메모리얼 컬렉션',     total: 61  },
+  { id: 'EB-02', name: 'Memorial Collection Vol.2',              nameJa: 'メモリアルコレクション Vol.2', nameKo: '메모리얼 컬렉션 Vol.2', total: 55 },
+  { id: 'EB-03', name: 'Heroines Edition',                       nameJa: 'ヒロインズエディション',       nameKo: '히로인즈 에디션',     total: 60  },
   { id: 'ST-01', name: 'Straw Hat Crew',                         total: 17  },
   { id: 'ST-02', name: 'Worst Generation',                       total: 17  },
   { id: 'ST-03', name: 'The Seven Warlords of the Sea',          total: 17  },
@@ -392,13 +405,14 @@ const OP_KNOWN_SETS = [
   { id: 'ST-20', name: 'Red Blue Sabo',                          total: 43  },
 ]
 
-function parseOpHtml(html: string, setId: string): OpCard[] {
+function parseOpHtml(html: string, setId: string, site: string): OpCard[] {
   const seen = new Set<string>()
+  const prefix = setId.replace('-', '')
   const imgRe = /\/images\/card\/([A-Z0-9-]+(?:_p\d+)?)\.(?:png|jpg|webp)/gi
   let m: RegExpExecArray | null
   while ((m = imgRe.exec(html)) !== null) {
     const num = m[1].toUpperCase()
-    if (!seen.has(num) && num.startsWith(setId.replace('-', ''))) seen.add(num)
+    if (!seen.has(num) && num.startsWith(prefix)) seen.add(num)
   }
   return [...seen].map(num => {
     const esc = num.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -408,65 +422,136 @@ function parseOpHtml(html: string, setId: string): OpCard[] {
       number: num,
       name: nameMt ? nameMt[1].trim() : num,
       rarity: rarityMt ? rarityMt[1].trim() : 'Unknown',
-      imageUrl: `${OP_SITE}/images/card/${num}.png`,
+      imageUrl: `${site}/images/card/${num}.png`,
     }
   })
+}
+
+async function fetchOpCards(site: string, setId: string): Promise<OpCard[]> {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 20_000)
+  const body = new URLSearchParams({ 'series[]': setId })
+  const res = await fetch(`${site}/cardlist/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': 'Mozilla/5.0 (compatible; RocketAuctionHouse/1.0)',
+      Accept: 'text/html,application/xhtml+xml,*/*',
+      Referer: `${site}/cardlist/`,
+    },
+    body: body.toString(),
+    signal: ctrl.signal,
+  })
+  clearTimeout(timer)
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const html = await res.text()
+  const cards = parseOpHtml(html, setId, site)
+  if (cards.length === 0) throw new Error('파싱 결과 0건')
+  return cards
 }
 
 function opFallback(setId: string, total: number): OpCard[] {
   const prefix = setId.replace('-', '')
   return Array.from({ length: total }, (_, i) => {
     const num = `${prefix}-${String(i + 1).padStart(3, '0')}`
-    return { number: num, name: num, rarity: 'Unknown', imageUrl: `${OP_SITE}/images/card/${num}.png` }
+    return { number: num, name: num, rarity: 'Unknown', imageUrl: `${OP_SITE_EN}/images/card/${num}.png` }
   })
 }
 
 async function importOnePiece() {
   log('ONEPIECE', `▶ 원피스 ${OP_KNOWN_SETS.length}개 세트 가져오기 중...`)
-  let totalImported = 0, totalSkipped = 0
+  let totalImported = 0, totalSkipped = 0, totalJa = 0, totalKo = 0
 
   for (let i = 0; i < OP_KNOWN_SETS.length; i++) {
     const set = OP_KNOWN_SETS[i]
     let cards: OpCard[]
     let usedFallback = false
 
+    // 1단계: 영어 사이트에서 기본 데이터 가져오기
     try {
-      const ctrl = new AbortController()
-      const timer = setTimeout(() => ctrl.abort(), 20_000)
-      const body = new URLSearchParams({ 'series[]': set.id })
-      const res = await fetch(`${OP_SITE}/cardlist/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': 'Mozilla/5.0 (compatible; RocketAuctionHouse/1.0)',
-          Accept: 'text/html,application/xhtml+xml,*/*',
-          Referer: `${OP_SITE}/cardlist/`,
-        },
-        body: body.toString(),
-        signal: ctrl.signal,
-      })
-      clearTimeout(timer)
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const html = await res.text()
-      cards = parseOpHtml(html, set.id)
-      if (cards.length === 0) throw new Error('파싱 결과 0건')
+      cards = await fetchOpCards(OP_SITE_EN, set.id)
     } catch {
       cards = opFallback(set.id, set.total)
       usedFallback = true
     }
 
+    const setNameKo = set.nameKo ?? set.name
+    const setNameJa = set.nameJa ?? set.name
+
     const records = cards.map(c => ({
-      externalId: `onepiece_${c.number}`, name: c.name, tcgType: 'ONEPIECE' as const,
-      setName: set.name, setCode: set.id,
-      cardNumber: c.number, rarity: c.rarity, imageUrl: c.imageUrl,
+      externalId: `onepiece_${c.number}`,
+      name: c.name,
+      nameJa: null as string | null,
+      nameKo: null as string | null,
+      tcgType: 'ONEPIECE' as const,
+      setName: setNameKo,
+      setCode: set.id,
+      cardNumber: c.number,
+      rarity: c.rarity,
+      imageUrl: c.imageUrl,
     }))
     const result = await prisma.card.createMany({ data: records, skipDuplicates: true })
     totalImported += result.count
     totalSkipped += records.length - result.count
     log('ONEPIECE', `[${i + 1}/${OP_KNOWN_SETS.length}] ${set.name}: +${result.count}장${usedFallback ? ' (폴백)' : ''}`)
+
+    // 2단계: 일본어 이름 가져오기
+    try {
+      const jaCards = await fetchOpCards(OP_SITE_JA, set.id)
+      const jaMap = new Map(jaCards.map(c => [c.number, c.name]))
+      const dbCards = await prisma.card.findMany({
+        where: { tcgType: 'ONEPIECE', setCode: set.id, nameJa: null },
+        select: { id: true, cardNumber: true },
+      })
+      const toUpdateJa = dbCards.filter(c => c.cardNumber && jaMap.has(c.cardNumber))
+      if (toUpdateJa.length > 0) {
+        await prisma.$transaction(
+          toUpdateJa.map(c => prisma.card.update({
+            where: { id: c.id },
+            data: { nameJa: jaMap.get(c.cardNumber!) },
+          }))
+        )
+        totalJa += toUpdateJa.length
+        log('ONEPIECE', `  └ 일본어명 업데이트: ${toUpdateJa.length}장 (${setNameJa})`)
+      }
+    } catch {
+      log('ONEPIECE', `  └ 일본어 사이트 접근 실패, 스킵`)
+    }
+    await sleep(300)
+
+    // 3단계: 한국어 이름 가져오기 시도
+    try {
+      const koCards = await fetchOpCards(OP_SITE_KO, set.id)
+      const koMap = new Map(koCards.map(c => [c.number, c.name]))
+      const dbCards = await prisma.card.findMany({
+        where: { tcgType: 'ONEPIECE', setCode: set.id, nameKo: null },
+        select: { id: true, cardNumber: true },
+      })
+      const toUpdateKo = dbCards.filter(c => c.cardNumber && koMap.has(c.cardNumber))
+      if (toUpdateKo.length > 0) {
+        await prisma.$transaction(
+          toUpdateKo.map(c => prisma.card.update({
+            where: { id: c.id },
+            data: { nameKo: koMap.get(c.cardNumber!) },
+          }))
+        )
+        totalKo += toUpdateKo.length
+        log('ONEPIECE', `  └ 한국어명 업데이트: ${toUpdateKo.length}장`)
+      }
+    } catch {
+      // 한국어 사이트 없으면 일본어명을 nameKo로 복사 (raw SQL)
+      await prisma.$executeRaw`
+        UPDATE "Card"
+        SET "nameKo" = "nameJa"
+        WHERE "tcgType" = 'ONEPIECE'
+          AND "setCode" = ${set.id}
+          AND "nameKo" IS NULL
+          AND "nameJa" IS NOT NULL
+      `
+    }
     await sleep(500)
   }
-  log('ONEPIECE', `✅ 완료 — 임포트 ${totalImported}, 스킵 ${totalSkipped}`)
+  log('ONEPIECE', `✅ 완료 — 임포트 ${totalImported}, 스킵 ${totalSkipped}, 일본어 ${totalJa}건, 한국어 ${totalKo}건`)
 }
 
 // ── 메인 ─────────────────────────────────────────────────────────────────────
