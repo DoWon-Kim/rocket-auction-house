@@ -16,7 +16,7 @@ import {
   Share2, Eye,
 } from 'lucide-react'
 import Link from 'next/link'
-import { io, Socket } from 'socket.io-client'
+import type { Socket } from 'socket.io-client'
 import { RatingBadge } from '@/components/StarRating'
 import { PriceHistoryChart } from '@/components/PriceHistoryChart'
 import { WishlistButton } from '@/components/WishlistButton'
@@ -497,6 +497,8 @@ export default function ListingDetailPage() {
   const { remaining, urgent } = useCountdown(auctionEndsAt)
 
   useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { io } = require('socket.io-client') as typeof import('socket.io-client')
     const socket: Socket = io(process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') ?? 'http://localhost:4000', { transports: ['websocket'] })
     socket.emit('join:listing', id)
 

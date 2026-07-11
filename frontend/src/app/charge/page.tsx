@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { loadTossPayments } from '@tosspayments/tosspayments-sdk'
 import { useAuthStore } from '@/lib/store'
 import { Wallet, Zap, AlertCircle, CreditCard, ChevronRight } from 'lucide-react'
 
@@ -30,6 +29,7 @@ export default function ChargePage() {
     if (value > 5_000_000) { setError('1회 최대 충전 금액은 5,000,000P 입니다.'); return }
     setError(''); setLoading(true)
     try {
+      const { loadTossPayments } = await import('@tosspayments/tosspayments-sdk')
       const tossPayments = await loadTossPayments(CLIENT_KEY)
       const payment = tossPayments.payment({ customerKey: u.id })
       await payment.requestPayment({
