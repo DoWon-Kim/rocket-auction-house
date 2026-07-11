@@ -43,6 +43,6 @@ function fileFilter(_req: Express.Request, file: Express.Multer.File, cb: multer
 // memoryStorage를 사용해 buffer를 받아 magic bytes 검증 후 컨트롤러에서 S3/디스크로 저장
 export const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 20 * 1024 * 1024 },
   fileFilter,
 })
