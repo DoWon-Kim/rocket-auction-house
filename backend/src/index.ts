@@ -49,6 +49,8 @@ app.set('trust proxy', 1)
 const ALLOWED_ORIGINS = [
   process.env.FRONTEND_URL,
   'http://localhost:3000',
+  'https://rocketcard.co.kr',
+  'https://www.rocketcard.co.kr',
   /^https:\/\/.*\.vercel\.app$/,
 ].filter(Boolean) as (string | RegExp)[]
 
