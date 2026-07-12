@@ -1551,6 +1551,53 @@ export async function fixOnePieceNames(_req: AuthRequest, res: Response) {
   res.end()
 }
 
+// ── 원피스 전체 세트 임포트 SSE (GET 방식, Bandai 공식 사이트) ─────────────────
+
+export async function importAllOnePieceSets(_req: AuthRequest, res: Response) {
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.setHeader('X-Accel-Buffering', 'no')
+  res.flushHeaders()
+
+  const send = (data: object) => res.write(`data: ${JSON.stringify(data)}\n\n`)
+  let totalImported = 0
+  let totalSkipped  = 0
+
+  for (const set of OP_KNOWN_SETS) {
+    try {
+      send({ type: 'set-start', setId: set.id, setName: set.name })
+      let cards: ParsedOpCard[]
+      try {
+        cards = await fetchOpCardsFromSite(set.id)
+        if (cards.length === 0) throw new Error('파싱 0건')
+      } catch {
+        cards = generateOpFallbackCards(set.id, set.total)
+      }
+      const records = cards.map(c => ({
+        externalId: `onepiece_${c.number}`,
+        name:       c.name,
+        tcgType:    'ONEPIECE' as const,
+        setName:    set.name,
+        setCode:    set.id,
+        cardNumber: c.number,
+        rarity:     c.rarity,
+        imageUrl:   c.imageUrl,
+      }))
+      const result = await prisma.card.createMany({ data: records, skipDuplicates: true })
+      totalImported += result.count
+      totalSkipped  += records.length - result.count
+      send({ type: 'set-done', setId: set.id, setName: set.name, imported: result.count, total: records.length })
+      await sleep(300)
+    } catch (err) {
+      send({ type: 'set-error', setId: set.id, reason: String(err) })
+    }
+  }
+
+  send({ type: 'done', totalImported, totalSkipped })
+  res.end()
+}
+
 // ── 원피스 패러렐(망가) 카드 임포트 (OPTCG API _p1/p2 카드 생성) ──────────────
 
 export async function importOnePieceParallels(_req: AuthRequest, res: Response) {

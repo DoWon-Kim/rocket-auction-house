@@ -541,24 +541,18 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
     setOpDone(null)
 
     const endpoints: Record<string, string> = {
-      rarity:    '/admin/import/onepiece/enrich-rarity',
-      names:     '/admin/import/onepiece/fix-names',
+      rarity:             '/admin/import/onepiece/enrich-rarity',
+      names:              '/admin/import/onepiece/fix-names',
       parallels:          '/admin/import/onepiece/parallels',
       'parallels-bandai': '/admin/import/onepiece/parallels-bandai',
+      'import-all':       '/admin/import/onepiece/import-all',
       details:            '/admin/import/onepiece/enrich-details',
-      'import-all':       '/admin/import/all',
     }
 
     try {
       const apiBase = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api'
-      const isPost = type === 'import-all'
       const response = await fetch(`${apiBase}${endpoints[type]}`, {
-        method: isPost ? 'POST' : 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          ...(isPost ? { 'Content-Type': 'application/json' } : {}),
-        },
-        body: isPost ? JSON.stringify({ types: ['ONEPIECE'] }) : undefined,
+        headers: { Authorization: `Bearer ${token}` },
       })
       if (!response.ok || !response.body) {
         setOpLog([{ type: 'error', reason: `HTTP ${response.status}` }])
@@ -748,7 +742,7 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
                     {opDone.totalCreated !== undefined && ` — +${opDone.totalCreated as number}장 패러렐 카드 추가`}
                     {opDone.totalUpdated !== undefined && ` — ${opDone.totalUpdated as number}장 업데이트`}
                     {opDone.totalFixed   !== undefined && ` — ${opDone.totalFixed   as number}장 이름 업데이트`}
-                    {(opDone.totals as Record<string, {imported:number;skipped:number}>)?.ONEPIECE !== undefined && ` — ${(opDone.totals as Record<string,{imported:number;skipped:number}>).ONEPIECE.imported}장 임포트 / ${(opDone.totals as Record<string,{imported:number;skipped:number}>).ONEPIECE.skipped}장 스킵`}
+                    {opDone.totalImported !== undefined && ` — +${opDone.totalImported as number}장 임포트 / ${opDone.totalSkipped as number}장 스킵`}
                   </span>
                 </div>
               )}

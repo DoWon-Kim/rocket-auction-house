@@ -59,6 +59,7 @@ import {
   fixOnePieceNames,
   importOnePieceParallels,
   importOnePieceParallelsFromBandai,
+  importAllOnePieceSets,
   enrichOnePieceDetails,
   mergeLanguageDuplicates,
   importAll,
@@ -360,6 +361,7 @@ router.get('/admin/import/onepiece/enrich-rarity', authenticate, requireSuperAdm
 router.get('/admin/import/onepiece/fix-names',     authenticate, requireSuperAdmin, fixOnePieceNames)
 router.get('/admin/import/onepiece/parallels',        authenticate, requireSuperAdmin, importOnePieceParallels)
 router.get('/admin/import/onepiece/parallels-bandai', authenticate, requireSuperAdmin, importOnePieceParallelsFromBandai)
+router.get('/admin/import/onepiece/import-all',       authenticate, requireSuperAdmin, importAllOnePieceSets)
 router.get('/admin/import/onepiece/enrich-details',   authenticate, requireSuperAdmin, enrichOnePieceDetails)
 router.post('/admin/import/merge-duplicates', authenticate, requireSuperAdmin, mergeLanguageDuplicates)
 router.post('/admin/import/yugioh-all',    authenticate, requireSuperAdmin, importYugiohAll)
