@@ -16,6 +16,8 @@ export async function searchCards(req: Request, res: Response) {
     const q         = (req.query.q as string | undefined)?.trim()
     const tcgType   = parseTcgType(req.query.tcgType)
     const rarity    = (req.query.rarity as string | undefined)?.trim()
+    const rarities  = (req.query.rarities as string | undefined)
+      ?.split(',').map(r => r.trim()).filter(Boolean) ?? []
     const setName   = (req.query.setName as string | undefined)?.trim()
     const lang      = (req.query.lang as string | undefined)?.trim()
     const supertype = (req.query.supertype as string | undefined)?.trim()  // Pokémon / Trainer / Energy
@@ -62,7 +64,11 @@ export async function searchCards(req: Request, res: Response) {
         ],
       } : {}),
       ...(tcgType   ? { tcgType }   : {}),
-      ...(rarity    ? { rarity: { contains: rarity, mode: 'insensitive' as const } } : {}),
+      ...(rarities.length > 0
+        ? { OR: rarities.map(r => ({ rarity: { contains: r, mode: 'insensitive' as const } })) }
+        : rarity
+        ? { rarity: { contains: rarity, mode: 'insensitive' as const } }
+        : {}),
       ...(setName   ? { setName: { contains: setName, mode: 'insensitive' as const } } : {}),
       ...(supertype ? { supertype: { contains: supertype, mode: 'insensitive' as const } } : {}),
       ...(cardType  ? { cardTypes: { contains: cardType, mode: 'insensitive' as const } } : {}),
@@ -78,6 +84,8 @@ export async function searchCards(req: Request, res: Response) {
         ? [{ listings: { _count: 'desc' } }, { nameKo: { sort: 'asc', nulls: 'last' } }]
         : sort === 'hp_desc'
         ? [{ hp: { sort: 'desc', nulls: 'last' } }]
+        : sort === 'hp_asc'
+        ? [{ hp: { sort: 'asc', nulls: 'last' } }]
         : /* name (default) */
           [{ nameKo: { sort: 'asc', nulls: 'last' } }, { name: 'asc' }]
 

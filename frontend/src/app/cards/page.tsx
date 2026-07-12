@@ -56,6 +56,7 @@ const SORT_OPTIONS = [
   { value: 'newest',  label: '최신 등록순' },
   { value: 'popular', label: '리스팅 많은순' },
   { value: 'hp_desc', label: 'HP 높은순' },
+  { value: 'hp_asc',  label: 'HP 낮은순' },
 ]
 
 // 포켓몬 에너지 타입 (icu.gg 스타일)
@@ -116,13 +117,25 @@ function CardSkeleton() {
 
 // ─── 카드 타일 ────────────────────────────────────────────────────────────────
 
-function CardTile({ card, displayLang }: { card: Card; displayLang?: string }) {
+function CardTile({
+  card, displayLang, onHover,
+}: {
+  card: Card
+  displayLang?: string
+  onHover: (info: { card: Card; rect: DOMRect } | null) => void
+}) {
+  const tileRef = useRef<HTMLDivElement>(null)
   const displayName =
     displayLang === 'ja' ? (card.nameJa ?? card.name) :
     (card.nameKo ?? card.name)
   const rColor = rarityColorClass(card.rarity)
 
   return (
+    <div
+      ref={tileRef}
+      onMouseEnter={() => tileRef.current && onHover({ card, rect: tileRef.current.getBoundingClientRect() })}
+      onMouseLeave={() => onHover(null)}
+    >
     <Link
       href={`/cards/${card.id}`}
       className="group bg-[#1a1410] border border-[#2e2318] rounded-xl overflow-hidden hover:border-[#d4a853]/40 hover:shadow-[0_0_20px_rgba(212,168,83,0.08)] transition-all duration-200 flex flex-col"
@@ -201,6 +214,7 @@ function CardTile({ card, displayLang }: { card: Card; displayLang?: string }) {
         </div>
       </div>
     </Link>
+    </div>
   )
 }
 
@@ -266,60 +280,116 @@ function SearchDropdown({
 // ─── 필터 사이드바 ────────────────────────────────────────────────────────────
 
 function FilterSidebar({
-  tcgType, rarity, setName, onRarity, onSet, metaData, metaLoading,
+  tcgType, selectedRarities, setName, hpMin, hpMax,
+  onRarityToggle, onClearRarities, onSet, onHpChange,
+  metaData, metaLoading,
 }: {
   tcgType: string
-  rarity: string
+  selectedRarities: string[]
   setName: string
-  onRarity: (r: string) => void
+  hpMin: string
+  hpMax: string
+  onRarityToggle: (r: string) => void
+  onClearRarities: () => void
   onSet: (s: string) => void
+  onHpChange: (min: string, max: string) => void
   metaData: CardMeta | undefined
   metaLoading: boolean
 }) {
   const [setSearch, setSetSearch] = useState('')
   const [setOpen, setSetOpen] = useState(false)
+  const [localMin, setLocalMin] = useState(hpMin)
+  const [localMax, setLocalMax] = useState(hpMax)
+
+  useEffect(() => setLocalMin(hpMin), [hpMin])
+  useEffect(() => setLocalMax(hpMax), [hpMax])
 
   const filteredSets = metaData?.sets.filter(s =>
     s.name.toLowerCase().includes(setSearch.toLowerCase())
   ) ?? []
 
+  const showHpRange = tcgType === 'POKEMON' || (tcgType === '' && (metaData?.supertypes?.length ?? 0) > 0)
+
   return (
     <div className="space-y-5">
-      {/* 레어도 */}
+      {/* 레어도 — 다중 선택 체크박스 */}
       <div>
-        <p className="text-xs font-semibold text-[#7a6040] uppercase tracking-wider mb-3">레어도</p>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-semibold text-[#7a6040] uppercase tracking-wider">레어도</p>
+          {selectedRarities.length > 0 && (
+            <button onClick={onClearRarities} className="text-[10px] text-[#5a4830] hover:text-[#e0b878] transition-colors">
+              초기화
+            </button>
+          )}
+        </div>
         {metaLoading ? (
           <div className="space-y-1.5">
             {[1,2,3,4].map(i => <div key={i} className="h-7 bg-[#1a1208] rounded-lg animate-pulse" />)}
           </div>
         ) : (
-          <div className="space-y-1">
-            <button
-              onClick={() => onRarity('')}
-              className={`w-full text-left px-3 py-1.5 rounded-lg text-xs transition-colors ${
-                !rarity ? 'bg-[#2a1c08] text-[#e0b878]' : 'text-[#7a6040] hover:bg-[#1a1208] hover:text-[#9e8a6a]'
-              }`}
-            >
-              전체 레어도
-            </button>
-            {metaData?.rarities.slice(0, 15).map(r => (
-              <button
-                key={r.name}
-                onClick={() => onRarity(r.name === rarity ? '' : r.name)}
-                className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs transition-colors ${
-                  rarity === r.name ? 'bg-[#2a1c08] text-[#e0b878]' : 'text-[#7a6040] hover:bg-[#1a1208] hover:text-[#9e8a6a]'
-                }`}
-              >
-                <span className="flex items-center gap-2">
-                  <span className={`w-1.5 h-1.5 rounded-full ${rarityColorClass(r.name).split(' ')[0].replace('text-', 'bg-')}`} />
-                  {rarityLabel(r.name)}
-                </span>
-                <span className="text-[10px] text-[#4a3820]">{r.count.toLocaleString()}</span>
-              </button>
-            ))}
+          <div className="space-y-0.5 max-h-56 overflow-y-auto pr-0.5">
+            {metaData?.rarities.slice(0, 25).map(r => {
+              const checked = selectedRarities.includes(r.name)
+              return (
+                <label
+                  key={r.name}
+                  className={`flex items-center gap-2 cursor-pointer px-3 py-1.5 rounded-lg text-xs transition-colors select-none ${
+                    checked ? 'bg-[#2a1c08] text-[#e0b878]' : 'text-[#7a6040] hover:bg-[#1a1208] hover:text-[#9e8a6a]'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => onRarityToggle(r.name)}
+                    className="w-3 h-3 shrink-0 accent-[#d4a853]"
+                  />
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${rarityColorClass(r.name).split(' ')[0].replace('text-', 'bg-')}`} />
+                  <span className="flex-1 truncate">{rarityLabel(r.name)}</span>
+                  <span className="text-[10px] text-[#4a3820] shrink-0">{r.count.toLocaleString()}</span>
+                </label>
+              )
+            })}
           </div>
         )}
       </div>
+
+      {/* HP 범위 (포켓몬) */}
+      {showHpRange && (
+        <div>
+          <p className="text-xs font-semibold text-[#7a6040] uppercase tracking-wider mb-3">HP 범위</p>
+          <div className="flex gap-2 items-center">
+            <input
+              type="number"
+              min="0"
+              value={localMin}
+              onChange={e => setLocalMin(e.target.value)}
+              onBlur={() => onHpChange(localMin, localMax)}
+              onKeyDown={e => e.key === 'Enter' && onHpChange(localMin, localMax)}
+              placeholder="최소"
+              className="w-full bg-[#1a1208] border border-[#2e2318] rounded-lg px-2.5 py-1.5 text-xs text-[#f5ead8] placeholder:text-[#4a3820] focus:outline-none focus:border-[#d4a853]/30 transition-colors"
+            />
+            <span className="text-[#5a4830] text-xs shrink-0">~</span>
+            <input
+              type="number"
+              min="0"
+              value={localMax}
+              onChange={e => setLocalMax(e.target.value)}
+              onBlur={() => onHpChange(localMin, localMax)}
+              onKeyDown={e => e.key === 'Enter' && onHpChange(localMin, localMax)}
+              placeholder="최대"
+              className="w-full bg-[#1a1208] border border-[#2e2318] rounded-lg px-2.5 py-1.5 text-xs text-[#f5ead8] placeholder:text-[#4a3820] focus:outline-none focus:border-[#d4a853]/30 transition-colors"
+            />
+          </div>
+          {(hpMin || hpMax) && (
+            <button
+              onClick={() => { setLocalMin(''); setLocalMax(''); onHpChange('', '') }}
+              className="mt-1.5 flex items-center gap-1 text-[11px] text-[#7a6040] hover:text-[#9e8a6a] transition-colors"
+            >
+              <X size={10} /> HP 필터 해제
+            </button>
+          )}
+        </div>
+      )}
 
       {/* 세트 */}
       <div>
@@ -425,19 +495,24 @@ function CardsContent() {
   const searchParams = useSearchParams()
   const router       = useRouter()
 
-  const q         = searchParams.get('q')         ?? ''
-  const tcgType   = searchParams.get('tcgType')   ?? ''
-  const rarity    = searchParams.get('rarity')    ?? ''
-  const setName   = searchParams.get('setName')   ?? ''
-  const lang      = searchParams.get('lang')      ?? ''
-  const supertype = searchParams.get('supertype') ?? ''
-  const cardType  = searchParams.get('cardType')  ?? ''
-  const sort      = searchParams.get('sort')      ?? 'name'
-  const page      = Math.max(1, Number(searchParams.get('page') ?? '1'))
+  const q            = searchParams.get('q')         ?? ''
+  const tcgType      = searchParams.get('tcgType')   ?? ''
+  const raritiesParam= searchParams.get('rarities')  ?? ''
+  const setName      = searchParams.get('setName')   ?? ''
+  const lang         = searchParams.get('lang')      ?? ''
+  const supertype    = searchParams.get('supertype') ?? ''
+  const cardType     = searchParams.get('cardType')  ?? ''
+  const hpMin        = searchParams.get('hpMin')     ?? ''
+  const hpMax        = searchParams.get('hpMax')     ?? ''
+  const sort         = searchParams.get('sort')      ?? 'name'
+  const page         = Math.max(1, Number(searchParams.get('page') ?? '1'))
+
+  const selectedRarities = raritiesParam ? raritiesParam.split(',').filter(Boolean) : []
 
   const [searchInput, setSearchInput] = useState(q)
   const [showInstant, setShowInstant] = useState(false)
   const [showMobileFilter, setShowMobileFilter] = useState(false)
+  const [hoverInfo, setHoverInfo] = useState<{ card: Card; rect: DOMRect } | null>(null)
   const searchRef = useRef<HTMLDivElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -475,22 +550,40 @@ function CardsContent() {
     router.push(`/cards?${params.toString()}`)
   }
 
-  const hasFilter = !!(tcgType || rarity || setName || q || lang || supertype || cardType)
+  const hasFilter = !!(tcgType || raritiesParam || setName || q || lang || supertype || cardType || hpMin || hpMax)
 
   function clearAll() {
     router.push('/cards')
     setSearchInput('')
   }
 
+  function toggleRarity(r: string) {
+    const next = selectedRarities.includes(r)
+      ? selectedRarities.filter(x => x !== r)
+      : [...selectedRarities, r]
+    setParam('rarities', next.join(','))
+  }
+
+  function handleHpChange(min: string, max: string) {
+    const p = new URLSearchParams(searchParams.toString())
+    if (min) p.set('hpMin', min); else p.delete('hpMin')
+    if (max) p.set('hpMax', max); else p.delete('hpMax')
+    p.delete('page')
+    router.push(`/cards?${p.toString()}`)
+  }
+
   // 카드 목록 조회
   const { data, isLoading } = useQuery<CardsResponse>({
-    queryKey: ['cards', { q, tcgType, rarity, setName, lang, supertype, cardType, sort, page }],
+    queryKey: ['cards', { q, tcgType, raritiesParam, setName, lang, supertype, cardType, hpMin, hpMax, sort, page }],
     queryFn: () => api.get('/cards', { params: {
       q: q || undefined, tcgType: tcgType || undefined,
-      rarity: rarity || undefined, setName: setName || undefined,
+      rarities: raritiesParam || undefined,
+      setName: setName || undefined,
       lang: lang || undefined,
       supertype: supertype || undefined,
       cardType: cardType || undefined,
+      hpMin: hpMin || undefined,
+      hpMax: hpMax || undefined,
       sort, page, limit: 24,
     }}).then(r => r.data),
     staleTime: 30_000,
@@ -515,10 +608,14 @@ function CardsContent() {
   const FilterPanel = (
     <FilterSidebar
       tcgType={tcgType}
-      rarity={rarity}
+      selectedRarities={selectedRarities}
       setName={setName}
-      onRarity={r => setParam('rarity', r)}
+      hpMin={hpMin}
+      hpMax={hpMax}
+      onRarityToggle={toggleRarity}
+      onClearRarities={() => setParam('rarities', '')}
       onSet={s => setParam('setName', s)}
+      onHpChange={handleHpChange}
       metaData={metaData}
       metaLoading={metaLoading}
     />
@@ -733,10 +830,23 @@ function CardsContent() {
                   </span>
                 ) : null
               })()}
-              {rarity && (
+              {selectedRarities.length > 0 && (
+                selectedRarities.length === 1 ? (
+                  <span className="flex items-center gap-1 text-[11px] bg-[#2a1c08] border border-[#3d2a0c] text-[#e0b878] px-2.5 py-1 rounded-lg">
+                    {rarityLabel(selectedRarities[0])}
+                    <button onClick={() => setParam('rarities', '')}><X size={9} /></button>
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 text-[11px] bg-[#2a1c08] border border-[#3d2a0c] text-[#e0b878] px-2.5 py-1 rounded-lg">
+                    레어도 {selectedRarities.length}개 선택
+                    <button onClick={() => setParam('rarities', '')}><X size={9} /></button>
+                  </span>
+                )
+              )}
+              {(hpMin || hpMax) && (
                 <span className="flex items-center gap-1 text-[11px] bg-[#2a1c08] border border-[#3d2a0c] text-[#e0b878] px-2.5 py-1 rounded-lg">
-                  {rarityLabel(rarity)}
-                  <button onClick={() => setParam('rarity', '')}><X size={9} /></button>
+                  HP {hpMin || '0'}~{hpMax || '∞'}
+                  <button onClick={() => handleHpChange('', '')}><X size={9} /></button>
                 </span>
               )}
               {setName && (
@@ -795,9 +905,49 @@ function CardsContent() {
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
-              {cards.map(card => <CardTile key={card.id} card={card} displayLang={lang || undefined} />)}
+              {cards.map(card => (
+                <CardTile
+                  key={card.id}
+                  card={card}
+                  displayLang={lang || undefined}
+                  onHover={setHoverInfo}
+                />
+              ))}
             </div>
           )}
+
+          {/* 호버 프리뷰 — 데스크탑 xl+ 전용 */}
+          {hoverInfo && hoverInfo.card.imageUrl && (() => {
+            const r = hoverInfo.rect
+            const spaceRight = window.innerWidth - r.right
+            const left = spaceRight >= 208 ? r.right + 8 : r.left - 208
+            const top  = Math.min(r.top, window.innerHeight - 300)
+            return (
+              <div
+                className="fixed z-[9999] pointer-events-none hidden xl:block"
+                style={{ left: Math.max(8, left), top: Math.max(8, top) }}
+              >
+                <div className="relative w-48 rounded-xl overflow-hidden shadow-2xl border border-[#d4a853]/30 bg-[#0f0b08]" style={{ aspectRatio: '3/4' }}>
+                  <Image
+                    src={resolveImageSrc(hoverInfo.card.imageUrl)!}
+                    alt=""
+                    fill
+                    className="object-contain"
+                    sizes="192px"
+                  />
+                </div>
+                <div className="mt-1.5 px-1">
+                  <p className="text-xs font-semibold text-[#f5ead8] line-clamp-1">
+                    {hoverInfo.card.nameKo ?? hoverInfo.card.name}
+                  </p>
+                  <p className="text-[10px] text-[#7a6040] mt-0.5">
+                    {hoverInfo.card.setName}
+                    {hoverInfo.card.cardNumber && ` · ${hoverInfo.card.cardNumber}`}
+                  </p>
+                </div>
+              </div>
+            )
+          })()}
 
           {/* 페이지네이션 */}
           {totalPages > 1 && (
