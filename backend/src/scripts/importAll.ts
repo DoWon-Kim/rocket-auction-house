@@ -582,6 +582,112 @@ async function importOnePiece() {
   log('ONEPIECE', `✅ 완료 — 임포트 ${totalImported}, 스킵 ${totalSkipped}, 일본어 ${totalJa}건, 한국어 ${totalKo}건`)
 }
 
+// ── 원피스 레어도 보강 (optcgapi.com) ────────────────────────────────────────
+
+interface OptcgCard {
+  card_set_id: string
+  rarity: string
+  card_name: string
+}
+
+async function enrichOnePieceRarities() {
+  log('OP-RARITY', '▶ OPTCG API로 원피스 레어도 보강 시작...')
+
+  // 부스터팩: OP-01 ~ OP-15 (API 지원 범위)
+  const boosterSets = OP_KNOWN_SETS
+    .filter(s => s.id.startsWith('OP-'))
+    .map(s => s.id)
+    .filter(id => {
+      const num = parseInt(id.split('-')[1], 10)
+      return num <= 15
+    })
+
+  // 스타터덱: ST-01 ~ ST-30
+  const starterSets = OP_KNOWN_SETS
+    .filter(s => s.id.startsWith('ST-'))
+    .map(s => s.id)
+    .filter(id => {
+      const num = parseInt(id.split('-')[1], 10)
+      return num <= 30
+    })
+
+  let totalUpdated = 0
+
+  for (const setId of boosterSets) {
+    try {
+      const data = await fetchWithRetry<OptcgCard[]>(
+        `https://optcgapi.com/api/sets/${setId}/`,
+        { timeoutMs: 15_000, retries: 2, cacheTtlMs: SET_CACHE },
+      )
+      if (!Array.isArray(data) || data.length === 0) {
+        log('OP-RARITY', `  ${setId}: 데이터 없음, 스킵`)
+        continue
+      }
+      const rarityMap = new Map(data.map(c => [c.card_set_id.toUpperCase(), c.rarity]))
+
+      const dbCards = await prisma.card.findMany({
+        where: { tcgType: 'ONEPIECE', setCode: setId },
+        select: { id: true, cardNumber: true },
+      })
+      const toUpdate = dbCards.filter(c => c.cardNumber && rarityMap.has(c.cardNumber.toUpperCase()))
+      if (toUpdate.length > 0) {
+        const CHUNK = 100
+        for (let i = 0; i < toUpdate.length; i += CHUNK) {
+          await prisma.$transaction(
+            toUpdate.slice(i, i + CHUNK).map(c => prisma.card.update({
+              where: { id: c.id },
+              data: { rarity: rarityMap.get(c.cardNumber!.toUpperCase())! },
+            }))
+          )
+        }
+        totalUpdated += toUpdate.length
+        log('OP-RARITY', `  ${setId}: 레어도 업데이트 ${toUpdate.length}장`)
+      }
+      await sleep(300)
+    } catch (err) {
+      log('OP-RARITY', `  ${setId}: 오류 — ${err}`)
+    }
+  }
+
+  for (const setId of starterSets) {
+    try {
+      const data = await fetchWithRetry<OptcgCard[]>(
+        `https://optcgapi.com/api/decks/${setId}/`,
+        { timeoutMs: 15_000, retries: 2, cacheTtlMs: SET_CACHE },
+      )
+      if (!Array.isArray(data) || data.length === 0) {
+        log('OP-RARITY', `  ${setId}: 데이터 없음, 스킵`)
+        continue
+      }
+      const rarityMap = new Map(data.map(c => [c.card_set_id.toUpperCase(), c.rarity]))
+
+      const dbCards = await prisma.card.findMany({
+        where: { tcgType: 'ONEPIECE', setCode: setId },
+        select: { id: true, cardNumber: true },
+      })
+      const toUpdate = dbCards.filter(c => c.cardNumber && rarityMap.has(c.cardNumber.toUpperCase()))
+      if (toUpdate.length > 0) {
+        const CHUNK = 100
+        for (let i = 0; i < toUpdate.length; i += CHUNK) {
+          await prisma.$transaction(
+            toUpdate.slice(i, i + CHUNK).map(c => prisma.card.update({
+              where: { id: c.id },
+              data: { rarity: rarityMap.get(c.cardNumber!.toUpperCase())! },
+            }))
+          )
+        }
+        totalUpdated += toUpdate.length
+        log('OP-RARITY', `  ${setId}: 레어도 업데이트 ${toUpdate.length}장`)
+      }
+      await sleep(200)
+    } catch (err) {
+      log('OP-RARITY', `  ${setId}: 오류 — ${err}`)
+    }
+  }
+
+  log('OP-RARITY', `✅ 완료 — 총 ${totalUpdated}장 레어도 업데이트`)
+}
+
 // ── 메인 ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -621,6 +727,10 @@ async function main() {
 
   if (run('onepiece')) {
     await safeRun('ONEPIECE', importOnePiece)
+  }
+
+  if (run('onepiece-rarity') || run('op-rarity')) {
+    await safeRun('OP-RARITY', enrichOnePieceRarities)
   }
 
   const after = await prisma.card.count()

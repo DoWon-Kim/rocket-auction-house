@@ -836,7 +836,7 @@ const OP_SITE = 'https://en.onepiece-cardgame.com'
 
 // 알려진 세트 목록 (세트가 추가될 때 여기에 추가)
 export const OP_KNOWN_SETS = [
-  // 부스터 팩
+  // ── 부스터 팩 ───────────────────────────────────────────────────────────────
   { id: 'OP-01', name: 'Romance Dawn',                            total: 121, releaseDate: '2022-12-02' },
   { id: 'OP-02', name: 'Paramount War',                           total: 121, releaseDate: '2023-03-10' },
   { id: 'OP-03', name: 'Pillars of Strength',                     total: 121, releaseDate: '2023-06-30' },
@@ -847,10 +847,21 @@ export const OP_KNOWN_SETS = [
   { id: 'OP-08', name: 'Two Legends',                             total: 120, releaseDate: '2024-10-25' },
   { id: 'OP-09', name: 'Emperors in the New World',               total: 100, releaseDate: '2025-01-24' },
   { id: 'OP-10', name: 'Royal Blood',                             total: 100, releaseDate: '2025-04-25' },
-  // 이벤트 / 기념 부스터
+  { id: 'OP-11', name: 'Pillars of the Earth',                    total: 100, releaseDate: '2025-07-25' },
+  { id: 'OP-12', name: 'Legacy of the Master',                    total: 155, releaseDate: '2025-10-10' },
+  { id: 'OP-13', name: 'Carrying On His Will',                    total: 175, releaseDate: '2026-01-01' },
+  { id: 'OP-14', name: "The Azure Sea's Seven",                   total: 199, releaseDate: '2026-04-01' },
+  { id: 'OP-15', name: "Adventure on Kami's Island",              total: 180, releaseDate: '2026-06-01' },
+  { id: 'OP-16', name: 'The Time of Battle',                      total: 157, releaseDate: '2026-07-01' },
+  // ── 엑스트라 / 기념 부스터 ────────────────────────────────────────────────
   { id: 'EB-01', name: 'Memorial Collection',                     total: 61,  releaseDate: '2024-08-08' },
   { id: 'EB-02', name: 'Memorial Collection Vol.2',               total: 55,  releaseDate: '2025-04-25' },
-  // 스타터 덱
+  { id: 'EB-03', name: 'Heroines Edition',                        total: 60,  releaseDate: '2025-06-01' },
+  { id: 'EB-04', name: 'Egghead Crisis',                          total: 65,  releaseDate: '2026-03-01' },
+  // ── 프리미엄 부스터 ────────────────────────────────────────────────────────
+  { id: 'PRB-01', name: 'ONE PIECE CARD THE BEST',                total: 319, releaseDate: '2024-12-06' },
+  { id: 'PRB-02', name: 'ONE PIECE CARD THE BEST vol.2',          total: 179, releaseDate: '2026-06-01' },
+  // ── 스타터 덱 ──────────────────────────────────────────────────────────────
   { id: 'ST-01', name: 'Straw Hat Crew',                          total: 17,  releaseDate: '2022-12-02' },
   { id: 'ST-02', name: 'Worst Generation',                        total: 17,  releaseDate: '2022-12-02' },
   { id: 'ST-03', name: 'The Seven Warlords of the Sea',           total: 17,  releaseDate: '2022-12-02' },
@@ -871,6 +882,22 @@ export const OP_KNOWN_SETS = [
   { id: 'ST-18', name: 'Purple Blue Monkey D. Garp',              total: 43,  releaseDate: '2025-01-24' },
   { id: 'ST-19', name: 'Blue Black Monkey D. Luffy',              total: 43,  releaseDate: '2025-01-24' },
   { id: 'ST-20', name: 'Red Blue Sabo',                           total: 43,  releaseDate: '2025-04-25' },
+  { id: 'ST-21', name: 'EX Gear 5',                               total: 43,  releaseDate: '2025-03-14' },
+  { id: 'ST-22', name: 'EX Ace & Newgate',                        total: 43,  releaseDate: '2025-09-05' },
+  { id: 'ST-23', name: 'Red Shanks',                              total: 43,  releaseDate: '2025-06-06' },
+  { id: 'ST-24', name: 'Green Jewelry Bonney',                    total: 43,  releaseDate: '2025-06-06' },
+  { id: 'ST-25', name: 'Blue Buggy',                              total: 43,  releaseDate: '2025-06-06' },
+  { id: 'ST-26', name: 'Purple Black Monkey D. Luffy',            total: 43,  releaseDate: '2025-06-06' },
+  { id: 'ST-27', name: 'Black Marshall D. Teach',                 total: 43,  releaseDate: '2025-06-06' },
+  { id: 'ST-28', name: 'Green Yellow Yamato',                     total: 43,  releaseDate: '2025-06-06' },
+  { id: 'ST-29', name: 'Yellow Luffy (Egghead)',                  total: 43,  releaseDate: '2026-01-16' },
+  { id: 'ST-30', name: 'EX Red Green Ace & Luffy',                total: 43,  releaseDate: '2026-06-06' },
+  { id: 'ST-31', name: 'Red Starter Deck 2026',                   total: 50,  releaseDate: '2026-07-11' },
+  { id: 'ST-32', name: 'Green Starter Deck 2026',                 total: 50,  releaseDate: '2026-07-11' },
+  { id: 'ST-33', name: 'Blue Starter Deck 2026',                  total: 50,  releaseDate: '2026-07-11' },
+  { id: 'ST-34', name: 'Purple Starter Deck 2026',                total: 50,  releaseDate: '2026-07-11' },
+  { id: 'ST-35', name: 'Black Starter Deck 2026',                 total: 50,  releaseDate: '2026-07-11' },
+  { id: 'ST-36', name: 'Yellow Starter Deck 2026',                total: 50,  releaseDate: '2026-07-11' },
 ]
 
 interface ParsedOpCard { number: string; name: string; rarity: string; imageUrl: string | null }
@@ -1359,6 +1386,72 @@ export async function importAll(req: AuthRequest, res: Response) {
     clearInterval(heartbeat)
     res.end()
   }
+}
+
+// ── 원피스 레어도 보강 (optcgapi.com) ────────────────────────────────────────
+
+interface OptcgApiCard { card_set_id: string; rarity: string; card_name: string }
+
+export async function enrichOnePieceRarities(_req: AuthRequest, res: Response) {
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+
+  const send = (data: object) => res.write(`data: ${JSON.stringify(data)}\n\n`)
+  let totalUpdated = 0
+
+  const boosterSets = OP_KNOWN_SETS
+    .filter(s => s.id.startsWith('OP-'))
+    .filter(s => parseInt(s.id.split('-')[1], 10) <= 15)
+    .map(s => s.id)
+
+  const starterSets = OP_KNOWN_SETS
+    .filter(s => s.id.startsWith('ST-'))
+    .filter(s => parseInt(s.id.split('-')[1], 10) <= 30)
+    .map(s => s.id)
+
+  const processSets = async (sets: string[], urlFn: (id: string) => string) => {
+    for (const setId of sets) {
+      try {
+        const resp = await fetch(urlFn(setId), {
+          headers: { 'User-Agent': 'RocketAuctionHouse/1.0' },
+          signal: AbortSignal.timeout(12_000),
+        })
+        if (!resp.ok) { send({ setId, status: 'skip', reason: `HTTP ${resp.status}` }); continue }
+        const data = await resp.json() as OptcgApiCard[]
+        if (!Array.isArray(data) || data.length === 0) { send({ setId, status: 'skip', reason: '데이터 없음' }); continue }
+
+        const rarityMap = new Map(data.map(c => [c.card_set_id.toUpperCase(), c.rarity]))
+        const dbCards = await prisma.card.findMany({
+          where: { tcgType: 'ONEPIECE', setCode: setId },
+          select: { id: true, cardNumber: true },
+        })
+        const toUpdate = dbCards.filter(c => c.cardNumber && rarityMap.has(c.cardNumber.toUpperCase()))
+        if (toUpdate.length > 0) {
+          const CHUNK = 100
+          for (let i = 0; i < toUpdate.length; i += CHUNK) {
+            await prisma.$transaction(
+              toUpdate.slice(i, i + CHUNK).map(c => prisma.card.update({
+                where: { id: c.id },
+                data: { rarity: rarityMap.get(c.cardNumber!.toUpperCase())! },
+              }))
+            )
+          }
+          totalUpdated += toUpdate.length
+        }
+        send({ setId, status: 'ok', updated: toUpdate.length, total: dbCards.length })
+        await sleep(250)
+      } catch (err) {
+        send({ setId, status: 'error', reason: String(err) })
+      }
+    }
+  }
+
+  await processSets(boosterSets, id => `https://optcgapi.com/api/sets/${id}/`)
+  await processSets(starterSets, id => `https://optcgapi.com/api/decks/${id}/`)
+
+  send({ type: 'done', totalUpdated })
+  res.end()
 }
 
 // ── 언어 중복 카드 병합 ───────────────────────────────────────────────────────
