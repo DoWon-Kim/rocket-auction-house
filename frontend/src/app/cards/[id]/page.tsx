@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { api } from '@/lib/api'
-import { TCG_LABELS, CONDITION_LABELS, LISTING_TYPE_LABELS, rarityLabel } from '@/lib/utils'
+import { TCG_LABELS, CONDITION_LABELS, LISTING_TYPE_LABELS, rarityLabel, resolveImageSrc } from '@/lib/utils'
 import ListingCard from '@/components/ListingCard'
 import {
   ChevronLeft, Tag, TrendingUp, Package, Layers,
@@ -383,7 +383,7 @@ export default function CardDetailPage() {
           >
             {card.imageUrl && !imgError ? (
               <Image
-                src={card.imageUrl}
+                src={resolveImageSrc(card.imageUrl)!}
                 alt={displayName}
                 fill
                 className="object-contain"

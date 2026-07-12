@@ -115,6 +115,16 @@ export const RARITY_LABELS: Record<string, string> = {
   '알 수 없음': '알 수 없음',
 }
 
+const _API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api').replace(/\/api$/, '')
+
+export function resolveImageSrc(imageUrl: string | null | undefined): string | null {
+  if (!imageUrl) return null
+  if (imageUrl.includes('onepiece-cardgame.com')) {
+    return `${_API_BASE}/api/proxy/image?url=${encodeURIComponent(imageUrl)}`
+  }
+  return imageUrl
+}
+
 export function rarityLabel(rarity: string | null | undefined): string {
   if (!rarity) return '알 수 없음'
   return RARITY_LABELS[rarity] ?? rarity

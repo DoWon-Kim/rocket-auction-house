@@ -17,13 +17,13 @@ const nextConfig: NextConfig = {
   images: {
     ...(isDev && { dangerouslyAllowLocalIP: true }),
     remotePatterns: [
-      // 개발: 로컬 백엔드 업로드
+      // 개발: 로컬 백엔드 (업로드 + 이미지 프록시)
       ...(isDev
-        ? [{ protocol: 'http' as const, hostname: 'localhost', port: '4000', pathname: '/uploads/**' }]
+        ? [{ protocol: 'http' as const, hostname: 'localhost', port: '4000', pathname: '/**' }]
         : []),
-      // 프로덕션: 실제 백엔드 도메인 업로드 (NEXT_PUBLIC_API_URL 기반 자동 추출)
+      // 프로덕션: 실제 백엔드 도메인 (업로드 + 이미지 프록시, NEXT_PUBLIC_API_URL 기반 자동 추출)
       ...(apiHostname
-        ? [{ protocol: 'https' as const, hostname: apiHostname, pathname: '/uploads/**' }]
+        ? [{ protocol: 'https' as const, hostname: apiHostname, pathname: '/**' }]
         : []),
       // 포켓몬 TCG API
       { protocol: 'https', hostname: 'images.pokemontcg.io' },

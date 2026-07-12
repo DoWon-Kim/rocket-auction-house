@@ -43,6 +43,7 @@ import {
 import { authenticate, optionalAuth, requireAdmin, requireSuperAdmin } from '../middleware/auth'
 import { requireSection } from '../middleware/permissions'
 import { searchCards, getCardMeta, getCardRank, getCard, getCardListings, getCardPriceHistory } from '../controllers/card.controller'
+import { proxyImage } from '../controllers/imageProxy.controller'
 import { upload } from '../middleware/upload'
 import { uploadImage } from '../controllers/upload.controller'
 import { confirmPayment } from '../controllers/payment.controller'
@@ -127,6 +128,9 @@ router.get('/cards', searchCards)
 router.get('/cards/:id', getCard)
 router.get('/cards/:id/price-history', getCardPriceHistory)
 router.get('/cards/:id/listings', getCardListings)
+
+// 이미지 프록시 (외부 이미지 핫링크 차단 우회)
+router.get('/proxy/image', proxyImage)
 
 // 이미지 업로드
 router.post('/upload', authenticate, uploadLimiter, upload.single('file'), uploadImage)

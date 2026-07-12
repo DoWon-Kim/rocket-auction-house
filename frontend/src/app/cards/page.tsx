@@ -6,7 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { api } from '@/lib/api'
-import { TCG_LABELS, rarityLabel } from '@/lib/utils'
+import { TCG_LABELS, rarityLabel, resolveImageSrc } from '@/lib/utils'
 import {
   Search, SlidersHorizontal, X, ChevronLeft, ChevronRight,
   LayoutGrid, Layers, TrendingUp, Sparkles, ChevronDown, Clock,
@@ -131,7 +131,7 @@ function CardTile({ card, displayLang }: { card: Card; displayLang?: string }) {
       <div className="relative aspect-[3/4] bg-[#0f0b08] overflow-hidden">
         {card.imageUrl ? (
           <Image
-            src={card.imageUrl}
+            src={resolveImageSrc(card.imageUrl)!}
             alt={displayName}
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
@@ -235,7 +235,7 @@ function SearchDropdown({
             >
               <div className="relative w-8 h-11 shrink-0 rounded overflow-hidden bg-[#0f0b08]">
                 {card.imageUrl ? (
-                  <Image src={card.imageUrl} alt={card.nameKo ?? card.name} fill className="object-contain" />
+                  <Image src={resolveImageSrc(card.imageUrl)!} alt={card.nameKo ?? card.name} fill className="object-contain" />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center text-xs">{TCG_ICONS[card.tcgType] ?? '🃏'}</div>
                 )}
@@ -406,7 +406,7 @@ function RecentlyViewedBar({ onNavigate }: { onNavigate: (id: string) => void })
           >
             <div className="relative w-16 h-[85px] rounded-xl overflow-hidden border border-[#2e2318] group-hover:border-[#d4a853]/40 transition-colors bg-[#1a1410]">
               {card.imageUrl ? (
-                <Image src={card.imageUrl} alt={card.nameKo ?? card.name} fill sizes="64px" className="object-contain" />
+                <Image src={resolveImageSrc(card.imageUrl)!} alt={card.nameKo ?? card.name} fill sizes="64px" className="object-contain" />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center text-2xl">🃏</div>
               )}
