@@ -593,23 +593,13 @@ interface OptcgCard {
 async function enrichOnePieceRarities() {
   log('OP-RARITY', '▶ OPTCG API로 원피스 레어도 보강 시작...')
 
-  // 부스터팩: OP-01 ~ OP-15 (API 지원 범위)
   const boosterSets = OP_KNOWN_SETS
     .filter(s => s.id.startsWith('OP-'))
     .map(s => s.id)
-    .filter(id => {
-      const num = parseInt(id.split('-')[1], 10)
-      return num <= 15
-    })
 
-  // 스타터덱: ST-01 ~ ST-30
   const starterSets = OP_KNOWN_SETS
     .filter(s => s.id.startsWith('ST-'))
     .map(s => s.id)
-    .filter(id => {
-      const num = parseInt(id.split('-')[1], 10)
-      return num <= 30
-    })
 
   // 엑스트라 부스터 (EB-04는 OP14-EB04 통합 세트로 접근)
   const extraSets = OP_KNOWN_SETS

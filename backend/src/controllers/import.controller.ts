@@ -1416,12 +1416,10 @@ export async function enrichOnePieceRarities(_req: AuthRequest, res: Response) {
 
   const boosterSets = OP_KNOWN_SETS
     .filter(s => s.id.startsWith('OP-'))
-    .filter(s => parseInt(s.id.split('-')[1], 10) <= 15)
     .map(s => s.id)
 
   const starterSets = OP_KNOWN_SETS
     .filter(s => s.id.startsWith('ST-'))
-    .filter(s => parseInt(s.id.split('-')[1], 10) <= 30)
     .map(s => s.id)
 
   const processSets = async (sets: string[], urlFn: (id: string) => string) => {
