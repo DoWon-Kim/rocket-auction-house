@@ -1639,6 +1639,102 @@ export async function importOnePieceParallels(_req: AuthRequest, res: Response) 
   res.end()
 }
 
+// ── 원피스 패러렐 카드 임포트 (Bandai 이미지 URL 프로브 방식) ──────────────────
+// OPTCG API에 없는 패러렐 카드를 공식 Bandai 이미지 서버에 HEAD 요청으로 탐색
+
+export async function importOnePieceParallelsFromBandai(_req: AuthRequest, res: Response) {
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+
+  const send = (data: object) => res.write(`data: ${JSON.stringify(data)}\n\n`)
+  const IMG_BASE = `${OP_SITE}/images/cardlist/card`
+  let totalCreated = 0
+
+  for (const set of OP_KNOWN_SETS) {
+    try {
+      // 이 세트의 기본 카드 목록 (패러렐 제외)
+      const baseCards = await prisma.card.findMany({
+        where: {
+          tcgType: 'ONEPIECE',
+          setCode: set.id,
+          NOT: { cardNumber: { contains: '_p' } },
+        },
+        select: {
+          cardNumber: true, name: true, nameKo: true, rarity: true,
+          retreatCost: true, hp: true, cardTypes: true,
+          supertype: true, subtypes: true, description: true, flavorText: true, artist: true,
+        },
+      })
+
+      if (baseCards.length === 0) continue
+
+      // 이미 DB에 있는 _p1 카드 번호 수집
+      const existingP1 = new Set(
+        (await prisma.card.findMany({
+          where: { tcgType: 'ONEPIECE', setCode: set.id, cardNumber: { contains: '_p1' } },
+          select: { cardNumber: true },
+        })).map(c => c.cardNumber!.toUpperCase())
+      )
+
+      const toProbe = baseCards.filter(c => !existingP1.has(`${c.cardNumber!.toUpperCase()}_P1`))
+      let found = 0
+
+      for (const card of toProbe) {
+        const p1Num = `${card.cardNumber!}_p1`
+        const imgUrl = `${IMG_BASE}/${p1Num}.png`
+
+        try {
+          const resp = await fetch(imgUrl, {
+            method: 'HEAD',
+            headers: { 'User-Agent': 'RocketAuctionHouse/1.0' },
+            signal: AbortSignal.timeout(5_000),
+          })
+
+          if (resp.ok) {
+            await prisma.card.upsert({
+              where: { externalId: `onepiece_${p1Num.toUpperCase()}` },
+              create: {
+                externalId: `onepiece_${p1Num.toUpperCase()}`,
+                name:        card.name,
+                nameKo:      card.nameKo,
+                tcgType:     'ONEPIECE',
+                setName:     set.name,
+                setCode:     set.id,
+                cardNumber:  p1Num,
+                rarity:      card.rarity,
+                imageUrl:    imgUrl,
+                // 기본 카드의 스탯 복사
+                retreatCost: card.retreatCost,
+                hp:          card.hp,
+                cardTypes:   card.cardTypes,
+                supertype:   card.supertype,
+                subtypes:    card.subtypes,
+                description: card.description,
+                flavorText:  card.flavorText,
+                artist:      card.artist,
+              },
+              update: { imageUrl: imgUrl },
+            })
+            found++
+            totalCreated++
+          }
+        } catch { /* 타임아웃 or 오류 = 이미지 없음 */ }
+
+        await sleep(120) // Bandai 서버 부하 방지
+      }
+
+      send({ setId: set.id, status: 'ok', found, probed: toProbe.length })
+      await sleep(300)
+    } catch (err) {
+      send({ setId: set.id, status: 'error', reason: String(err) })
+    }
+  }
+
+  send({ type: 'done', totalCreated })
+  res.end()
+}
+
 // ── 원피스 카드 게임 스탯 보강 (cost/power/color/attribute/type/effect) ─────────
 
 export async function enrichOnePieceDetails(_req: AuthRequest, res: Response) {

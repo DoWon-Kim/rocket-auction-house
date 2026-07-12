@@ -58,6 +58,7 @@ import {
   enrichOnePieceRarities,
   fixOnePieceNames,
   importOnePieceParallels,
+  importOnePieceParallelsFromBandai,
   enrichOnePieceDetails,
   mergeLanguageDuplicates,
   importAll,
@@ -357,8 +358,9 @@ router.get('/admin/import/onepiece/sets',          authenticate, requireSuperAdm
 router.post('/admin/import/onepiece',              authenticate, requireSuperAdmin, importOnePiece)
 router.get('/admin/import/onepiece/enrich-rarity', authenticate, requireSuperAdmin, enrichOnePieceRarities)
 router.get('/admin/import/onepiece/fix-names',     authenticate, requireSuperAdmin, fixOnePieceNames)
-router.get('/admin/import/onepiece/parallels',     authenticate, requireSuperAdmin, importOnePieceParallels)
-router.get('/admin/import/onepiece/enrich-details', authenticate, requireSuperAdmin, enrichOnePieceDetails)
+router.get('/admin/import/onepiece/parallels',        authenticate, requireSuperAdmin, importOnePieceParallels)
+router.get('/admin/import/onepiece/parallels-bandai', authenticate, requireSuperAdmin, importOnePieceParallelsFromBandai)
+router.get('/admin/import/onepiece/enrich-details',   authenticate, requireSuperAdmin, enrichOnePieceDetails)
 router.post('/admin/import/merge-duplicates', authenticate, requireSuperAdmin, mergeLanguageDuplicates)
 router.post('/admin/import/yugioh-all',    authenticate, requireSuperAdmin, importYugiohAll)
 router.post('/admin/import/all',           authenticate, requireSuperAdmin, importAll)
