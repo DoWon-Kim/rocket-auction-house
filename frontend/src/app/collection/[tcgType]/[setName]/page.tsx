@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { ChevronLeft, Layers, CheckCircle2, Package } from 'lucide-react'
-import { TCG_LABELS } from '@/lib/utils'
+import { TCG_LABELS, resolveImageSrc } from '@/lib/utils'
 import { WishlistButton } from '@/components/WishlistButton'
 import { useState } from 'react'
 
@@ -152,7 +152,7 @@ export default function CollectionSetPage({ params }: { params: Promise<{ tcgTyp
                 <Link href={`/cards/${card.id}`} className="block aspect-[3/4] bg-[#120d08]">
                   {card.imageUrl ? (
                     <Image
-                      src={card.imageUrl} alt={name}
+                      src={resolveImageSrc(card.imageUrl)!} alt={name}
                       width={120} height={160}
                       className={`w-full h-full object-cover transition-all duration-200 ${card.owned ? '' : 'grayscale'}`}
                     />

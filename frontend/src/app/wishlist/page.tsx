@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Heart, Target, Trash2, Tag, TrendingDown, ExternalLink } from 'lucide-react'
-import { TCG_LABELS } from '@/lib/utils'
+import { TCG_LABELS, resolveImageSrc } from '@/lib/utils'
 import { WishlistTargetEditButton } from '@/components/WishlistButton'
 
 interface WishlistItem {
@@ -102,7 +102,7 @@ export default function WishlistPage() {
                   <div className="w-10 h-14 rounded-lg overflow-hidden bg-[#120d08] border border-[#2e2318]">
                     {item.card.imageUrl ? (
                       <Image
-                        src={item.card.imageUrl} alt={name}
+                        src={resolveImageSrc(item.card.imageUrl)!} alt={name}
                         width={40} height={56} className="object-cover w-full h-full"
                       />
                     ) : (

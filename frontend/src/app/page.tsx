@@ -6,7 +6,7 @@ import { Gavel, Tag, Handshake, Package, ChevronRight, ShieldCheck, Zap, Trendin
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import ListingCard from '@/components/ListingCard'
-import { TCG_LABELS } from '@/lib/utils'
+import { TCG_LABELS, resolveImageSrc } from '@/lib/utils'
 
 const FEATURES = [
   {
@@ -214,7 +214,7 @@ export default function Home() {
                   }`}>{idx + 1}</span>
                   {card.imageUrl
                     ? <div className="relative w-8 h-11 shrink-0 rounded overflow-hidden bg-[#0f0b08]">
-                        <Image src={card.imageUrl} alt={card.name ?? ''} fill className="object-contain" sizes="32px" />
+                        <Image src={resolveImageSrc(card.imageUrl)!} alt={card.name ?? ''} fill className="object-contain" sizes="32px" />
                       </div>
                     : <div className="w-8 h-11 shrink-0 rounded bg-[#1a1208] flex items-center justify-center text-xs">🃏</div>
                   }

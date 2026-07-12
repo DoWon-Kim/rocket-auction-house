@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import Image from 'next/image'
 import Link from 'next/link'
 import { api } from '@/lib/api'
-import { TCG_LABELS, rarityLabel } from '@/lib/utils'
+import { TCG_LABELS, rarityLabel, resolveImageSrc } from '@/lib/utils'
 import { TrendingUp, Tag, Crown, Zap, ChevronRight } from 'lucide-react'
 
 // ─── 타입 ─────────────────────────────────────────────────────────────────────
@@ -107,7 +107,7 @@ function RankRow({ item, mode }: { item: RankItem; mode: string }) {
       <div className="relative w-10 h-14 shrink-0 rounded overflow-hidden bg-[#0f0b08]">
         {item.card.imageUrl ? (
           <Image
-            src={item.card.imageUrl}
+            src={resolveImageSrc(item.card.imageUrl)!}
             alt={displayName}
             fill
             className="object-contain"

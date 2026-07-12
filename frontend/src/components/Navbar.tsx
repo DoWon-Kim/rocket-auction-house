@@ -12,6 +12,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { connectSocket, reconnectWithToken } from '@/lib/socket'
+import { resolveImageSrc } from '@/lib/utils'
 
 interface SiteMenu {
   key: string
@@ -174,7 +175,7 @@ export default function Navbar() {
                   >
                     {card.imageUrl ? (
                       <img
-                        src={card.imageUrl}
+                        src={resolveImageSrc(card.imageUrl) ?? ''}
                         alt={card.name}
                         className="w-7 h-10 object-contain rounded shrink-0"
                         onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}

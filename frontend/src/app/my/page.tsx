@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/lib/store'
-import { LISTING_TYPE_LABELS, CONDITION_LABELS, TCG_LABELS } from '@/lib/utils'
+import { LISTING_TYPE_LABELS, CONDITION_LABELS, TCG_LABELS, resolveImageSrc } from '@/lib/utils'
 import Badge from '@/components/ui/Badge'
 import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
@@ -1308,7 +1308,7 @@ function ShippingTab() {
                         <div key={si.id} className="flex items-center gap-3 py-1.5 border-b border-[#2e2318]/50 last:border-0">
                           <div className="relative w-8 h-10 shrink-0 rounded-lg overflow-hidden bg-[#2a1c0c]">
                             {si.inventoryItem.card.imageUrl
-                              ? <Image src={si.inventoryItem.card.imageUrl} alt={si.inventoryItem.card.name} fill className="object-cover" />
+                              ? <Image src={resolveImageSrc(si.inventoryItem.card.imageUrl)!} alt={si.inventoryItem.card.name} fill className="object-cover" />
                               : <div className="absolute inset-0 flex items-center justify-center text-xs">🃏</div>
                             }
                           </div>

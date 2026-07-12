@@ -6,7 +6,7 @@ import { api } from '@/lib/api'
 import ListingCard from '@/components/ListingCard'
 import SkeletonCard from '@/components/SkeletonCard'
 import SellForm from '@/components/SellForm'
-import { TCG_LABELS, CONDITION_LABELS } from '@/lib/utils'
+import { TCG_LABELS, CONDITION_LABELS, resolveImageSrc } from '@/lib/utils'
 import { Suspense, useState } from 'react'
 import {
   SlidersHorizontal, X, PlusCircle, LayoutGrid,
@@ -166,7 +166,7 @@ function MarketStatBar() {
                     <span className="text-[10px] font-bold text-[#4a3820] w-4 text-right shrink-0">#{idx + 1}</span>
                     {card.imageUrl
                       ? <div className="relative w-6 h-9 shrink-0 rounded overflow-hidden bg-[#0f0b08]">
-                          <Image src={card.imageUrl} alt={card.name ?? ''} fill className="object-contain" sizes="24px" />
+                          <Image src={resolveImageSrc(card.imageUrl)!} alt={card.name ?? ''} fill className="object-contain" sizes="24px" />
                         </div>
                       : <div className="w-6 h-9 shrink-0 rounded bg-[#1a1208] flex items-center justify-center text-[8px]">🃏</div>
                     }

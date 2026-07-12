@@ -6,7 +6,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import Image from 'next/image'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/lib/store'
-import { TCG_LABELS, CONDITION_LABELS, rarityLabel } from '@/lib/utils'
+import { TCG_LABELS, CONDITION_LABELS, rarityLabel, resolveImageSrc } from '@/lib/utils'
 import Badge from '@/components/ui/Badge'
 import { Search, Tag, Gavel, Handshake, Check, ChevronRight, Info, ImagePlus, X as XIcon, Loader2 } from 'lucide-react'
 
@@ -194,7 +194,7 @@ export default function SellForm({ onSuccess }: SellFormProps) {
             <div className="bg-[#0d1a2e] border border-[#3d2a0c]/60 rounded-xl p-4 flex items-center gap-4">
               <div className="relative w-12 h-16 shrink-0 rounded-lg overflow-hidden bg-[#1a1410]">
                 {selectedCard.imageUrl
-                  ? <Image src={selectedCard.imageUrl} alt={selectedCard.name} fill className="object-cover" />
+                  ? <Image src={resolveImageSrc(selectedCard.imageUrl)!} alt={selectedCard.name} fill className="object-cover" />
                   : <div className="absolute inset-0 flex items-center justify-center text-xl">🃏</div>}
               </div>
               <div className="flex-1 min-w-0">
@@ -214,7 +214,7 @@ export default function SellForm({ onSuccess }: SellFormProps) {
                 <button key={c.id} onClick={() => { setSelectedCard(c); setCardSearch(c.name) }}
                   className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-[#1a1208] transition-colors text-left ${i > 0 ? 'border-t border-[#2e2318]' : ''}`}>
                   <div className="relative w-9 h-12 shrink-0 rounded bg-[#1a1208] overflow-hidden">
-                    {c.imageUrl ? <Image src={c.imageUrl} alt={c.name} fill className="object-cover" /> : <div className="absolute inset-0 flex items-center justify-center text-sm">🃏</div>}
+                    {c.imageUrl ? <Image src={resolveImageSrc(c.imageUrl)!} alt={c.name} fill className="object-cover" /> : <div className="absolute inset-0 flex items-center justify-center text-sm">🃏</div>}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -381,7 +381,7 @@ export default function SellForm({ onSuccess }: SellFormProps) {
             <div className="p-5 flex items-center gap-4 border-b border-[#2e2318]">
               <div className="relative w-14 h-20 shrink-0 rounded-lg overflow-hidden bg-[#1a1208]">
                 {selectedCard.imageUrl
-                  ? <Image src={selectedCard.imageUrl} alt={selectedCard.name} fill className="object-cover" />
+                  ? <Image src={resolveImageSrc(selectedCard.imageUrl)!} alt={selectedCard.name} fill className="object-cover" />
                   : <div className="absolute inset-0 flex items-center justify-center text-2xl">🃏</div>}
               </div>
               <div>

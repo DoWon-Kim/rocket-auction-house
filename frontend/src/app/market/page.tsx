@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import Image from 'next/image'
 import Link from 'next/link'
 import { api } from '@/lib/api'
-import { TCG_LABELS, rarityLabel } from '@/lib/utils'
+import { TCG_LABELS, rarityLabel, resolveImageSrc } from '@/lib/utils'
 import {
   BarChart2, TrendingUp, TrendingDown, Zap, Clock,
   ShieldCheck, Tag, Gavel, Handshake, ChevronRight,
@@ -250,7 +250,7 @@ export default function MarketPage() {
                   </div>
                   <div className="relative w-10 h-14 shrink-0 rounded overflow-hidden bg-[#0f0b08]">
                     {card.imageUrl ? (
-                      <Image src={card.imageUrl} alt={card.name ?? ''} fill className="object-contain" sizes="40px" />
+                      <Image src={resolveImageSrc(card.imageUrl)!} alt={card.name ?? ''} fill className="object-contain" sizes="40px" />
                     ) : (
                       <div className="absolute inset-0 flex items-center justify-center text-sm">🃏</div>
                     )}

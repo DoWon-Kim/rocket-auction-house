@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/lib/store'
 import Badge from '@/components/ui/Badge'
-import { TCG_LABELS, CONDITION_LABELS, LISTING_TYPE_LABELS, rarityLabel } from '@/lib/utils'
+import { TCG_LABELS, CONDITION_LABELS, LISTING_TYPE_LABELS, rarityLabel, resolveImageSrc } from '@/lib/utils'
 import { format } from 'date-fns'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Image from 'next/image'
@@ -766,7 +766,7 @@ export default function ListingDetailPage() {
           {listing.imageUrls?.length > 0 && listing.card.imageUrl && (
             <div className="flex items-center gap-3 bg-[#1a1410] border border-[#2e2318] rounded-xl p-3">
               <div className="relative w-10 h-14 shrink-0 rounded-lg overflow-hidden border border-[#2e2318]">
-                <Image src={listing.card.imageUrl} alt={listing.card.name} fill className="object-cover" />
+                <Image src={resolveImageSrc(listing.card.imageUrl)!} alt={listing.card.name} fill className="object-cover" />
               </div>
               <p className="text-xs text-[#5a4830]">공식 카드 이미지</p>
             </div>
