@@ -146,6 +146,17 @@ function RetreatDots({ count }: { count: number }) {
   )
 }
 
+function opColorClass(color: string): string {
+  const c = color.toLowerCase()
+  if (c.includes('red'))    return 'text-red-400 border-red-700/30 bg-red-900/20'
+  if (c.includes('blue'))   return 'text-blue-400 border-blue-700/30 bg-blue-900/20'
+  if (c.includes('green'))  return 'text-emerald-400 border-emerald-700/30 bg-emerald-900/20'
+  if (c.includes('purple')) return 'text-purple-400 border-purple-700/30 bg-purple-900/20'
+  if (c.includes('black'))  return 'text-gray-300 border-gray-600/30 bg-gray-800/20'
+  if (c.includes('yellow')) return 'text-yellow-400 border-yellow-700/30 bg-yellow-900/20'
+  return 'text-[#8a7055] border-[#2e2318] bg-[#1a1208]'
+}
+
 function rarityColorClass(rarity: string): string {
   const r = rarity.toLowerCase()
   if (r.includes('hyper') || r.includes('starlight') || r.includes('quarter century'))
@@ -646,7 +657,77 @@ export default function CardDetailPage() {
             </div>
           )}
 
-          {card.description && (
+          {/* 원피스 카드 스탯 */}
+          {card.tcgType === 'ONEPIECE' && (card.retreatCost != null || card.hp != null || card.cardTypes || card.supertype || card.subtypes || card.description || card.flavorText) && (
+            <div className="bg-[#1a1410] border border-[#2e2318] rounded-xl overflow-hidden">
+              {/* 헤더: 카드 타입 + 속성 + 색 */}
+              {(card.supertype || card.cardTypes || card.subtypes) && (
+                <div className="flex items-center gap-2 flex-wrap px-4 py-3 border-b border-[#2e2318]">
+                  {card.supertype && (
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#1a1208] text-[#9e8a6a] border border-[#2e2318]">
+                      {card.supertype}
+                    </span>
+                  )}
+                  {card.cardTypes && card.cardTypes.split('/').map(col => (
+                    <span key={col} className={`text-[10px] font-bold px-2 py-0.5 rounded border ${opColorClass(col.trim())}`}>
+                      {col.trim()}
+                    </span>
+                  ))}
+                  {card.subtypes && (
+                    <span className="text-[11px] text-[#7a6040] ml-auto">
+                      속성: <span className="text-[#9e8a6a]">{card.subtypes}</span>
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* 스탯: Cost / Power / Counter */}
+              {(card.retreatCost != null || card.hp != null || card.artist) && (
+                <div className="flex divide-x divide-[#2e2318] border-b border-[#2e2318]">
+                  {card.retreatCost != null && (
+                    <div className="flex-1 px-4 py-3 text-center">
+                      <p className="text-[9px] text-[#4a3820] uppercase tracking-wider mb-1">Cost</p>
+                      <p className="text-2xl font-black text-[#d4a853]">{card.retreatCost}</p>
+                    </div>
+                  )}
+                  {card.hp != null && (
+                    <div className="flex-1 px-4 py-3 text-center">
+                      <p className="text-[9px] text-[#4a3820] uppercase tracking-wider mb-1">Power</p>
+                      <p className="text-2xl font-black text-[#f5ead8]">{card.hp.toLocaleString()}</p>
+                    </div>
+                  )}
+                  {card.artist && (
+                    <div className="flex-1 px-4 py-3 text-center">
+                      <p className="text-[9px] text-[#4a3820] uppercase tracking-wider mb-1">
+                        {card.artist.startsWith('life:') ? 'Life' : 'Counter'}
+                      </p>
+                      <p className="text-2xl font-black text-emerald-400">
+                        {card.artist.startsWith('life:') ? card.artist.slice(5) : card.artist}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 소속 / 타입 */}
+              {card.flavorText && (
+                <div className="px-4 py-2 border-b border-[#1a1208]">
+                  <span className="text-[10px] text-[#4a3820]">소속  </span>
+                  <span className="text-[11px] text-[#8a7055]">{card.flavorText}</span>
+                </div>
+              )}
+
+              {/* 효과 텍스트 */}
+              {card.description && (
+                <div className="px-4 py-3">
+                  <p className="text-[9px] text-[#4a3820] uppercase tracking-wider mb-2">Effect</p>
+                  <p className="text-xs text-[#8a7055] leading-relaxed whitespace-pre-line">{card.description}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {card.description && card.tcgType !== 'ONEPIECE' && (
             <div className="bg-[#1a1410] border border-[#2e2318] rounded-xl p-4">
               <p className="text-xs text-[#8a7055] leading-relaxed">{card.description}</p>
             </div>

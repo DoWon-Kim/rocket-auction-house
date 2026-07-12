@@ -1390,7 +1390,21 @@ export async function importAll(req: AuthRequest, res: Response) {
 
 // ── 원피스 레어도 보강 (optcgapi.com) ────────────────────────────────────────
 
-interface OptcgApiCard { card_set_id: string; rarity: string; card_name: string }
+interface OptcgApiCard {
+  card_set_id: string
+  rarity: string
+  card_name: string
+  // 게임 스탯 (enrichOnePieceDetails에서 사용)
+  cost?: number | null
+  power?: number | null
+  color?: string | null
+  attribute?: string | null
+  counter?: number | null
+  life?: number | null
+  type?: string | null        // 소속/타입 (The Straw Hat Crew 등)
+  effect?: string | null
+  card_type?: string | null   // CHARACTER, EVENT, STAGE, LEADER, DON!!
+}
 
 export async function enrichOnePieceRarities(_req: AuthRequest, res: Response) {
   res.setHeader('Content-Type', 'text/event-stream')
@@ -1624,6 +1638,97 @@ export async function importOnePieceParallels(_req: AuthRequest, res: Response) 
   }
 
   send({ type: 'done', totalCreated })
+  res.end()
+}
+
+// ── 원피스 카드 게임 스탯 보강 (cost/power/color/attribute/type/effect) ─────────
+
+export async function enrichOnePieceDetails(_req: AuthRequest, res: Response) {
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+
+  const send = (data: object) => res.write(`data: ${JSON.stringify(data)}\n\n`)
+  const OP_API_ID_MAP: Record<string, string> = { 'OP-14': 'OP14-EB04', 'OP-15': 'OP15-EB04', 'EB-04': 'OP14-EB04' }
+  let totalUpdated = 0
+
+  for (const set of OP_KNOWN_SETS) {
+    try {
+      const apiId = OP_API_ID_MAP[set.id] ?? set.id
+      const isStarter = set.id.startsWith('ST-')
+      const url = isStarter
+        ? `https://optcgapi.com/api/decks/${apiId}/`
+        : `https://optcgapi.com/api/sets/${apiId}/`
+
+      let data: OptcgApiCard[]
+      try {
+        const resp = await fetch(url, {
+          headers: { 'User-Agent': 'RocketAuctionHouse/1.0' },
+          signal: AbortSignal.timeout(12_000),
+        })
+        if (!resp.ok) { send({ setId: set.id, status: 'skip', reason: `HTTP ${resp.status}` }); continue }
+        data = await resp.json() as OptcgApiCard[]
+      } catch { send({ setId: set.id, status: 'skip', reason: 'fetch 실패' }); continue }
+
+      if (!Array.isArray(data) || data.length === 0) continue
+
+      // 하이브리드 세트(OP14-EB04)는 prefix로 필터링
+      const prefix = set.id.replace('-', '') + '-'
+      const filtered = (apiId !== set.id.replace('-', ''))
+        ? data.filter(c => c.card_set_id.toUpperCase().startsWith(prefix))
+        : data
+
+      // API 응답을 cardNumber 기준 Map으로
+      const statsMap = new Map(filtered.map(c => [c.card_set_id.toUpperCase(), c]))
+
+      const dbCards = await prisma.card.findMany({
+        where: { tcgType: 'ONEPIECE', setCode: set.id },
+        select: { id: true, cardNumber: true },
+      })
+
+      const toUpdate = dbCards.filter(c => c.cardNumber && statsMap.has(c.cardNumber.toUpperCase()))
+      if (toUpdate.length === 0) {
+        send({ setId: set.id, status: 'skip', reason: '매칭 없음', total: dbCards.length })
+        continue
+      }
+
+      const CHUNK = 50
+      let updated = 0
+      for (let i = 0; i < toUpdate.length; i += CHUNK) {
+        await prisma.$transaction(
+          toUpdate.slice(i, i + CHUNK).map(c => {
+            const s = statsMap.get(c.cardNumber!.toUpperCase())!
+            return prisma.card.update({
+              where: { id: c.id },
+              data: {
+                retreatCost: s.cost   ?? null,
+                hp:          s.power  ?? null,
+                cardTypes:   s.color  ?? null,
+                supertype:   s.card_type ?? null,
+                subtypes:    s.attribute ?? null,
+                description: s.effect ?? null,
+                flavorText:  s.type   ?? null,
+                // counter 값 (1000/2000/-) / life (리더 전용) → artist 필드 재활용
+                artist: s.counter != null
+                  ? String(s.counter)
+                  : s.life != null
+                  ? `life:${s.life}`
+                  : null,
+              },
+            })
+          })
+        )
+        updated += Math.min(CHUNK, toUpdate.length - i)
+      }
+      totalUpdated += updated
+      send({ setId: set.id, status: 'ok', updated, total: dbCards.length })
+      await sleep(250)
+    } catch (err) {
+      send({ setId: set.id, status: 'error', reason: String(err) })
+    }
+  }
+
+  send({ type: 'done', totalUpdated })
   res.end()
 }
 

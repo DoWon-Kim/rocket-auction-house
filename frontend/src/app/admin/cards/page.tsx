@@ -533,7 +533,7 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
     }
   }
 
-  async function handleOpSse(type: 'rarity' | 'names' | 'parallels') {
+  async function handleOpSse(type: 'rarity' | 'names' | 'parallels' | 'details') {
     if (opRunning) return
     setOpRunning(true)
     setOpType(type)
@@ -544,6 +544,7 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
       rarity:    '/admin/import/onepiece/enrich-rarity',
       names:     '/admin/import/onepiece/fix-names',
       parallels: '/admin/import/onepiece/parallels',
+      details:   '/admin/import/onepiece/enrich-details',
     }
 
     try {
@@ -686,6 +687,13 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
                     ? <div className="w-3 h-3 rounded-full border-2 border-[#2e2318] border-t-[#d4a853] animate-spin" />
                     : <Zap size={12} />}
                   패러렐(망가) 카드 임포트
+                </button>
+                <button onClick={() => handleOpSse('details')} disabled={opRunning}
+                  className="flex items-center gap-1.5 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] hover:text-[#e8d5b0] disabled:opacity-40 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors">
+                  {opRunning && opType === 'details'
+                    ? <div className="w-3 h-3 rounded-full border-2 border-[#2e2318] border-t-[#d4a853] animate-spin" />
+                    : <Download size={12} />}
+                  카드 스탯 보강 (cost/power/효과)
                 </button>
               </div>
 
