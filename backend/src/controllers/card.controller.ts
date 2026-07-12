@@ -24,6 +24,7 @@ export async function searchCards(req: Request, res: Response) {
     const cardType  = (req.query.cardType as string | undefined)?.trim()   // Fire / Water / Grass ...
     const hpMin     = req.query.hpMin ? Number(req.query.hpMin) : undefined
     const hpMax     = req.query.hpMax ? Number(req.query.hpMax) : undefined
+    const parallel  = (req.query.parallel as string | undefined) === 'true'
     const sort      = (req.query.sort as string | undefined) ?? 'name'
     const page      = Math.max(1, Number(req.query.page ?? 1))
     const limit     = Math.min(60, Math.max(1, Number(req.query.limit ?? 24)))
@@ -75,6 +76,15 @@ export async function searchCards(req: Request, res: Response) {
       ...(hpMin !== undefined ? { hp: { gte: hpMin } } : {}),
       ...(hpMax !== undefined ? { hp: { lte: hpMax } } : {}),
       ...langFilter,
+      ...(parallel ? {
+        AND: [{
+          OR: [
+            { cardNumber: { contains: '_p1' } },
+            { cardNumber: { contains: '_p2' } },
+            { cardNumber: { contains: '_p3' } },
+          ],
+        }],
+      } : {}),
     }
 
     const orderBy: object[] =

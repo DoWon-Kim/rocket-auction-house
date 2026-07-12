@@ -528,6 +528,7 @@ function CardsContent() {
   const cardType     = searchParams.get('cardType')  ?? ''
   const hpMin        = searchParams.get('hpMin')     ?? ''
   const hpMax        = searchParams.get('hpMax')     ?? ''
+  const parallel     = searchParams.get('parallel')  === 'true'
   const sort         = searchParams.get('sort')      ?? 'name'
   const page         = Math.max(1, Number(searchParams.get('page') ?? '1'))
 
@@ -576,7 +577,7 @@ function CardsContent() {
     router.push(`/cards?${params.toString()}`)
   }
 
-  const hasFilter = !!(tcgType || raritiesParam || setName || q || lang || supertype || cardType || hpMin || hpMax)
+  const hasFilter = !!(tcgType || raritiesParam || setName || q || lang || supertype || cardType || hpMin || hpMax || parallel)
 
   function clearAll() {
     router.push('/cards')
@@ -600,7 +601,7 @@ function CardsContent() {
 
   // 카드 목록 조회
   const { data, isLoading } = useQuery<CardsResponse>({
-    queryKey: ['cards', { q, tcgType, raritiesParam, setName, lang, supertype, cardType, hpMin, hpMax, sort, page }],
+    queryKey: ['cards', { q, tcgType, raritiesParam, setName, lang, supertype, cardType, hpMin, hpMax, parallel, sort, page }],
     queryFn: () => api.get('/cards', { params: {
       q: q || undefined, tcgType: tcgType || undefined,
       rarities: raritiesParam || undefined,
@@ -610,6 +611,7 @@ function CardsContent() {
       cardType: cardType || undefined,
       hpMin: hpMin || undefined,
       hpMax: hpMax || undefined,
+      parallel: parallel ? 'true' : undefined,
       sort, page, limit: 24,
     }}).then(r => r.data),
     staleTime: 30_000,
@@ -743,6 +745,23 @@ function CardsContent() {
           </button>
         ))}
       </div>
+
+      {/* ── 원피스 패러렐 카드 필터 ── */}
+      {(tcgType === 'ONEPIECE' || !tcgType) && (
+        <div className="flex gap-1.5 items-center flex-wrap">
+          <span className="text-[11px] text-[#5a4830] font-medium mr-1">특수</span>
+          <button
+            onClick={() => setParam('parallel', parallel ? '' : 'true')}
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+              parallel
+                ? 'bg-[#2a1c08] text-[#e0b878] border-[#3d2a0c]'
+                : 'bg-transparent text-[#7a6040] border-[#2e2318] hover:border-[#4a3520] hover:text-[#9e8a6a]'
+            }`}
+          >
+            ✨ 원피스 패러렐
+          </button>
+        </div>
+      )}
 
       {/* ── 포켓몬 카드 분류 필터 ── */}
       {(tcgType === 'POKEMON' || (!tcgType && (metaData?.supertypes?.length ?? 0) > 0)) && (
@@ -879,6 +898,12 @@ function CardsContent() {
                 <span className="flex items-center gap-1 text-[11px] bg-[#2a1c08] border border-[#3d2a0c] text-[#e0b878] px-2.5 py-1 rounded-lg max-w-[180px]">
                   <span className="truncate">{setName}</span>
                   <button onClick={() => setParam('setName', '')}><X size={9} /></button>
+                </span>
+              )}
+              {parallel && (
+                <span className="flex items-center gap-1 text-[11px] bg-[#2a1c08] border border-[#3d2a0c] text-[#e0b878] px-2.5 py-1 rounded-lg">
+                  ✨ 패러렐 카드
+                  <button onClick={() => setParam('parallel', '')}><X size={9} /></button>
                 </span>
               )}
               {hasFilter && (

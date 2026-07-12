@@ -364,6 +364,10 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
   const [enrichResult, setEnrichResult] = useState<EnrichResult | null>(null)
   const [mergeLoading, setMergeLoading] = useState(false)
   const [mergeResult, setMergeResult] = useState<MergeResult | null>(null)
+  const [opRunning, setOpRunning] = useState(false)
+  const [opType, setOpType] = useState<string | null>(null)
+  const [opLog, setOpLog] = useState<Array<Record<string, unknown>>>([])
+  const [opDone, setOpDone] = useState<Record<string, unknown> | null>(null)
   const prevKey = useRef<string>('')
 
   const cacheKey = `${tcg}_${pLang}_${mLang}`
@@ -529,6 +533,57 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
     }
   }
 
+  async function handleOpSse(type: 'rarity' | 'names' | 'parallels') {
+    if (opRunning) return
+    setOpRunning(true)
+    setOpType(type)
+    setOpLog([])
+    setOpDone(null)
+
+    const endpoints: Record<string, string> = {
+      rarity:    '/admin/import/onepiece/enrich-rarity',
+      names:     '/admin/import/onepiece/fix-names',
+      parallels: '/admin/import/onepiece/parallels',
+    }
+
+    try {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api'
+      const response = await fetch(`${apiBase}${endpoints[type]}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!response.ok || !response.body) {
+        setOpLog([{ type: 'error', reason: `HTTP ${response.status}` }])
+        return
+      }
+      const reader  = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buf = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buf += decoder.decode(value, { stream: true })
+        const lines = buf.split('\n')
+        buf = lines.pop() ?? ''
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          try {
+            const ev = JSON.parse(line.slice(6)) as Record<string, unknown>
+            if (ev.type === 'done') {
+              setOpDone(ev)
+              onImported()
+            } else {
+              setOpLog(p => [...p.slice(-40), ev])
+            }
+          } catch { /* ignore */ }
+        }
+      }
+    } catch (err) {
+      setOpLog(p => [...p, { type: 'error', reason: String(err) }])
+    } finally {
+      setOpRunning(false)
+    }
+  }
+
   const filteredSets = sets.filter(s => s.name.toLowerCase().includes(setSearch.toLowerCase()))
   const canImport = tcg === 'DIGIMON' ? true : !!selectedSet
 
@@ -603,6 +658,67 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
             <div className="space-y-1">
               <p className="text-xs text-[#8a7055]">원피스 카드 게임 (Bandai) · 공식 사이트에서 카드 정보를 가져옵니다.</p>
               <p className="text-xs text-[#5a4830]">OP-01~10, ST-01~20, EB-01~02 총 32개 세트 지원 · 파싱 실패 시 카드 번호 기반 기본 레코드 생성</p>
+            </div>
+          )}
+
+          {/* 원피스 데이터 보강 / 패러렐 임포트 */}
+          {tcg === 'ONEPIECE' && (
+            <div className="border-t border-[#2e2318] pt-4 space-y-3">
+              <p className="text-xs font-semibold text-[#7a6040] uppercase tracking-wider">데이터 보강 / 패러렐 임포트</p>
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => handleOpSse('rarity')} disabled={opRunning}
+                  className="flex items-center gap-1.5 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] hover:text-[#e8d5b0] disabled:opacity-40 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors">
+                  {opRunning && opType === 'rarity'
+                    ? <div className="w-3 h-3 rounded-full border-2 border-[#2e2318] border-t-[#d4a853] animate-spin" />
+                    : <Download size={12} />}
+                  레어도 보강
+                </button>
+                <button onClick={() => handleOpSse('names')} disabled={opRunning}
+                  className="flex items-center gap-1.5 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] hover:text-[#e8d5b0] disabled:opacity-40 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors">
+                  {opRunning && opType === 'names'
+                    ? <div className="w-3 h-3 rounded-full border-2 border-[#2e2318] border-t-[#d4a853] animate-spin" />
+                    : <Download size={12} />}
+                  카드명 보강
+                </button>
+                <button onClick={() => handleOpSse('parallels')} disabled={opRunning}
+                  className="flex items-center gap-1.5 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] hover:text-[#e8d5b0] disabled:opacity-40 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors">
+                  {opRunning && opType === 'parallels'
+                    ? <div className="w-3 h-3 rounded-full border-2 border-[#2e2318] border-t-[#d4a853] animate-spin" />
+                    : <Zap size={12} />}
+                  패러렐(망가) 카드 임포트
+                </button>
+              </div>
+
+              {opLog.length > 0 && (
+                <div className="bg-black/40 border border-[#2e2318] rounded-xl p-3 max-h-32 overflow-y-auto font-mono text-xs space-y-0.5">
+                  {opLog.map((ev, i) => (
+                    <p key={i} className={
+                      ev.status === 'error' || ev.type === 'error'
+                        ? 'text-red-400'
+                        : ev.status === 'ok'
+                        ? 'text-emerald-400'
+                        : 'text-[#8a7055]'
+                    }>
+                      {ev.setId ? `${ev.setId}: ` : ''}
+                      {ev.status === 'ok'
+                        ? `+${(ev.created ?? ev.updated ?? ev.fixed ?? 0) as number}건`
+                        : String(ev.reason ?? ev.status ?? '...')}
+                    </p>
+                  ))}
+                  {opRunning && <p className="text-[#f0a832] animate-pulse">⋯</p>}
+                </div>
+              )}
+
+              {opDone && !opRunning && (
+                <div className="bg-emerald-950/30 border border-emerald-800/40 rounded-xl px-4 py-2.5 text-sm">
+                  <span className="text-emerald-400 font-semibold">
+                    ✓ 완료
+                    {opDone.totalCreated !== undefined && ` — +${opDone.totalCreated as number}장 패러렐 카드 추가`}
+                    {opDone.totalUpdated !== undefined && ` — ${opDone.totalUpdated as number}장 레어도 업데이트`}
+                    {opDone.totalFixed   !== undefined && ` — ${opDone.totalFixed   as number}장 이름 업데이트`}
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
