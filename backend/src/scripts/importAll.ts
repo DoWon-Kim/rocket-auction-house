@@ -369,20 +369,32 @@ interface OpSet {
 }
 
 const OP_KNOWN_SETS: OpSet[] = [
-  { id: 'OP-01', name: 'Romance Dawn',                           nameJa: 'ROMANCE DAWN',             nameKo: '로맨스 던',           total: 121 },
-  { id: 'OP-02', name: 'Paramount War',                          nameJa: 'PARAMOUNT WAR',            nameKo: '파라마운트 워',        total: 121 },
-  { id: 'OP-03', name: 'Pillars of Strength',                    nameJa: 'PILLARS OF STRENGTH',      nameKo: '필라스 오브 스트렝스', total: 121 },
-  { id: 'OP-04', name: 'Kingdoms of Intrigue',                   nameJa: 'KINGDOMS OF INTRIGUE',     nameKo: '킹덤스 오브 인트리그', total: 122 },
-  { id: 'OP-05', name: 'Awakening of the New Era',               nameJa: 'AWAKENING OF THE NEW ERA', nameKo: '어웨이크닝 오브 뉴 에라', total: 120 },
-  { id: 'OP-06', name: 'Wings of the Captain',                   nameJa: 'WINGS OF THE CAPTAIN',     nameKo: '윙스 오브 더 캡틴',   total: 120 },
-  { id: 'OP-07', name: 'Five Hundred Years in the Future',       nameJa: '500年後の未来',              nameKo: '500년 후의 미래',     total: 119 },
-  { id: 'OP-08', name: 'Two Legends',                            nameJa: 'TWO LEGENDS',              nameKo: '투 레전드',           total: 120 },
-  { id: 'OP-09', name: 'Emperors in the New World',              nameJa: '新たなる皇帝',               nameKo: '새로운 황제',         total: 100 },
-  { id: 'OP-10', name: 'Royal Blood',                            nameJa: 'ROYAL BLOOD',              nameKo: '로얄 블러드',         total: 100 },
-  { id: 'OP-11', name: 'Pillars of the Earth',                   nameJa: '大地の柱',                  nameKo: '대지의 기둥',         total: 100 },
-  { id: 'EB-01', name: 'Memorial Collection',                    nameJa: 'メモリアルコレクション',       nameKo: '메모리얼 컬렉션',     total: 61  },
-  { id: 'EB-02', name: 'Memorial Collection Vol.2',              nameJa: 'メモリアルコレクション Vol.2', nameKo: '메모리얼 컬렉션 Vol.2', total: 55 },
-  { id: 'EB-03', name: 'Heroines Edition',                       nameJa: 'ヒロインズエディション',       nameKo: '히로인즈 에디션',     total: 60  },
+  // ── 부스터팩 ─────────────────────────────────────────────────────────────────
+  { id: 'OP-01', name: 'Romance Dawn',                           nameJa: 'ROMANCE DAWN',              nameKo: '로맨스 던',              total: 121 },
+  { id: 'OP-02', name: 'Paramount War',                          nameJa: 'PARAMOUNT WAR',             nameKo: '파라마운트 워',           total: 121 },
+  { id: 'OP-03', name: 'Pillars of Strength',                    nameJa: 'PILLARS OF STRENGTH',       nameKo: '필라스 오브 스트렝스',    total: 121 },
+  { id: 'OP-04', name: 'Kingdoms of Intrigue',                   nameJa: 'KINGDOMS OF INTRIGUE',      nameKo: '킹덤스 오브 인트리그',    total: 122 },
+  { id: 'OP-05', name: 'Awakening of the New Era',               nameJa: 'AWAKENING OF THE NEW ERA',  nameKo: '어웨이크닝 오브 뉴 에라', total: 120 },
+  { id: 'OP-06', name: 'Wings of the Captain',                   nameJa: 'WINGS OF THE CAPTAIN',      nameKo: '윙스 오브 더 캡틴',      total: 120 },
+  { id: 'OP-07', name: 'Five Hundred Years in the Future',       nameJa: '500年後の未来',               nameKo: '500년 후의 미래',         total: 119 },
+  { id: 'OP-08', name: 'Two Legends',                            nameJa: 'TWO LEGENDS',               nameKo: '투 레전드',              total: 120 },
+  { id: 'OP-09', name: 'Emperors in the New World',              nameJa: '新たなる皇帝',                nameKo: '새로운 황제',             total: 100 },
+  { id: 'OP-10', name: 'Royal Blood',                            nameJa: 'ROYAL BLOOD',               nameKo: '로얄 블러드',             total: 100 },
+  { id: 'OP-11', name: 'Pillars of the Earth',                   nameJa: '大地の柱',                   nameKo: '대지의 기둥',             total: 100 },
+  { id: 'OP-12', name: 'Legacy of the Master',                   nameJa: 'LEGACY OF THE MASTER',      nameKo: '레거시 오브 더 마스터',   total: 155 },
+  { id: 'OP-13', name: 'Carrying On His Will',                   nameJa: '受け継がれる意志',             nameKo: '계승되는 의지',           total: 175 },
+  { id: 'OP-14', name: "The Azure Sea's Seven",                  nameJa: '蒼海の七人',                 nameKo: '푸른 바다의 일곱 명',     total: 199 },
+  { id: 'OP-15', name: "Adventure on Kami's Island",             nameJa: '神の島の冒険',                nameKo: '신의 섬의 모험',          total: 180 },
+  { id: 'OP-16', name: 'The Time of Battle',                     nameJa: '決戦の刻',                   nameKo: '결전의 순간',             total: 157 },
+  // ── 엑스트라 부스터 ───────────────────────────────────────────────────────────
+  { id: 'EB-01', name: 'Memorial Collection',                    nameJa: 'メモリアルコレクション',        nameKo: '메모리얼 컬렉션',         total: 61  },
+  { id: 'EB-02', name: 'Memorial Collection Vol.2',              nameJa: 'メモリアルコレクション Vol.2',  nameKo: '메모리얼 컬렉션 Vol.2',   total: 55  },
+  { id: 'EB-03', name: 'Heroines Edition',                       nameJa: 'ヒロインズエディション',        nameKo: '히로인즈 에디션',         total: 60  },
+  { id: 'EB-04', name: 'Egghead Crisis',                         nameJa: 'エッグヘッドクライシス',        nameKo: '에그헤드 크라이시스',     total: 65  },
+  // ── 프리미엄 부스터 ───────────────────────────────────────────────────────────
+  { id: 'PRB-01', name: 'ONE PIECE CARD THE BEST',               nameJa: 'ONE PIECE CARD THE BEST',   nameKo: '원피스 카드 더 베스트',   total: 319 },
+  { id: 'PRB-02', name: 'ONE PIECE CARD THE BEST vol.2',         nameJa: 'ONE PIECE CARD THE BEST Vol.2', nameKo: '원피스 카드 더 베스트 Vol.2', total: 179 },
+  // ── 스타터덱 ─────────────────────────────────────────────────────────────────
   { id: 'ST-01', name: 'Straw Hat Crew',                         total: 17  },
   { id: 'ST-02', name: 'Worst Generation',                       total: 17  },
   { id: 'ST-03', name: 'The Seven Warlords of the Sea',          total: 17  },
@@ -403,12 +415,28 @@ const OP_KNOWN_SETS: OpSet[] = [
   { id: 'ST-18', name: 'Purple Blue Monkey D. Garp',             total: 43  },
   { id: 'ST-19', name: 'Blue Black Monkey D. Luffy',             total: 43  },
   { id: 'ST-20', name: 'Red Blue Sabo',                          total: 43  },
+  { id: 'ST-21', name: 'EX Gear 5',                              total: 43  },
+  { id: 'ST-22', name: 'EX Ace & Newgate',                       total: 43  },
+  { id: 'ST-23', name: 'Red Shanks',                             total: 43  },
+  { id: 'ST-24', name: 'Green Jewelry Bonney',                   total: 43  },
+  { id: 'ST-25', name: 'Blue Buggy',                             total: 43  },
+  { id: 'ST-26', name: 'Purple Black Monkey D. Luffy',           total: 43  },
+  { id: 'ST-27', name: 'Black Marshall D. Teach',                total: 43  },
+  { id: 'ST-28', name: 'Green Yellow Yamato',                    total: 43  },
+  { id: 'ST-29', name: 'Yellow Luffy (Egghead)',                 total: 43  },
+  { id: 'ST-30', name: 'EX Red Green Ace & Luffy',               total: 43  },
+  { id: 'ST-31', name: 'Red Starter Deck 2026',                  total: 50  },
+  { id: 'ST-32', name: 'Green Starter Deck 2026',                total: 50  },
+  { id: 'ST-33', name: 'Blue Starter Deck 2026',                 total: 50  },
+  { id: 'ST-34', name: 'Purple Starter Deck 2026',               total: 50  },
+  { id: 'ST-35', name: 'Black Starter Deck 2026',                total: 50  },
+  { id: 'ST-36', name: 'Yellow Starter Deck 2026',               total: 50  },
 ]
 
 function parseOpHtml(html: string, setId: string, site: string): OpCard[] {
   const seen = new Set<string>()
   const prefix = setId.replace('-', '')
-  const imgRe = /\/images\/card\/([A-Z0-9-]+(?:_p\d+)?)\.(?:png|jpg|webp)/gi
+  const imgRe = /\/images\/(?:cardlist\/)?card\/([A-Z0-9-]+(?:_p\d+)?)\.(?:png|jpg|webp)/gi
   let m: RegExpExecArray | null
   while ((m = imgRe.exec(html)) !== null) {
     const num = m[1].toUpperCase()
