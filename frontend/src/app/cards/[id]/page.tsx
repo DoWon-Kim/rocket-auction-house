@@ -11,11 +11,12 @@ import ListingCard from '@/components/ListingCard'
 import {
   ChevronLeft, Tag, TrendingUp, Package, Layers,
   ChevronLeft as Prev, ChevronRight as Next,
-  ShoppingBag, AlertCircle, BarChart2,
+  ShoppingBag, AlertCircle, BarChart2, CheckCircle2,
 } from 'lucide-react'
 import { PriceHistoryChart } from '@/components/PriceHistoryChart'
 import { WishlistButton } from '@/components/WishlistButton'
 import { useRecentlyViewed } from '@/hooks/useRecentlyViewed'
+import { useCollection } from '@/hooks/useCollection'
 
 // ─── 타입 ─────────────────────────────────────────────────────────────────────
 
@@ -289,6 +290,7 @@ export default function CardDetailPage() {
   const [listingPage, setListingPage] = useState(1)
   const [imgError, setImgError] = useState(false)
   const { addCard } = useRecentlyViewed()
+  const { isCollected, toggle: toggleCollection } = useCollection()
 
   const { data: card, isLoading } = useQuery<CardDetail>({
     queryKey: ['card', id],
@@ -298,6 +300,15 @@ export default function CardDetailPage() {
   useEffect(() => {
     if (card) addCard({ id: card.id, name: card.name, nameKo: card.nameKo, imageUrl: card.imageUrl ?? null, tcgType: card.tcgType, setName: card.setName })
   }, [card?.id])
+
+  const { data: sameSetData } = useQuery<{ cards: Array<{ id: string; name: string; nameKo: string | null; cardNumber: string | null; imageUrl: string | null; rarity: string }> }>({
+    queryKey: ['same-set', card?.setName, card?.tcgType, id],
+    queryFn: () => api.get('/cards', {
+      params: { setName: card!.setName, tcgType: card!.tcgType, limit: 18, sort: 'name' },
+    }).then(r => r.data),
+    enabled: !!card,
+    staleTime: 60_000,
+  })
 
   const { data: listingsData, isLoading: listingsLoading } = useQuery<ListingsResponse>({
     queryKey: ['card-listings', id, listingSort, listingType, listingPage],
@@ -458,8 +469,20 @@ export default function CardDetailPage() {
             </div>
 
             {/* 메인 카드명 (한국어 우선) */}
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-2">
               <h1 className="text-2xl font-bold text-[#f5ead8] leading-tight flex-1">{displayName}</h1>
+              <button
+                onClick={() => toggleCollection(card.id)}
+                title={isCollected(card.id) ? '보유 해제' : '보유 카드로 마킹'}
+                className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all mt-1 ${
+                  isCollected(card.id)
+                    ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
+                    : 'bg-[#1a1208] border-[#2e2318] text-[#5a4830] hover:border-emerald-700/40 hover:text-emerald-500'
+                }`}
+              >
+                <CheckCircle2 size={13} />
+                {isCollected(card.id) ? '보유 중' : '보유'}
+              </button>
               <WishlistButton cardId={card.id} cardName={displayName} />
             </div>
 
@@ -727,16 +750,56 @@ export default function CardDetailPage() {
         )}
       </div>
 
-      {/* ── 같은 세트 카드 보기 ── */}
-      <div className="flex justify-center pt-2">
-        <Link
-          href={`/cards?setName=${encodeURIComponent(card.setName)}&tcgType=${card.tcgType}`}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] rounded-xl text-sm text-[#7a6040] hover:text-[#e8d5b0] transition-colors"
-        >
-          <Layers size={14} />
-          같은 세트 카드 더 보기 — {card.setName}
-        </Link>
-      </div>
+      {/* ── 같은 세트 카드 ── */}
+      {sameSetData && sameSetData.cards.filter(c => c.id !== card.id).length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold text-[#f5ead8] flex items-center gap-2">
+              <Layers size={15} className="text-[#d4a853]" />
+              같은 세트 카드
+              <span className="text-xs font-normal text-[#5a4830]">— {card.setName}</span>
+            </h2>
+            <Link
+              href={`/cards?setName=${encodeURIComponent(card.setName)}&tcgType=${card.tcgType}`}
+              className="text-xs text-[#7a6040] hover:text-[#d4a853] transition-colors"
+            >
+              전체 보기 →
+            </Link>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+            {sameSetData.cards
+              .filter(c => c.id !== card.id)
+              .slice(0, 16)
+              .map(c => (
+                <Link
+                  key={c.id}
+                  href={`/cards/${c.id}`}
+                  className="shrink-0 group flex flex-col items-center gap-1 w-20"
+                >
+                  <div className="relative w-20 h-[106px] rounded-lg overflow-hidden border border-[#2e2318] group-hover:border-[#d4a853]/40 transition-colors bg-[#1a1410]">
+                    {c.imageUrl ? (
+                      <Image
+                        src={resolveImageSrc(c.imageUrl)!}
+                        alt={c.nameKo ?? c.name}
+                        fill
+                        sizes="80px"
+                        className="object-contain"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center text-xl text-[#2e2318]">🃏</div>
+                    )}
+                  </div>
+                  <p className="text-[9px] text-[#5a4830] group-hover:text-[#c9a860] line-clamp-2 text-center leading-tight w-full transition-colors">
+                    {c.nameKo ?? c.name}
+                  </p>
+                  {c.cardNumber && (
+                    <p className="text-[8px] text-[#4a3820] font-mono">{c.cardNumber}</p>
+                  )}
+                </Link>
+              ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

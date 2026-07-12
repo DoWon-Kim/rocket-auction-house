@@ -98,6 +98,12 @@ export async function searchCards(req: Request, res: Response) {
           cardNumber: true, rarity: true, imageUrl: true,
           supertype: true, subtypes: true, cardTypes: true, hp: true,
           _count: { select: { listings: true } },
+          listings: {
+            where: { status: 'ACTIVE', listingType: 'BUY_NOW', buyNowPrice: { not: null } },
+            select: { buyNowPrice: true },
+            orderBy: { buyNowPrice: 'asc' },
+            take: 1,
+          },
         },
         orderBy,
         skip,
@@ -106,7 +112,12 @@ export async function searchCards(req: Request, res: Response) {
       prisma.card.count({ where }),
     ])
 
-    res.json({ cards, total, page, totalPages: Math.ceil(total / limit), limit })
+    const formattedCards = cards.map(({ listings: cheapest, ...c }) => ({
+      ...c,
+      minPrice: cheapest[0]?.buyNowPrice ?? null,
+    }))
+
+    res.json({ cards: formattedCards, total, page, totalPages: Math.ceil(total / limit), limit })
   } catch (err) {
     console.error('[searchCards]', err)
     res.status(500).json({ message: '카드 검색 중 오류가 발생했습니다.' })

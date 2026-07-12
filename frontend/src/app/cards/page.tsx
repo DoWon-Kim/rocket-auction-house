@@ -9,9 +9,10 @@ import { api } from '@/lib/api'
 import { TCG_LABELS, rarityLabel, resolveImageSrc } from '@/lib/utils'
 import {
   Search, SlidersHorizontal, X, ChevronLeft, ChevronRight,
-  LayoutGrid, Layers, TrendingUp, Sparkles, ChevronDown, Clock,
+  LayoutGrid, Layers, TrendingUp, Sparkles, ChevronDown, Clock, CheckCircle2,
 } from 'lucide-react'
 import { useRecentlyViewed } from '@/hooks/useRecentlyViewed'
+import { useCollection } from '@/hooks/useCollection'
 
 // ─── 타입 ─────────────────────────────────────────────────────────────────────
 
@@ -30,6 +31,7 @@ interface Card {
   subtypes: string | null
   cardTypes: string | null
   hp: number | null
+  minPrice: number | null
   _count: { listings: number }
 }
 
@@ -118,11 +120,13 @@ function CardSkeleton() {
 // ─── 카드 타일 ────────────────────────────────────────────────────────────────
 
 function CardTile({
-  card, displayLang, onHover,
+  card, displayLang, onHover, isCollected, onToggleCollection,
 }: {
   card: Card
   displayLang?: string
   onHover: (info: { card: Card; rect: DOMRect } | null) => void
+  isCollected: boolean
+  onToggleCollection: () => void
 }) {
   const tileRef = useRef<HTMLDivElement>(null)
   const displayName =
@@ -155,8 +159,28 @@ function CardTile({
             {TCG_ICONS[card.tcgType] ?? '🃏'}
           </div>
         )}
+        {/* 보유 체크 버튼 */}
+        <button
+          onClick={e => { e.preventDefault(); e.stopPropagation(); onToggleCollection() }}
+          title={isCollected ? '보유 해제' : '보유 마킹'}
+          className={`absolute top-2 left-2 z-10 w-6 h-6 rounded-full flex items-center justify-center transition-all duration-150 ${
+            isCollected
+              ? 'bg-emerald-500 border border-emerald-400 text-white shadow-lg'
+              : 'bg-[#0f0b08]/70 border border-[#2e2318] text-[#4a3820] opacity-0 group-hover:opacity-100'
+          }`}
+        >
+          <CheckCircle2 size={14} />
+        </button>
+        {/* 최저가 배지 */}
+        {card.minPrice != null && (
+          <div className="absolute bottom-2 left-0 right-0 flex justify-center">
+            <div className="bg-[#0f0b08]/85 backdrop-blur-sm border border-[#d4a853]/40 text-[#d4a853] text-[10px] font-bold px-2 py-0.5 rounded-full">
+              최저 {card.minPrice.toLocaleString()}P
+            </div>
+          </div>
+        )}
         {/* 리스팅 수 배지 */}
-        {card._count.listings > 0 && (
+        {card._count.listings > 0 && card.minPrice == null && (
           <div className="absolute top-2 right-2 bg-[#0f0b08]/80 backdrop-blur-sm border border-[#d4a853]/30 text-[#d4a853] text-[10px] font-bold px-1.5 py-0.5 rounded-md">
             {card._count.listings}건
           </div>
@@ -508,6 +532,8 @@ function CardsContent() {
   const page         = Math.max(1, Number(searchParams.get('page') ?? '1'))
 
   const selectedRarities = raritiesParam ? raritiesParam.split(',').filter(Boolean) : []
+
+  const { isCollected, toggle: toggleCollection } = useCollection()
 
   const [searchInput, setSearchInput] = useState(q)
   const [showInstant, setShowInstant] = useState(false)
@@ -911,6 +937,8 @@ function CardsContent() {
                   card={card}
                   displayLang={lang || undefined}
                   onHover={setHoverInfo}
+                  isCollected={isCollected(card.id)}
+                  onToggleCollection={() => toggleCollection(card.id)}
                 />
               ))}
             </div>
