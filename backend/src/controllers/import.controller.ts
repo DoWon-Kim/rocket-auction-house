@@ -1447,8 +1447,16 @@ export async function enrichOnePieceRarities(_req: AuthRequest, res: Response) {
     }
   }
 
-  const OP_API_ID_MAP: Record<string, string> = { 'OP-14': 'OP14-EB04', 'OP-15': 'OP15-EB04' }
-  await processSets(boosterSets, id => `https://optcgapi.com/api/sets/${OP_API_ID_MAP[id] ?? id}/`)
+  const OP_API_ID_MAP: Record<string, string> = { 'OP-14': 'OP14-EB04', 'OP-15': 'OP15-EB04', 'EB-04': 'OP14-EB04' }
+
+  const extraSets = OP_KNOWN_SETS
+    .filter(s => s.id.startsWith('EB-'))
+    .map(s => s.id)
+
+  await processSets([...boosterSets, ...extraSets], id => {
+    const apiId = OP_API_ID_MAP[id] ?? id
+    return `https://optcgapi.com/api/sets/${apiId}/`
+  })
   await processSets(starterSets, id => `https://optcgapi.com/api/decks/${id}/`)
 
   send({ type: 'done', totalUpdated })
@@ -1464,7 +1472,7 @@ export async function fixOnePieceNames(_req: AuthRequest, res: Response) {
 
   const send = (data: object) => res.write(`data: ${JSON.stringify(data)}\n\n`)
 
-  const OP_API_ID_MAP: Record<string, string> = { 'OP-14': 'OP14-EB04', 'OP-15': 'OP15-EB04' }
+  const OP_API_ID_MAP: Record<string, string> = { 'OP-14': 'OP14-EB04', 'OP-15': 'OP15-EB04', 'EB-04': 'OP14-EB04' }
 
   const candidates = await prisma.card.findMany({
     where: { tcgType: 'ONEPIECE' },
@@ -1528,6 +1536,94 @@ export async function fixOnePieceNames(_req: AuthRequest, res: Response) {
   }
 
   send({ type: 'done', totalFixed })
+  res.end()
+}
+
+// ── 원피스 패러렐(망가) 카드 임포트 (OPTCG API _p1/p2 카드 생성) ──────────────
+
+export async function importOnePieceParallels(_req: AuthRequest, res: Response) {
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+
+  const send = (data: object) => res.write(`data: ${JSON.stringify(data)}\n\n`)
+
+  const OP_API_ID_MAP: Record<string, string> = {
+    'OP-14': 'OP14-EB04',
+    'OP-15': 'OP15-EB04',
+    'EB-04': 'OP14-EB04',
+  }
+
+  let totalCreated = 0
+
+  for (const set of OP_KNOWN_SETS) {
+    try {
+      const apiId = OP_API_ID_MAP[set.id] ?? set.id
+      const isStarter = set.id.startsWith('ST-')
+      const url = isStarter
+        ? `https://optcgapi.com/api/decks/${apiId}/`
+        : `https://optcgapi.com/api/sets/${apiId}/`
+
+      let data: OptcgApiCard[]
+      try {
+        const resp = await fetch(url, {
+          headers: { 'User-Agent': 'RocketAuctionHouse/1.0' },
+          signal: AbortSignal.timeout(12_000),
+        })
+        if (!resp.ok) continue
+        data = await resp.json() as OptcgApiCard[]
+      } catch {
+        continue
+      }
+      if (!Array.isArray(data) || data.length === 0) continue
+
+      // 이 세트의 카드 번호 접두사 (OP01-, EB04-, ST01- 등)
+      const prefix = set.id.replace('-', '') + '-'
+
+      const parallelCards = data.filter(c =>
+        /_p\d+$/i.test(c.card_set_id) && c.card_set_id.toUpperCase().startsWith(prefix)
+      )
+
+      if (parallelCards.length === 0) continue
+
+      const cardNums = parallelCards.map(c => c.card_set_id.toUpperCase())
+      const existing = new Set(
+        (await prisma.card.findMany({
+          where: { tcgType: 'ONEPIECE', cardNumber: { in: cardNums } },
+          select: { cardNumber: true },
+        })).map(c => c.cardNumber!.toUpperCase())
+      )
+
+      const toCreate = parallelCards.filter(c => !existing.has(c.card_set_id.toUpperCase()))
+      if (toCreate.length === 0) {
+        send({ setId: set.id, status: 'skip', reason: '이미 존재', count: parallelCards.length })
+        continue
+      }
+
+      const records = toCreate.map(c => {
+        const num = c.card_set_id.toUpperCase()
+        return {
+          externalId: `onepiece_${num}`,
+          name: c.card_name || num,
+          tcgType: 'ONEPIECE' as const,
+          setName: set.name,
+          setCode: set.id,
+          cardNumber: num,
+          rarity: c.rarity,
+          imageUrl: `${OP_SITE}/images/card/${num}.png`,
+        }
+      })
+
+      const result = await prisma.card.createMany({ data: records, skipDuplicates: true })
+      totalCreated += result.count
+      send({ setId: set.id, status: 'ok', created: result.count, total: parallelCards.length })
+      await sleep(250)
+    } catch (err) {
+      send({ setId: set.id, status: 'error', reason: String(err) })
+    }
+  }
+
+  send({ type: 'done', totalCreated })
   res.end()
 }
 

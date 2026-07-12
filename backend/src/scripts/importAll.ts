@@ -611,17 +611,25 @@ async function enrichOnePieceRarities() {
       return num <= 30
     })
 
-  // OPTCG API는 OP-14/OP-15를 하이브리드 세트 코드로 사용
+  // 엑스트라 부스터 (EB-04는 OP14-EB04 통합 세트로 접근)
+  const extraSets = OP_KNOWN_SETS
+    .filter(s => s.id.startsWith('EB-'))
+    .map(s => s.id)
+
+  // OPTCG API는 OP-14/OP-15/EB-04를 하이브리드 세트 코드로 사용
   const OP_API_ID_MAP: Record<string, string> = {
     'OP-14': 'OP14-EB04',
     'OP-15': 'OP15-EB04',
+    'EB-04': 'OP14-EB04',
   }
 
   let totalUpdated = 0
 
-  for (const setId of boosterSets) {
+  for (const setId of [...boosterSets, ...extraSets]) {
     try {
       const apiId = OP_API_ID_MAP[setId] ?? setId
+      // EB-04 등 엑스트라 부스터는 혼합 세트(OP14-EB04)에서 이 세트의 카드만 필터
+      const prefix = setId.replace('-', '') + '-'
       const data = await fetchWithRetry<OptcgCard[]>(
         `https://optcgapi.com/api/sets/${apiId}/`,
         { timeoutMs: 15_000, retries: 2, cacheTtlMs: SET_CACHE },
@@ -630,7 +638,11 @@ async function enrichOnePieceRarities() {
         log('OP-RARITY', `  ${setId}: 데이터 없음, 스킵`)
         continue
       }
-      const rarityMap = new Map(data.map(c => [c.card_set_id.toUpperCase(), c.rarity]))
+      // 혼합 세트(OP14-EB04)에서 이 세트에 해당하는 카드만 필터
+      const relevant = apiId !== setId
+        ? data.filter(c => c.card_set_id.toUpperCase().startsWith(prefix))
+        : data
+      const rarityMap = new Map(relevant.map(c => [c.card_set_id.toUpperCase(), c.rarity]))
 
       const dbCards = await prisma.card.findMany({
         where: { tcgType: 'ONEPIECE', setCode: setId },
@@ -703,6 +715,7 @@ async function fixOnePieceNames() {
   const OP_API_ID_MAP: Record<string, string> = {
     'OP-14': 'OP14-EB04',
     'OP-15': 'OP15-EB04',
+    'EB-04': 'OP14-EB04',
   }
 
   // name === cardNumber 패턴인 카드 (폴백으로 생성된 카드)
@@ -773,6 +786,88 @@ async function fixOnePieceNames() {
   log('OP-NAMES', `✅ 완료 — 총 ${totalFixed}장 이름 업데이트`)
 }
 
+// ── 원피스 패러렐(망가) 카드 임포트 (OPTCG API _p1/p2 카드 생성) ──────────────
+
+async function importOnePieceParallels() {
+  log('OP-PARALLEL', '▶ 원피스 패러렐(망가) 카드 임포트 시작...')
+
+  const OP_API_ID_MAP: Record<string, string> = {
+    'OP-14': 'OP14-EB04',
+    'OP-15': 'OP15-EB04',
+    'EB-04': 'OP14-EB04',
+  }
+
+  let totalCreated = 0
+
+  for (const set of OP_KNOWN_SETS) {
+    try {
+      const apiId = OP_API_ID_MAP[set.id] ?? set.id
+      const isStarter = set.id.startsWith('ST-')
+      const url = isStarter
+        ? `https://optcgapi.com/api/decks/${apiId}/`
+        : `https://optcgapi.com/api/sets/${apiId}/`
+
+      let data: OptcgCard[]
+      try {
+        data = await fetchWithRetry<OptcgCard[]>(url, {
+          timeoutMs: 15_000, retries: 1, cacheTtlMs: SET_CACHE,
+        })
+      } catch {
+        continue
+      }
+      if (!Array.isArray(data) || data.length === 0) continue
+
+      // 이 세트의 카드 번호 접두사 (OP01-, EB04-, ST01- 등)
+      const prefix = set.id.replace('-', '') + '-'
+
+      // _p1/_p2 등 접미사가 있고, 이 세트에 해당하는 카드만 필터
+      const parallelCards = data.filter(c =>
+        /_p\d+$/i.test(c.card_set_id) && c.card_set_id.toUpperCase().startsWith(prefix)
+      )
+
+      if (parallelCards.length === 0) continue
+
+      const cardNums = parallelCards.map(c => c.card_set_id.toUpperCase())
+      const existing = new Set(
+        (await prisma.card.findMany({
+          where: { tcgType: 'ONEPIECE', cardNumber: { in: cardNums } },
+          select: { cardNumber: true },
+        })).map(c => c.cardNumber!.toUpperCase())
+      )
+
+      const toCreate = parallelCards.filter(c => !existing.has(c.card_set_id.toUpperCase()))
+      if (toCreate.length === 0) {
+        log('OP-PARALLEL', `  ${set.id}: 모두 이미 존재 (${parallelCards.length}장)`)
+        continue
+      }
+
+      const setName = set.nameKo ?? set.name
+      const records = toCreate.map(c => {
+        const num = c.card_set_id.toUpperCase()
+        return {
+          externalId: `onepiece_${num}`,
+          name: c.card_name || num,
+          tcgType: 'ONEPIECE' as const,
+          setName,
+          setCode: set.id,
+          cardNumber: num,
+          rarity: c.rarity,
+          imageUrl: `${OP_SITE_EN}/images/cardlist/card/${num}.png`,
+        }
+      })
+
+      const result = await prisma.card.createMany({ data: records, skipDuplicates: true })
+      totalCreated += result.count
+      log('OP-PARALLEL', `  ${set.id}: +${result.count}장 패러렐 카드 추가 (총 ${parallelCards.length}장 중)`)
+      await sleep(300)
+    } catch (err) {
+      log('OP-PARALLEL', `  ${set.id}: 오류 — ${err}`)
+    }
+  }
+
+  log('OP-PARALLEL', `✅ 완료 — 총 ${totalCreated}장 패러렐 카드 추가`)
+}
+
 // ── 메인 ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -820,6 +915,10 @@ async function main() {
 
   if (run('onepiece-names') || run('op-names')) {
     await safeRun('OP-NAMES', fixOnePieceNames)
+  }
+
+  if (run('onepiece-parallels') || run('op-parallels')) {
+    await safeRun('OP-PARALLEL', importOnePieceParallels)
   }
 
   const after = await prisma.card.count()
