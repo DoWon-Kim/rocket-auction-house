@@ -611,12 +611,19 @@ async function enrichOnePieceRarities() {
       return num <= 30
     })
 
+  // OPTCG API는 OP-14/OP-15를 하이브리드 세트 코드로 사용
+  const OP_API_ID_MAP: Record<string, string> = {
+    'OP-14': 'OP14-EB04',
+    'OP-15': 'OP15-EB04',
+  }
+
   let totalUpdated = 0
 
   for (const setId of boosterSets) {
     try {
+      const apiId = OP_API_ID_MAP[setId] ?? setId
       const data = await fetchWithRetry<OptcgCard[]>(
-        `https://optcgapi.com/api/sets/${setId}/`,
+        `https://optcgapi.com/api/sets/${apiId}/`,
         { timeoutMs: 15_000, retries: 2, cacheTtlMs: SET_CACHE },
       )
       if (!Array.isArray(data) || data.length === 0) {

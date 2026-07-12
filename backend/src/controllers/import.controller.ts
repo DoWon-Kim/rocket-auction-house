@@ -1447,7 +1447,8 @@ export async function enrichOnePieceRarities(_req: AuthRequest, res: Response) {
     }
   }
 
-  await processSets(boosterSets, id => `https://optcgapi.com/api/sets/${id}/`)
+  const OP_API_ID_MAP: Record<string, string> = { 'OP-14': 'OP14-EB04', 'OP-15': 'OP15-EB04' }
+  await processSets(boosterSets, id => `https://optcgapi.com/api/sets/${OP_API_ID_MAP[id] ?? id}/`)
   await processSets(starterSets, id => `https://optcgapi.com/api/decks/${id}/`)
 
   send({ type: 'done', totalUpdated })
