@@ -533,7 +533,7 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
     }
   }
 
-  async function handleOpSse(type: 'rarity' | 'names' | 'parallels' | 'parallels-bandai' | 'details') {
+  async function handleOpSse(type: 'rarity' | 'names' | 'parallels' | 'parallels-bandai' | 'details' | 'import-all') {
     if (opRunning) return
     setOpRunning(true)
     setOpType(type)
@@ -546,12 +546,19 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
       parallels:          '/admin/import/onepiece/parallels',
       'parallels-bandai': '/admin/import/onepiece/parallels-bandai',
       details:            '/admin/import/onepiece/enrich-details',
+      'import-all':       '/admin/import/all',
     }
 
     try {
       const apiBase = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api'
+      const isPost = type === 'import-all'
       const response = await fetch(`${apiBase}${endpoints[type]}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        method: isPost ? 'POST' : 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          ...(isPost ? { 'Content-Type': 'application/json' } : {}),
+        },
+        body: isPost ? JSON.stringify({ types: ['ONEPIECE'] }) : undefined,
       })
       if (!response.ok || !response.body) {
         setOpLog([{ type: 'error', reason: `HTTP ${response.status}` }])
@@ -668,6 +675,13 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
             <div className="border-t border-[#2e2318] pt-4 space-y-3">
               <p className="text-xs font-semibold text-[#7a6040] uppercase tracking-wider">데이터 보강 / 패러렐 임포트</p>
               <div className="flex flex-wrap gap-2">
+                <button onClick={() => handleOpSse('import-all')} disabled={opRunning}
+                  className="flex items-center gap-1.5 bg-[#1a1410] border border-[#d4a853]/40 hover:border-[#d4a853] text-[#d4a853] hover:text-[#f0c060] disabled:opacity-40 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors">
+                  {opRunning && opType === 'import-all'
+                    ? <div className="w-3 h-3 rounded-full border-2 border-[#2e2318] border-t-[#d4a853] animate-spin" />
+                    : <Download size={12} />}
+                  전체 세트 임포트 (Bandai)
+                </button>
                 <button onClick={() => handleOpSse('rarity')} disabled={opRunning}
                   className="flex items-center gap-1.5 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] hover:text-[#e8d5b0] disabled:opacity-40 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors">
                   {opRunning && opType === 'rarity'
@@ -715,9 +729,11 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
                         ? 'text-emerald-400'
                         : 'text-[#8a7055]'
                     }>
-                      {ev.setId ? `${ev.setId}: ` : ''}
-                      {ev.status === 'ok'
-                        ? `+${(ev.created ?? ev.found ?? ev.updated ?? ev.fixed ?? 0) as number}건${ev.probed !== undefined ? ` / ${ev.probed as number}장 탐색` : ''}`
+                      {ev.setId ? `${ev.setId as string}: ` : ''}
+                      {(ev.status === 'ok' || ev.type === 'set-done')
+                        ? `+${(ev.imported ?? ev.created ?? ev.found ?? ev.updated ?? ev.fixed ?? 0) as number}건${ev.probed !== undefined ? ` / ${ev.probed as number}장 탐색` : ''}`
+                        : ev.type === 'set-start' || ev.type === 'tcg-start' || ev.type === 'info'
+                        ? String(ev.setName ?? ev.message ?? ev.tcg ?? '')
                         : String(ev.reason ?? ev.status ?? '...')}
                     </p>
                   ))}
@@ -730,8 +746,9 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
                   <span className="text-emerald-400 font-semibold">
                     ✓ 완료
                     {opDone.totalCreated !== undefined && ` — +${opDone.totalCreated as number}장 패러렐 카드 추가`}
-                    {opDone.totalUpdated !== undefined && ` — ${opDone.totalUpdated as number}장 레어도 업데이트`}
+                    {opDone.totalUpdated !== undefined && ` — ${opDone.totalUpdated as number}장 업데이트`}
                     {opDone.totalFixed   !== undefined && ` — ${opDone.totalFixed   as number}장 이름 업데이트`}
+                    {(opDone.totals as Record<string, {imported:number;skipped:number}>)?.ONEPIECE !== undefined && ` — ${(opDone.totals as Record<string,{imported:number;skipped:number}>).ONEPIECE.imported}장 임포트 / ${(opDone.totals as Record<string,{imported:number;skipped:number}>).ONEPIECE.skipped}장 스킵`}
                   </span>
                 </div>
               )}
