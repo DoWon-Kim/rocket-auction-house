@@ -422,7 +422,7 @@ function parseOpHtml(html: string, setId: string, site: string): OpCard[] {
       number: num,
       name: nameMt ? nameMt[1].trim() : num,
       rarity: rarityMt ? rarityMt[1].trim() : 'Unknown',
-      imageUrl: `${site}/images/card/${num}.png`,
+      imageUrl: `${site}/images/cardlist/card/${num}.png`,
     }
   })
 }
@@ -454,7 +454,7 @@ function opFallback(setId: string, total: number): OpCard[] {
   const prefix = setId.replace('-', '')
   return Array.from({ length: total }, (_, i) => {
     const num = `${prefix}-${String(i + 1).padStart(3, '0')}`
-    return { number: num, name: num, rarity: 'Unknown', imageUrl: `${OP_SITE_EN}/images/card/${num}.png` }
+    return { number: num, name: num, rarity: 'Unknown', imageUrl: `${OP_SITE_EN}/images/cardlist/card/${num}.png` }
   })
 }
 
