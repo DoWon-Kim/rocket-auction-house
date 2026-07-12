@@ -56,6 +56,7 @@ import {
   importDigimon,
   getOnePieceSets, importOnePiece,
   enrichOnePieceRarities,
+  fixOnePieceNames,
   mergeLanguageDuplicates,
   importAll,
 } from '../controllers/import.controller'
@@ -352,6 +353,7 @@ router.post('/admin/import/digimon',       authenticate, requireSuperAdmin, impo
 router.get('/admin/import/onepiece/sets',          authenticate, requireSuperAdmin, getOnePieceSets)
 router.post('/admin/import/onepiece',              authenticate, requireSuperAdmin, importOnePiece)
 router.get('/admin/import/onepiece/enrich-rarity', authenticate, requireSuperAdmin, enrichOnePieceRarities)
+router.get('/admin/import/onepiece/fix-names',     authenticate, requireSuperAdmin, fixOnePieceNames)
 router.post('/admin/import/merge-duplicates', authenticate, requireSuperAdmin, mergeLanguageDuplicates)
 router.post('/admin/import/yugioh-all',    authenticate, requireSuperAdmin, importYugiohAll)
 router.post('/admin/import/all',           authenticate, requireSuperAdmin, importAll)

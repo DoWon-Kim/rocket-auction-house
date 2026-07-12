@@ -695,6 +695,84 @@ async function enrichOnePieceRarities() {
   log('OP-RARITY', `✅ 완료 — 총 ${totalUpdated}장 레어도 업데이트`)
 }
 
+// ── 원피스 카드명 보강 (이름=번호인 카드를 OPTCG API로 업데이트) ──────────────
+
+async function fixOnePieceNames() {
+  log('OP-NAMES', '▶ 이름이 번호로 저장된 원피스 카드 이름 보강 중...')
+
+  const OP_API_ID_MAP: Record<string, string> = {
+    'OP-14': 'OP14-EB04',
+    'OP-15': 'OP15-EB04',
+  }
+
+  // name === cardNumber 패턴인 카드 (폴백으로 생성된 카드)
+  const candidates = await prisma.card.findMany({
+    where: { tcgType: 'ONEPIECE' },
+    select: { id: true, name: true, cardNumber: true, setCode: true },
+  })
+  const toFix = candidates.filter(c => c.cardNumber && c.name === c.cardNumber)
+
+  if (toFix.length === 0) {
+    log('OP-NAMES', '이미 모든 원피스 카드 이름이 채워져 있습니다.')
+    return
+  }
+  log('OP-NAMES', `  이름 없는 카드 총 ${toFix.length}장 발견`)
+
+  // setCode별 그룹화
+  const bySet = new Map<string, typeof toFix>()
+  for (const c of toFix) {
+    if (!c.setCode) continue
+    const arr = bySet.get(c.setCode) ?? []
+    arr.push(c)
+    bySet.set(c.setCode, arr)
+  }
+
+  let totalFixed = 0
+
+  for (const [setCode, cards] of bySet) {
+    try {
+      const apiId = OP_API_ID_MAP[setCode] ?? setCode
+      const isStarter = setCode.startsWith('ST-')
+      const url = isStarter
+        ? `https://optcgapi.com/api/decks/${apiId}/`
+        : `https://optcgapi.com/api/sets/${apiId}/`
+
+      const data = await fetchWithRetry<OptcgCard[]>(url, {
+        timeoutMs: 15_000, retries: 2, cacheTtlMs: SET_CACHE,
+      })
+      if (!Array.isArray(data) || data.length === 0) {
+        log('OP-NAMES', `  ${setCode}: API 데이터 없음, 스킵`)
+        continue
+      }
+
+      const nameMap = new Map(data.map(c => [c.card_set_id.toUpperCase(), c.card_name]))
+      const toUpdate = cards.filter(c => c.cardNumber && nameMap.has(c.cardNumber.toUpperCase()))
+
+      if (toUpdate.length === 0) {
+        log('OP-NAMES', `  ${setCode}: 매칭 카드 없음`)
+        continue
+      }
+
+      const CHUNK = 100
+      for (let i = 0; i < toUpdate.length; i += CHUNK) {
+        await prisma.$transaction(
+          toUpdate.slice(i, i + CHUNK).map(c => prisma.card.update({
+            where: { id: c.id },
+            data: { name: nameMap.get(c.cardNumber!.toUpperCase())! },
+          }))
+        )
+      }
+      totalFixed += toUpdate.length
+      log('OP-NAMES', `  ${setCode}: ${toUpdate.length}장 이름 업데이트`)
+      await sleep(300)
+    } catch (err) {
+      log('OP-NAMES', `  ${setCode}: 오류 — ${err}`)
+    }
+  }
+
+  log('OP-NAMES', `✅ 완료 — 총 ${totalFixed}장 이름 업데이트`)
+}
+
 // ── 메인 ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -738,6 +816,10 @@ async function main() {
 
   if (run('onepiece-rarity') || run('op-rarity')) {
     await safeRun('OP-RARITY', enrichOnePieceRarities)
+  }
+
+  if (run('onepiece-names') || run('op-names')) {
+    await safeRun('OP-NAMES', fixOnePieceNames)
   }
 
   const after = await prisma.card.count()

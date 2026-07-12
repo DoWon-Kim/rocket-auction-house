@@ -1455,6 +1455,82 @@ export async function enrichOnePieceRarities(_req: AuthRequest, res: Response) {
   res.end()
 }
 
+// ── 원피스 카드명 보강 (이름=번호인 카드를 OPTCG API card_name으로 업데이트) ──
+
+export async function fixOnePieceNames(_req: AuthRequest, res: Response) {
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+
+  const send = (data: object) => res.write(`data: ${JSON.stringify(data)}\n\n`)
+
+  const OP_API_ID_MAP: Record<string, string> = { 'OP-14': 'OP14-EB04', 'OP-15': 'OP15-EB04' }
+
+  const candidates = await prisma.card.findMany({
+    where: { tcgType: 'ONEPIECE' },
+    select: { id: true, name: true, cardNumber: true, setCode: true },
+  })
+  const toFix = candidates.filter(c => c.cardNumber && c.name === c.cardNumber)
+
+  send({ type: 'start', total: toFix.length })
+
+  if (toFix.length === 0) {
+    send({ type: 'done', totalFixed: 0, message: '모든 원피스 카드 이름이 이미 채워져 있습니다.' })
+    res.end(); return
+  }
+
+  const bySet = new Map<string, typeof toFix>()
+  for (const c of toFix) {
+    if (!c.setCode) continue
+    const arr = bySet.get(c.setCode) ?? []
+    arr.push(c)
+    bySet.set(c.setCode, arr)
+  }
+
+  let totalFixed = 0
+
+  for (const [setCode, cards] of bySet) {
+    try {
+      const apiId = OP_API_ID_MAP[setCode] ?? setCode
+      const isStarter = setCode.startsWith('ST-')
+      const url = isStarter
+        ? `https://optcgapi.com/api/decks/${apiId}/`
+        : `https://optcgapi.com/api/sets/${apiId}/`
+
+      const resp = await fetch(url, {
+        headers: { 'User-Agent': 'RocketAuctionHouse/1.0' },
+        signal: AbortSignal.timeout(12_000),
+      })
+      if (!resp.ok) { send({ setCode, status: 'skip', reason: `HTTP ${resp.status}` }); continue }
+      const data = await resp.json() as OptcgApiCard[]
+      if (!Array.isArray(data) || data.length === 0) { send({ setCode, status: 'skip', reason: '데이터 없음' }); continue }
+
+      const nameMap = new Map(data.map(c => [c.card_set_id.toUpperCase(), c.card_name ?? c.card_set_id]))
+      const toUpdate = cards.filter(c => c.cardNumber && nameMap.has(c.cardNumber.toUpperCase()))
+
+      if (toUpdate.length > 0) {
+        const CHUNK = 100
+        for (let i = 0; i < toUpdate.length; i += CHUNK) {
+          await prisma.$transaction(
+            toUpdate.slice(i, i + CHUNK).map(c => prisma.card.update({
+              where: { id: c.id },
+              data: { name: nameMap.get(c.cardNumber!.toUpperCase())! },
+            }))
+          )
+        }
+        totalFixed += toUpdate.length
+      }
+      send({ setCode, status: 'ok', fixed: toUpdate.length, total: cards.length })
+      await sleep(250)
+    } catch (err) {
+      send({ setCode, status: 'error', reason: String(err) })
+    }
+  }
+
+  send({ type: 'done', totalFixed })
+  res.end()
+}
+
 // ── 언어 중복 카드 병합 ───────────────────────────────────────────────────────
 // 별도 레코드로 저장된 KO/JA 카드들을 EN 기본 카드에 병합
 // pokemontcg.io(sv1)↔TCGdex(sv01) 세트 코드 불일치도 처리
