@@ -327,6 +327,47 @@ export async function getCard(req: Request, res: Response) {
   }
 }
 
+// ── GET /cards/:id/variants ────────────────────────────────────────────────────
+// 같은 카드번호의 다른 버전 (패러렐, SEC 등)
+
+export async function getCardVariants(req: Request, res: Response) {
+  try {
+    const { id } = req.params as { id: string }
+
+    const card = await prisma.card.findUnique({
+      where: { id },
+      select: { cardNumber: true, tcgType: true },
+    })
+
+    if (!card || !card.cardNumber) { res.json([]); return }
+
+    // _p1, _p2 등 패러렐 접미사 제거해 기본 카드번호 추출
+    const baseNum = card.cardNumber.replace(/_p\d+$/i, '')
+
+    const variants = await prisma.card.findMany({
+      where: {
+        tcgType: card.tcgType,
+        id: { not: id },
+        OR: [
+          { cardNumber: baseNum },
+          { cardNumber: { startsWith: `${baseNum}_` } },
+        ],
+      },
+      select: {
+        id: true, name: true, nameKo: true,
+        cardNumber: true, rarity: true, imageUrl: true,
+        _count: { select: { listings: true } },
+      },
+      orderBy: { cardNumber: 'asc' },
+    })
+
+    res.json(variants)
+  } catch (err) {
+    console.error('[getCardVariants]', err)
+    res.status(500).json({ message: '버전 조회 중 오류가 발생했습니다.' })
+  }
+}
+
 // ── GET /cards/:id/price-history ──────────────────────────────────────────────
 // 카드 체결 가격 히스토리 (최근 N일, 일별 집계)
 

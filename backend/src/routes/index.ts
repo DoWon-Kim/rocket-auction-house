@@ -42,7 +42,7 @@ import {
 } from '../controllers/admin.controller'
 import { authenticate, optionalAuth, requireAdmin, requireSuperAdmin } from '../middleware/auth'
 import { requireSection } from '../middleware/permissions'
-import { searchCards, getCardMeta, getCardRank, getCard, getCardListings, getCardPriceHistory } from '../controllers/card.controller'
+import { searchCards, getCardMeta, getCardRank, getCard, getCardVariants, getCardListings, getCardPriceHistory } from '../controllers/card.controller'
 import { proxyImage } from '../controllers/imageProxy.controller'
 import { upload } from '../middleware/upload'
 import { uploadImage } from '../controllers/upload.controller'
@@ -130,6 +130,7 @@ router.get('/cards/meta', getCardMeta)
 router.get('/cards/rank', getCardRank)
 router.get('/cards', searchCards)
 router.get('/cards/:id', getCard)
+router.get('/cards/:id/variants', getCardVariants)
 router.get('/cards/:id/price-history', getCardPriceHistory)
 router.get('/cards/:id/listings', getCardListings)
 

@@ -321,6 +321,13 @@ export default function CardDetailPage() {
     staleTime: 60_000,
   })
 
+  const { data: variants } = useQuery<Array<{ id: string; name: string; nameKo: string | null; cardNumber: string | null; rarity: string; imageUrl: string | null; _count: { listings: number } }>>({
+    queryKey: ['card-variants', id],
+    queryFn: () => api.get(`/cards/${id}/variants`).then(r => r.data),
+    enabled: !!card,
+    staleTime: 60_000,
+  })
+
   const { data: listingsData, isLoading: listingsLoading } = useQuery<ListingsResponse>({
     queryKey: ['card-listings', id, listingSort, listingType, listingPage],
     queryFn: () => api.get(`/cards/${id}/listings`, {
@@ -451,6 +458,38 @@ export default function CardDetailPage() {
             >
               <TrendingUp size={12} /> {extLink.label}에서 보기 ↗
             </a>
+          )}
+
+          {/* 다른 버전 */}
+          {variants && variants.length > 0 && (
+            <div className="w-full max-w-[260px]">
+              <p className="text-[10px] text-[#5a4830] uppercase tracking-wider mb-2 font-semibold">다른 버전 ({variants.length})</p>
+              <div className="grid grid-cols-3 gap-2">
+                {variants.map(v => (
+                  <Link key={v.id} href={`/cards/${v.id}`} className="group flex flex-col items-center gap-1">
+                    <div className="relative w-full aspect-[3/4] rounded-lg overflow-hidden border border-[#2e2318] group-hover:border-[#d4a853]/40 transition-colors bg-[#1a1208]">
+                      {v.imageUrl ? (
+                        <Image
+                          src={resolveImageSrc(v.imageUrl)!}
+                          alt={v.nameKo ?? v.name}
+                          fill
+                          sizes="80px"
+                          className="object-contain"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center text-xl">🃏</div>
+                      )}
+                    </div>
+                    <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded border ${rarityColorClass(v.rarity)}`}>
+                      {rarityLabel(v.rarity)}
+                    </span>
+                    <span className="text-[9px] text-[#5a4830] font-mono text-center leading-tight">
+                      {v.cardNumber?.replace(/.*_/, '_') ?? ''}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
           )}
         </div>
 
