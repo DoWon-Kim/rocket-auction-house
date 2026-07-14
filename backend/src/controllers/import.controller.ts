@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '../lib/prisma'
 import { AuthRequest } from '../middleware/auth'
 import { fetchWithRetry, ExternalApiError } from '../lib/fetchWithRetry'
+import { nodeRequest } from '../lib/nodeRequest'
 
 // ── 공통 ────────────────────────────────────────────────────────────────────────
 
@@ -1024,12 +1025,9 @@ function parseOpHtml(html: string): ParsedOpCard[] {
 
 // 공식 사이트로부터 특정 세트 카드 데이터 취득
 async function fetchOpCardsFromSite(setId: string): Promise<ParsedOpCard[]> {
-  const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), 20_000)
-
+  const bodyStr = new URLSearchParams({ 'series[]': setId }).toString()
   try {
-    const body = new URLSearchParams({ 'series[]': setId })
-    const res = await fetch(`${OP_SITE}/cardlist/`, {
+    const { ok, status, body } = await nodeRequest(`${OP_SITE}/cardlist/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -1037,14 +1035,12 @@ async function fetchOpCardsFromSite(setId: string): Promise<ParsedOpCard[]> {
         'Accept':       'text/html,application/xhtml+xml,*/*',
         'Referer':      `${OP_SITE}/cardlist/`,
       },
-      body: body.toString(),
-      signal: ctrl.signal,
+      body: bodyStr,
+      timeoutMs: 20_000,
     })
-    clearTimeout(timer)
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return parseOpHtml(await res.text())
+    if (!ok) throw new Error(`HTTP ${status}`)
+    return parseOpHtml(body)
   } catch {
-    clearTimeout(timer)
     throw new Error(`원피스 공식 사이트 취득 실패: ${setId}`)
   }
 }
@@ -1409,9 +1405,12 @@ export async function importAll(req: AuthRequest, res: Response) {
       initTcg('DIGIMON')
       send({ type: 'tcg-start', tcg: 'DIGIMON', message: '디지몬 전체 카드 가져오기 중...' })
       try {
-        const r = await fetch('https://digimoncard.io/api-public/search.php?series=Digimon+Card+Game')
-        if (!r.ok) throw new Error(`HTTP ${r.status}`)
-        const all = await r.json() as DigimonIoCard[]
+        const { ok, status, body: rawBody } = await nodeRequest(
+          'https://digimoncard.io/api-public/search.php?series=Digimon+Card+Game',
+          { timeoutMs: 30_000 },
+        )
+        if (!ok) throw new Error(`HTTP ${status}`)
+        const all = JSON.parse(rawBody) as DigimonIoCard[]
         const records = all.map(c => ({
           externalId: `digimon_${c.id}`, name: c.name, tcgType: 'DIGIMON' as const,
           setName: c.set_name?.[0] ?? 'Unknown',
@@ -1510,12 +1509,12 @@ export async function enrichOnePieceRarities(_req: AuthRequest, res: Response) {
   const processSets = async (sets: string[], urlFn: (id: string) => string) => {
     for (const setId of sets) {
       try {
-        const resp = await fetch(urlFn(setId), {
+        const { ok, status: httpStatus, body: rawBody } = await nodeRequest(urlFn(setId), {
           headers: { 'User-Agent': 'RocketAuctionHouse/1.0' },
-          signal: AbortSignal.timeout(12_000),
+          timeoutMs: 12_000,
         })
-        if (!resp.ok) { send({ setId, status: 'skip', reason: `HTTP ${resp.status}` }); continue }
-        const data = await resp.json() as OptcgApiCard[]
+        if (!ok) { send({ setId, status: 'skip', reason: `HTTP ${httpStatus}` }); continue }
+        const data = JSON.parse(rawBody) as OptcgApiCard[]
         if (!Array.isArray(data) || data.length === 0) { send({ setId, status: 'skip', reason: '데이터 없음' }); continue }
 
         const rarityMap = new Map(data.map(c => [c.card_set_id.toUpperCase(), c.rarity]))
@@ -1602,12 +1601,12 @@ export async function fixOnePieceNames(_req: AuthRequest, res: Response) {
         ? `https://optcgapi.com/api/decks/${apiId}/`
         : `https://optcgapi.com/api/sets/${apiId}/`
 
-      const resp = await fetch(url, {
+      const { ok: fixOk, status: fixStatus, body: fixBody } = await nodeRequest(url, {
         headers: { 'User-Agent': 'RocketAuctionHouse/1.0' },
-        signal: AbortSignal.timeout(12_000),
+        timeoutMs: 12_000,
       })
-      if (!resp.ok) { send({ setCode, status: 'skip', reason: `HTTP ${resp.status}` }); continue }
-      const data = await resp.json() as OptcgApiCard[]
+      if (!fixOk) { send({ setCode, status: 'skip', reason: `HTTP ${fixStatus}` }); continue }
+      const data = JSON.parse(fixBody) as OptcgApiCard[]
       if (!Array.isArray(data) || data.length === 0) { send({ setCode, status: 'skip', reason: '데이터 없음' }); continue }
 
       const nameMap = new Map(data.map(c => [c.card_set_id.toUpperCase(), c.card_name ?? c.card_set_id]))
@@ -1710,12 +1709,12 @@ export async function importOnePieceParallels(_req: AuthRequest, res: Response) 
 
       let data: OptcgApiCard[]
       try {
-        const resp = await fetch(url, {
+        const { ok: parOk, body: parBody } = await nodeRequest(url, {
           headers: { 'User-Agent': 'RocketAuctionHouse/1.0' },
-          signal: AbortSignal.timeout(12_000),
+          timeoutMs: 12_000,
         })
-        if (!resp.ok) continue
-        data = await resp.json() as OptcgApiCard[]
+        if (!parOk) continue
+        data = JSON.parse(parBody) as OptcgApiCard[]
       } catch {
         continue
       }
@@ -1817,13 +1816,13 @@ export async function importOnePieceParallelsFromBandai(_req: AuthRequest, res: 
         const imgUrl = `${IMG_BASE}/${p1Num}.png`
 
         try {
-          const resp = await fetch(imgUrl, {
+          const { ok: headOk } = await nodeRequest(imgUrl, {
             method: 'HEAD',
             headers: { 'User-Agent': 'RocketAuctionHouse/1.0' },
-            signal: AbortSignal.timeout(5_000),
+            timeoutMs: 5_000,
           })
 
-          if (resp.ok) {
+          if (headOk) {
             await prisma.card.upsert({
               where: { externalId: `onepiece_${p1Num.toUpperCase()}` },
               create: {
@@ -1888,12 +1887,12 @@ export async function enrichOnePieceDetails(_req: AuthRequest, res: Response) {
 
       let data: OptcgApiCard[]
       try {
-        const resp = await fetch(url, {
+        const { ok: detOk, status: detStatus, body: detBody } = await nodeRequest(url, {
           headers: { 'User-Agent': 'RocketAuctionHouse/1.0' },
-          signal: AbortSignal.timeout(12_000),
+          timeoutMs: 12_000,
         })
-        if (!resp.ok) { send({ setId: set.id, status: 'skip', reason: `HTTP ${resp.status}` }); continue }
-        data = await resp.json() as OptcgApiCard[]
+        if (!detOk) { send({ setId: set.id, status: 'skip', reason: `HTTP ${detStatus}` }); continue }
+        data = JSON.parse(detBody) as OptcgApiCard[]
       } catch { send({ setId: set.id, status: 'skip', reason: 'fetch 실패' }); continue }
 
       if (!Array.isArray(data) || data.length === 0) continue

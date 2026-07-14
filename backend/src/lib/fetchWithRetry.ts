@@ -1,12 +1,18 @@
 /**
  * 외부 API 호출 공통 유틸리티
  *
- * - timeout: AbortController로 지정 시간 초과 시 중단
+ * - IPv4 강제: nodeRequest (https.request + family: 4)로 Gabia 서버 ETIMEDOUT 방지
+ * - timeout: 지정 시간 초과 시 중단
  * - retry:   5xx / 네트워크 오류 시 지수 백오프로 재시도
  * - cache:   GET 요청 인메모리 TTL 캐시 (API 레이트 리밋 방지)
  */
 
-interface FetchOptions extends RequestInit {
+import { nodeRequest } from './nodeRequest'
+
+interface FetchOptions {
+  method?: string
+  headers?: Record<string, string>
+  body?: string | null
   timeoutMs?: number     // 기본 10s
   retries?: number       // 기본 2
   cacheTtlMs?: number    // 0 = 캐싱 안 함 (기본)
@@ -32,16 +38,18 @@ export async function fetchWithRetry<T = unknown>(
   options: FetchOptions = {},
 ): Promise<T> {
   const {
-    timeoutMs   = 10_000,
-    retries     = 2,
-    cacheTtlMs  = 0,
-    ...fetchOpts
+    timeoutMs  = 10_000,
+    retries    = 2,
+    cacheTtlMs = 0,
+    method,
+    headers,
+    body,
   } = options
 
-  const cacheKey = `${fetchOpts.method ?? 'GET'}:${url}`
+  const cacheKey = `${method ?? 'GET'}:${url}`
 
   // 캐시 히트 (GET만)
-  if (cacheTtlMs > 0 && (!fetchOpts.method || fetchOpts.method === 'GET')) {
+  if (cacheTtlMs > 0 && (!method || method === 'GET')) {
     const cached = cache.get(cacheKey)
     if (cached && cached.expiresAt > Date.now()) {
       return cached.data as T
@@ -60,22 +68,28 @@ export async function fetchWithRetry<T = unknown>(
     const timer = setTimeout(() => controller.abort(), timeoutMs)
 
     try {
-      const res = await fetch(url, { ...fetchOpts, signal: controller.signal })
+      const { status, ok, body: bodyText } = await nodeRequest(url, {
+        method: method ?? 'GET',
+        headers,
+        body: body ?? null,
+        signal: controller.signal,
+        timeoutMs,
+      })
       clearTimeout(timer)
 
-      if (!res.ok) {
+      if (!ok) {
         // 4xx는 재시도 불필요 (클라이언트 오류)
-        if (res.status < 500) {
-          throw new ExternalApiError(url, res.status, await res.text().catch(() => ''))
+        if (status < 500) {
+          throw new ExternalApiError(url, status, bodyText)
         }
-        lastError = new ExternalApiError(url, res.status, `HTTP ${res.status}`)
+        lastError = new ExternalApiError(url, status, `HTTP ${status}`)
         continue
       }
 
-      const data = await res.json() as T
+      const data = JSON.parse(bodyText) as T
 
       // 캐시 저장
-      if (cacheTtlMs > 0 && (!fetchOpts.method || fetchOpts.method === 'GET')) {
+      if (cacheTtlMs > 0 && (!method || method === 'GET')) {
         cache.set(cacheKey, { data, expiresAt: Date.now() + cacheTtlMs })
       }
 
