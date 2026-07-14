@@ -1,7 +1,8 @@
 import 'dotenv/config'
-import { Agent, setGlobalDispatcher } from 'undici'
 
 // Gabia 서버 IPv6 라우팅 불가 — 모든 fetch를 IPv4로 강제
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { Agent, setGlobalDispatcher } = require('undici')
 setGlobalDispatcher(new Agent({ connect: { family: 4 } }))
 
 import * as Sentry from '@sentry/node'
