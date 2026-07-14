@@ -50,6 +50,7 @@ import { confirmPayment } from '../controllers/payment.controller'
 import {
   getTcgdexSets, importTcgdex,
   getPokemonSets, importPokemon,
+  importAllJapanesePokemon,
   enrichPokemonKoNames, enrichPokemonJaNames,
   getYugiohSets, importYugioh, importYugiohAll,
   getMtgSets, importMtg,
@@ -347,8 +348,9 @@ router.delete('/notifications/:id',        authenticate, deleteNotification)
 router.get('/admin/import/tcgdex/sets',    authenticate, requireSuperAdmin, getTcgdexSets)
 router.post('/admin/import/tcgdex',        authenticate, requireSuperAdmin, importTcgdex)
 router.get('/admin/import/pokemon/sets',   authenticate, requireSuperAdmin, getPokemonSets)
-router.post('/admin/import/pokemon',       authenticate, requireSuperAdmin, importPokemon)
-router.post('/admin/import/pokemon/enrich-ko', authenticate, requireSuperAdmin, enrichPokemonKoNames)
+router.post('/admin/import/pokemon',            authenticate, requireSuperAdmin, importPokemon)
+router.get('/admin/import/pokemon/ja-all',      authenticate, requireSuperAdmin, importAllJapanesePokemon)
+router.post('/admin/import/pokemon/enrich-ko',  authenticate, requireSuperAdmin, enrichPokemonKoNames)
 router.post('/admin/import/pokemon/enrich-ja', authenticate, requireSuperAdmin, enrichPokemonJaNames)
 router.get('/admin/import/yugioh/sets',    authenticate, requireSuperAdmin, getYugiohSets)
 router.post('/admin/import/yugioh',        authenticate, requireSuperAdmin, importYugioh)

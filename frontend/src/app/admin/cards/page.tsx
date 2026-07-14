@@ -368,6 +368,9 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
   const [opType, setOpType] = useState<string | null>(null)
   const [opLog, setOpLog] = useState<Array<Record<string, unknown>>>([])
   const [opDone, setOpDone] = useState<Record<string, unknown> | null>(null)
+  const [jaRunning, setJaRunning] = useState(false)
+  const [jaLog, setJaLog] = useState<Array<Record<string, unknown>>>([])
+  const [jaDone, setJaDone] = useState<Record<string, unknown> | null>(null)
   const prevKey = useRef<string>('')
 
   const cacheKey = `${tcg}_${pLang}_${mLang}`
@@ -587,6 +590,42 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
     }
   }
 
+  async function handleJaImport() {
+    if (jaRunning) return
+    setJaRunning(true)
+    setJaLog([])
+    setJaDone(null)
+    try {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api'
+      const response = await fetch(`${apiBase}/admin/import/pokemon/ja-all`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!response.ok || !response.body) { setJaLog([{ type: 'error', reason: `HTTP ${response.status}` }]); return }
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buf = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buf += decoder.decode(value, { stream: true })
+        const lines = buf.split('\n')
+        buf = lines.pop() ?? ''
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          try {
+            const ev = JSON.parse(line.slice(6)) as Record<string, unknown>
+            if (ev.type === 'done') { setJaDone(ev); onImported() }
+            else setJaLog(p => [...p.slice(-50), ev])
+          } catch { /* ignore */ }
+        }
+      }
+    } catch (err) {
+      setJaLog(p => [...p, { type: 'error', reason: String(err) }])
+    } finally {
+      setJaRunning(false)
+    }
+  }
+
   const filteredSets = sets.filter(s => s.name.toLowerCase().includes(setSearch.toLowerCase()))
   const canImport = tcg === 'DIGIMON' ? true : !!selectedSet
 
@@ -802,6 +841,45 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
               {loading ? '가져오는 중...' : '가져오기'}
             </button>
           </div>
+
+          {/* 포켓몬 일판 전체 임포트 */}
+          {tcg === 'POKEMON' && (
+            <div className="border-t border-[#2e2318] pt-4 space-y-3">
+              <p className="text-xs font-semibold text-[#7a6040] uppercase tracking-wider">일판 전체 임포트</p>
+              <div className="flex flex-wrap gap-2">
+                <button onClick={handleJaImport} disabled={jaRunning}
+                  className="flex items-center gap-1.5 bg-[#1a1410] border border-[#d4a853]/40 hover:border-[#d4a853] text-[#d4a853] hover:text-[#f0c060] disabled:opacity-40 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors">
+                  {jaRunning
+                    ? <div className="w-3 h-3 rounded-full border-2 border-[#2e2318] border-t-[#d4a853] animate-spin" />
+                    : <Download size={12} />}
+                  일판 전체 임포트 (TCGdex JA)
+                </button>
+              </div>
+              <p className="text-xs text-[#5a4830]">TCGdex 일본어 전 세트 순회 — 영어판 대응 카드엔 일본어명 병합, 일본 독점 카드는 신규 생성</p>
+
+              {jaLog.length > 0 && (
+                <div className="bg-black/40 border border-[#2e2318] rounded-xl p-3 max-h-32 overflow-y-auto font-mono text-xs space-y-0.5">
+                  {jaLog.map((ev, i) => (
+                    <p key={i} className={ev.type === 'error' || ev.type === 'set-error' ? 'text-red-400' : ev.type === 'set-done' ? 'text-emerald-400' : 'text-[#8a7055]'}>
+                      {ev.setId ? `${ev.setId as string}: ` : ''}
+                      {ev.type === 'set-done'
+                        ? `+${(ev.created as number) ?? 0}신규 / ${(ev.merged as number) ?? 0}병합`
+                        : String(ev.message ?? ev.reason ?? ev.setName ?? '...')}
+                    </p>
+                  ))}
+                  {jaRunning && <p className="text-[#f0a832] animate-pulse">⋯</p>}
+                </div>
+              )}
+
+              {jaDone && !jaRunning && (
+                <div className="bg-emerald-950/30 border border-emerald-800/40 rounded-xl px-4 py-2.5 text-sm">
+                  <span className="text-emerald-400 font-semibold">
+                    ✓ 완료 — +{jaDone.totalCreated as number}장 신규 생성 / {jaDone.totalMerged as number}장 일본어명 병합
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 포켓몬 다국어 이름 보강 */}
           {tcg === 'POKEMON' && (

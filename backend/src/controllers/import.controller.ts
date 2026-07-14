@@ -220,6 +220,91 @@ export async function getPokemonSets(_req: AuthRequest, res: Response) {
   }
 }
 
+// ── 포켓몬 일판 전체 임포트 SSE (TCGdex JA 전 세트, GET 방식) ─────────────────
+// 영어판 대응 카드 → nameJa 병합 / 일본 독점 카드 → 신규 레코드 생성
+
+export async function importAllJapanesePokemon(_req: AuthRequest, res: Response) {
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.setHeader('X-Accel-Buffering', 'no')
+  res.flushHeaders()
+
+  const send = (data: object) => res.write(`data: ${JSON.stringify(data)}\n\n`)
+  let totalCreated = 0
+  let totalMerged  = 0
+
+  try {
+    const sets = await fetchWithRetry<TcgdexSet[]>(
+      'https://api.tcgdex.net/v2/ja/sets',
+      { cacheTtlMs: SET_CACHE, timeoutMs: 12_000 },
+    )
+    send({ type: 'info', message: `TCGdex JA: ${sets.length}개 세트 탐색 시작` })
+
+    for (const set of sets) {
+      try {
+        const data = await fetchWithRetry<TcgdexSetDetail>(
+          `https://api.tcgdex.net/v2/ja/sets/${set.id}`,
+          { timeoutMs: 12_000, retries: 1 },
+        )
+
+        const setCodeVars = pokemonSetCodeVariants(data.id)
+        const existing = await prisma.card.findMany({
+          where: {
+            tcgType: 'POKEMON',
+            setCode: { in: setCodeVars },
+            NOT: { OR: LANG_PREFIXES.map(p => ({ externalId: { startsWith: p } })) },
+          },
+          select: { id: true, cardNumber: true, nameJa: true },
+        })
+        const byNum = new Map(existing.map(c => [c.cardNumber, c]))
+
+        let created = 0, merged = 0
+        const toCreate: Prisma.CardCreateManyInput[] = []
+
+        for (const c of data.cards) {
+          const ex = byNum.get(c.localId)
+          if (ex) {
+            if (!ex.nameJa && c.name) {
+              await prisma.card.update({ where: { id: ex.id }, data: { nameJa: c.name } })
+              merged++
+            }
+          } else {
+            toCreate.push({
+              externalId:  `tcgdex_ja_${c.id}`,
+              name:        c.name,
+              nameJa:      c.name,
+              tcgType:     'POKEMON' as const,
+              setName:     data.name,
+              setCode:     data.id,
+              cardNumber:  c.localId,
+              rarity:      c.rarity ?? 'Unknown',
+              imageUrl:    c.image ? `${c.image}/low.webp` : null,
+            })
+          }
+        }
+
+        if (toCreate.length > 0) {
+          const r = await prisma.card.createMany({ data: toCreate, skipDuplicates: true })
+          created = r.count
+        }
+
+        totalCreated += created
+        totalMerged  += merged
+        send({ type: 'set-done', setId: set.id, setName: set.name, created, merged, total: data.cards.length })
+        await sleep(150)
+      } catch {
+        send({ type: 'set-error', setId: set.id, setName: set.name })
+      }
+    }
+  } catch (err) {
+    send({ type: 'error', reason: String(err) })
+  }
+
+  send({ type: 'done', totalCreated, totalMerged })
+  res.end()
+}
+
 export async function importPokemon(req: AuthRequest, res: Response) {
   const { setId } = req.body as { setId?: string }
   if (!setId) { res.status(400).json({ message: 'setId가 필요합니다.' }); return }
