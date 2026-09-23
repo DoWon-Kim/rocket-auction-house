@@ -1,7 +1,8 @@
 import { Resend } from 'resend'
 import { NotificationType } from '@prisma/client'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+// 키가 없으면 생성자가 throw하므로 키가 있을 때만 생성 (호출부는 키 체크 후 사용)
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 
 // ── HTML 템플릿 헬퍼 ──────────────────────────────────────────────────────────
 
@@ -185,7 +186,7 @@ export async function sendEmail({
   if (!process.env.RESEND_API_KEY) return
 
   try {
-    await resend.emails.send({
+    await resend!.emails.send({
       from: process.env.EMAIL_FROM ?? 'Rocket Auction House <noreply@rocketcard.co.kr>',
       to,
       subject,

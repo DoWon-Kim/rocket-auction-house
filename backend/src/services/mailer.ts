@@ -1,6 +1,7 @@
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+// 키가 없으면 생성자가 throw하므로 키가 있을 때만 생성 (호출부는 키 체크 후 사용)
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 const FROM = process.env.EMAIL_FROM ?? 'Rocket AH <noreply@rocketcard.co.kr>'
 const FRONTEND = process.env.FRONTEND_URL ?? 'http://localhost:3000'
 
@@ -22,7 +23,7 @@ export async function sendPasswordResetEmail(email: string, nickname: string, to
   }
 
   const link = `${FRONTEND}/reset-password?token=${token}`
-  await resend.emails.send({
+  await resend!.emails.send({
     from: FROM,
     to: email,
     subject: '[Rocket AH] 비밀번호 재설정 안내',
@@ -47,7 +48,7 @@ export async function sendVerificationEmail(email: string, nickname: string, tok
   }
 
   const link = `${FRONTEND}/verify-email?token=${token}`
-  await resend.emails.send({
+  await resend!.emails.send({
     from: FROM,
     to: email,
     subject: '[Rocket AH] 이메일 인증 안내',
