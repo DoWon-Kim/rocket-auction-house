@@ -44,19 +44,19 @@ function ResetPasswordForm() {
   return (
     <div className="min-h-[80vh] flex items-center justify-center">
       <div className="w-full max-w-sm">
-        <Link href="/login" className="inline-flex items-center gap-1.5 text-sm text-[#7a6040] hover:text-[#e8d5b0] transition-colors mb-8 group">
+        <Link href="/login" className="inline-flex items-center gap-1.5 text-sm text-muted-2 hover:text-fg-2 transition-colors mb-8 group">
           <ArrowLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" />
           로그인으로 돌아가기
         </Link>
 
         <div className="flex items-center gap-2.5 mb-8">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#d4a853] to-[#b8860b] flex items-center justify-center shadow-[0_0_16px_rgba(212,168,83,0.35)]">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent to-accent-deep flex items-center justify-center shadow-[0_0_16px_rgba(139,92,246,0.35)]">
             <Rocket size={17} className="text-white" strokeWidth={2.5} />
           </div>
-          <span className="text-lg font-bold text-white">Rocket <span className="text-[#d4a853]">AH</span></span>
+          <span className="text-lg font-bold text-white">Rocket <span className="text-accent-fg">AH</span></span>
         </div>
 
-        <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl p-6 space-y-5">
+        <div className="bg-surface border border-line rounded-2xl p-6 space-y-5">
           {done ? (
             <div className="space-y-4 text-center py-2">
               <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-950/60 border border-emerald-800/40 mx-auto">
@@ -64,10 +64,10 @@ function ResetPasswordForm() {
               </div>
               <div>
                 <h2 className="text-lg font-bold text-white mb-1">비밀번호 변경 완료!</h2>
-                <p className="text-sm text-[#7a6040]">새 비밀번호로 로그인해주세요.</p>
+                <p className="text-sm text-muted-2">새 비밀번호로 로그인해주세요.</p>
               </div>
               <Link href="/login"
-                className="flex items-center justify-center gap-2 h-11 w-full bg-[#d4a853] hover:bg-[#c49440] text-white rounded-xl font-semibold transition-all shadow-[0_0_20px_rgba(212,168,83,0.25)]">
+                className="flex items-center justify-center gap-2 h-11 w-full bg-accent hover:bg-accent-strong text-white rounded-xl font-semibold transition-all shadow-[0_0_20px_rgba(139,92,246,0.25)]">
                 로그인하기 <ArrowRight size={14} />
               </Link>
             </div>
@@ -75,7 +75,7 @@ function ResetPasswordForm() {
             <>
               <div>
                 <h2 className="text-base font-bold text-white mb-1">새 비밀번호 설정</h2>
-                <p className="text-sm text-[#7a6040]">사용할 새 비밀번호를 입력해주세요.</p>
+                <p className="text-sm text-muted-2">사용할 새 비밀번호를 입력해주세요.</p>
               </div>
 
               {error && (
@@ -86,21 +86,21 @@ function ResetPasswordForm() {
 
               {!token ? (
                 <Link href="/forgot-password"
-                  className="flex items-center justify-center h-11 w-full bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#8a7055] hover:text-[#e8d5b0] rounded-xl text-sm transition-all">
+                  className="flex items-center justify-center h-11 w-full bg-surface border border-line hover:border-line-strong text-muted hover:text-fg-2 rounded-xl text-sm transition-all">
                   비밀번호 찾기로 이동
                 </Link>
               ) : (
                 <form onSubmit={submit} className="space-y-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs text-[#7a6040] uppercase tracking-wider font-semibold">새 비밀번호</label>
+                    <label className="text-xs text-muted-2 uppercase tracking-wider font-semibold">새 비밀번호</label>
                     <div className="relative">
-                      <KeyRound size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5a4830] pointer-events-none" />
+                      <KeyRound size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-subtle pointer-events-none" />
                       <input type={showPw ? 'text' : 'password'} value={password}
                         onChange={e => setPassword(e.target.value)}
                         placeholder="8자 이상" required autoFocus
-                        className="w-full bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] focus:border-[#d4a853]/50 rounded-xl px-4 py-3 pl-11 pr-11 text-sm text-[#f5ead8] placeholder:text-[#5a4830] focus:outline-none transition-colors" />
+                        className="w-full bg-surface border border-line hover:border-line-strong focus:border-accent/50 rounded-xl px-4 py-3 pl-11 pr-11 text-sm text-fg placeholder:text-subtle focus:outline-none transition-colors" />
                       <button type="button" onClick={() => setShowPw(v => !v)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-[#5a4830] hover:text-[#9e8a6a] transition-colors">
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-subtle hover:text-fg-3 transition-colors">
                         {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
                       </button>
                     </div>
@@ -108,7 +108,7 @@ function ResetPasswordForm() {
                       <div className="space-y-1">
                         <div className="flex gap-1">
                           {[1, 2, 3].map(lvl => (
-                            <div key={lvl} className={`h-1 flex-1 rounded-full transition-colors ${pwStrength >= lvl ? strengthColor : 'bg-[#2e2318]'}`} />
+                            <div key={lvl} className={`h-1 flex-1 rounded-full transition-colors ${pwStrength >= lvl ? strengthColor : 'bg-line'}`} />
                           ))}
                         </div>
                         <p className={`text-[11px] ${['', 'text-red-400', 'text-yellow-400', 'text-emerald-400'][pwStrength]}`}>{strengthLabel}</p>
@@ -117,14 +117,14 @@ function ResetPasswordForm() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs text-[#7a6040] uppercase tracking-wider font-semibold">비밀번호 확인</label>
+                    <label className="text-xs text-muted-2 uppercase tracking-wider font-semibold">비밀번호 확인</label>
                     <div className="relative">
-                      <KeyRound size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5a4830] pointer-events-none" />
+                      <KeyRound size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-subtle pointer-events-none" />
                       <input type={showPw ? 'text' : 'password'} value={confirm}
                         onChange={e => setConfirm(e.target.value)}
                         placeholder="비밀번호를 다시 입력" required
-                        className={`w-full bg-[#1a1410] border rounded-xl px-4 py-3 pl-11 text-sm text-[#f5ead8] placeholder:text-[#5a4830] focus:outline-none transition-colors ${
-                          confirm && !pwMatch ? 'border-red-800/60 focus:border-red-700/60' : 'border-[#2e2318] hover:border-[#4a3520] focus:border-[#d4a853]/50'
+                        className={`w-full bg-surface border rounded-xl px-4 py-3 pl-11 text-sm text-fg placeholder:text-subtle focus:outline-none transition-colors ${
+                          confirm && !pwMatch ? 'border-red-800/60 focus:border-red-700/60' : 'border-line hover:border-line-strong focus:border-accent/50'
                         }`} />
                       {pwMatch && <CheckCircle size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-400" />}
                     </div>
@@ -134,7 +134,7 @@ function ResetPasswordForm() {
                   </div>
 
                   <button type="submit" disabled={loading || !password || !confirm}
-                    className="w-full h-11 flex items-center justify-center gap-2 bg-[#d4a853] hover:bg-[#c49440] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-all shadow-[0_0_20px_rgba(212,168,83,0.25)]">
+                    className="w-full h-11 flex items-center justify-center gap-2 bg-accent hover:bg-accent-strong disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-all shadow-[0_0_20px_rgba(139,92,246,0.25)]">
                     {loading ? <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> : <>비밀번호 변경 <ArrowRight size={14} /></>}
                   </button>
                 </form>
@@ -151,7 +151,7 @@ export default function ResetPasswordPage() {
   return (
     <Suspense fallback={
       <div className="min-h-[80vh] flex items-center justify-center">
-        <div className="w-6 h-6 rounded-full border-2 border-[#2e2318] border-t-[#d4a853] animate-spin" />
+        <div className="w-6 h-6 rounded-full border-2 border-line border-t-accent animate-spin" />
       </div>
     }>
       <ResetPasswordForm />

@@ -228,7 +228,7 @@ function SpotlightScene({
           ) : (
             <div
               className="absolute inset-0 flex items-center justify-center text-6xl"
-              style={{ background: '#1a1208' }}
+              style={{ background: 'var(--color-surface-2)' }}
             >
               🃏
             </div>
@@ -302,15 +302,15 @@ function FlipCard({ result, revealed, delay }: { result: DrawResult; revealed: b
     ? 'border-yellow-400 shadow-[0_0_16px_rgba(250,204,21,0.38)]'
     : result.grade === 2
     ? 'border-purple-400 shadow-[0_0_8px_rgba(192,132,252,0.22)]'
-    : 'border-[#2e2318]'
+    : 'border-line'
 
   const bgStyle = result.isLastOne
-    ? 'bg-gradient-to-b from-orange-900/30 to-[#1a1410]'
+    ? 'bg-gradient-to-b from-orange-900/30 to-surface'
     : result.grade === 3
-    ? 'bg-gradient-to-b from-yellow-900/30 to-[#1a1410]'
+    ? 'bg-gradient-to-b from-yellow-900/30 to-surface'
     : result.grade === 2
-    ? 'bg-gradient-to-b from-purple-900/30 to-[#1a1410]'
-    : 'bg-[#1a1410]'
+    ? 'bg-gradient-to-b from-purple-900/30 to-surface'
+    : 'bg-surface'
 
   return (
     <div className="relative" style={{ perspective: '800px' }}>
@@ -331,7 +331,7 @@ function FlipCard({ result, revealed, delay }: { result: DrawResult; revealed: b
               <Trophy size={10} /> LAST ONE
             </div>
           )}
-          <div className="relative aspect-[3/4] bg-[#1a1208] rounded-lg overflow-hidden">
+          <div className="relative aspect-[3/4] bg-surface-2 rounded-lg overflow-hidden">
             {result.card.imageUrl ? (
               <Image src={result.card.imageUrl} alt={result.card.name} fill className="object-cover" />
             ) : (
@@ -347,7 +347,7 @@ function FlipCard({ result, revealed, delay }: { result: DrawResult; revealed: b
               />
             )}
           </div>
-          <p className="text-[11px] font-medium line-clamp-2 leading-tight px-0.5 text-[#e8d5b0]">
+          <p className="text-[11px] font-medium line-clamp-2 leading-tight px-0.5 text-fg-2">
             {result.card.name}
           </p>
           <Badge
@@ -359,7 +359,7 @@ function FlipCard({ result, revealed, delay }: { result: DrawResult; revealed: b
 
         {/* Back */}
         <div
-          className="absolute inset-0 border-2 border-pink-500/60 bg-gradient-to-br from-pink-900/50 via-purple-900/40 to-[#d4a853]/20 rounded-xl flex items-center justify-center"
+          className="absolute inset-0 border-2 border-pink-500/60 bg-gradient-to-br from-pink-900/50 via-purple-900/40 to-accent/20 rounded-xl flex items-center justify-center"
           style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
         >
           <div className="text-center space-y-1">
@@ -480,13 +480,13 @@ export default function OripaDetailPage() {
   if (isLoading) {
     return (
       <div className="max-w-3xl mx-auto space-y-4">
-        <div className="h-8 w-32 bg-[#1a1410] border border-[#2e2318] rounded-xl animate-pulse" />
-        <div className="bg-[#1a1410] border border-[#2e2318] rounded-xl h-72 animate-pulse" />
-        <div className="bg-[#1a1410] border border-[#2e2318] rounded-xl h-40 animate-pulse" />
+        <div className="h-8 w-32 bg-surface border border-line rounded-xl animate-pulse" />
+        <div className="bg-surface border border-line rounded-xl h-72 animate-pulse" />
+        <div className="bg-surface border border-line rounded-xl h-40 animate-pulse" />
       </div>
     )
   }
-  if (!oripa) return <div className="text-center py-24 text-[#5a4830]">오리파를 찾을 수 없습니다.</div>
+  if (!oripa) return <div className="text-center py-24 text-subtle">오리파를 찾을 수 없습니다.</div>
 
   const progressPct = ((oripa.totalSlots - oripa.remainSlots) / oripa.totalSlots) * 100
   const isSoldOut = oripa.remainSlots === 0
@@ -512,55 +512,55 @@ export default function OripaDetailPage() {
 
       {/* ── Page content ── */}
       <div className="max-w-3xl mx-auto space-y-6">
-        <Link href="/oripas" className="inline-flex items-center gap-1 text-sm text-[#8a7055] hover:text-[#f5ead8] transition-colors">
+        <Link href="/oripas" className="inline-flex items-center gap-1 text-sm text-muted hover:text-fg transition-colors">
           <ChevronLeft size={16} /> 목록으로
         </Link>
 
         {/* Header */}
-        <div className="bg-[#1a1410] border border-[#2e2318] rounded-xl overflow-hidden">
-          <div className="relative h-52 bg-[#1a1208]">
+        <div className="bg-surface border border-line rounded-xl overflow-hidden">
+          <div className="relative h-52 bg-surface-2">
             {oripa.imageUrl ? (
               <Image src={oripa.imageUrl} alt={oripa.title} fill className="object-cover" />
             ) : (
-              <div className="absolute inset-0 bg-gradient-to-br from-pink-900/40 via-purple-900/30 to-[#d4a853]/20 flex items-center justify-center">
+              <div className="absolute inset-0 bg-gradient-to-br from-pink-900/40 via-purple-900/30 to-accent/20 flex items-center justify-center">
                 <Package size={72} className="text-pink-400/25" />
               </div>
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#1a1410] via-[#1a1410]/20 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/20 to-transparent" />
             <div className="absolute bottom-4 left-5 right-5">
-              <h1 className="text-2xl font-bold text-[#f5ead8] drop-shadow">{oripa.title}</h1>
+              <h1 className="text-[26px] sm:text-3xl font-bold tracking-tight text-fg drop-shadow">{oripa.title}</h1>
             </div>
           </div>
 
           <div className="p-5 space-y-4">
-            {oripa.description && <p className="text-[#8a7055] text-sm">{oripa.description}</p>}
+            {oripa.description && <p className="text-muted text-sm">{oripa.description}</p>}
 
             <div className="grid grid-cols-3 gap-3 text-center">
-              <div className="bg-[#1a1208] border border-[#2e2318] rounded-xl py-3">
-                <p className="text-lg font-bold text-[#f0a832] tabular-nums">{oripa.pricePerDraw.toLocaleString()}P</p>
-                <p className="text-xs text-[#5a4830] mt-0.5">1회 가격</p>
+              <div className="bg-surface-2 border border-line rounded-xl py-3">
+                <p className="text-lg font-bold text-accent-2 tabular-nums">{oripa.pricePerDraw.toLocaleString()}P</p>
+                <p className="text-xs text-subtle mt-0.5">1회 가격</p>
               </div>
-              <div className="bg-[#1a1208] border border-[#2e2318] rounded-xl py-3">
-                <p className={`text-lg font-bold tabular-nums ${isSoldOut ? 'text-[#5a4830]' : oripa.remainSlots <= 5 ? 'text-red-400' : 'text-[#f5ead8]'}`}>
+              <div className="bg-surface-2 border border-line rounded-xl py-3">
+                <p className={`text-lg font-bold tabular-nums ${isSoldOut ? 'text-subtle' : oripa.remainSlots <= 5 ? 'text-red-400' : 'text-fg'}`}>
                   {isSoldOut ? '매진' : oripa.remainSlots.toLocaleString()}
                 </p>
-                <p className="text-xs text-[#5a4830] mt-0.5">남은 슬롯</p>
+                <p className="text-xs text-subtle mt-0.5">남은 슬롯</p>
               </div>
-              <div className="bg-[#1a1208] border border-[#2e2318] rounded-xl py-3">
-                <p className="text-lg font-bold text-[#f5ead8] flex items-center justify-center gap-1 tabular-nums">
-                  <Users size={14} className="text-[#8a7055]" />
+              <div className="bg-surface-2 border border-line rounded-xl py-3">
+                <p className="text-lg font-bold text-fg flex items-center justify-center gap-1 tabular-nums">
+                  <Users size={14} className="text-muted" />
                   {oripa._count?.purchases ?? 0}
                 </p>
-                <p className="text-xs text-[#5a4830] mt-0.5">참여자</p>
+                <p className="text-xs text-subtle mt-0.5">참여자</p>
               </div>
             </div>
 
             <div className="space-y-1">
-              <div className="flex justify-between text-xs text-[#5a4830]">
+              <div className="flex justify-between text-xs text-subtle">
                 <span>{Math.round(progressPct)}% 소진</span>
                 <span>{oripa.remainSlots}/{oripa.totalSlots}</span>
               </div>
-              <div className="relative w-full bg-[#2e2318] rounded-full h-2.5 overflow-hidden">
+              <div className="relative w-full bg-line rounded-full h-2.5 overflow-hidden">
                 <div
                   className={`h-2.5 rounded-full transition-all duration-700 ${progressPct >= 90 ? 'bg-red-500' : 'bg-gradient-to-r from-pink-500 to-purple-500'}`}
                   style={{ width: `${progressPct}%` }}
@@ -576,7 +576,7 @@ export default function OripaDetailPage() {
                       ? 'bg-yellow-400/15 text-yellow-300 border border-yellow-400/30'
                       : g === 2
                       ? 'bg-purple-400/15 text-purple-300 border border-purple-400/30'
-                      : 'bg-[#1a1208] border border-[#2e2318] text-[#8a7055]'
+                      : 'bg-surface-2 border border-line text-muted'
                   }`}>
                     <Star size={10} fill="currentColor" />
                     {g === 3 ? '최상위' : g === 2 ? '레어' : '일반'} {(gradeProbs[g] * 100).toFixed(1)}%
@@ -588,15 +588,15 @@ export default function OripaDetailPage() {
         </div>
 
         {/* Draw panel */}
-        <div className="bg-[#1a1410] border border-[#2e2318] rounded-xl p-5 space-y-4">
-          <h2 className="font-semibold flex items-center gap-2 text-lg text-[#f5ead8]">
+        <div className="bg-surface border border-line rounded-xl p-5 space-y-4">
+          <h2 className="font-semibold flex items-center gap-2 text-lg text-fg">
             <Sparkles size={18} className="text-pink-400" /> 뽑기
           </h2>
 
           {isSoldOut ? (
             <div className="text-center py-8 space-y-2">
               <p className="text-4xl">📦</p>
-              <p className="text-[#8a7055] font-medium">이 오리파는 매진되었습니다.</p>
+              <p className="text-muted font-medium">이 오리파는 매진되었습니다.</p>
             </div>
           ) : (
             <>
@@ -609,7 +609,7 @@ export default function OripaDetailPage() {
                       className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                         drawCount === n
                           ? 'bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-lg shadow-pink-500/20'
-                          : 'bg-[#1a1208] border border-[#2e2318] text-[#8a7055] hover:border-[#4a3520] hover:text-[#e8d5b0]'
+                          : 'bg-surface-2 border border-line text-muted hover:border-line-strong hover:text-fg-2'
                       }`}
                     >
                       {n}회
@@ -618,15 +618,15 @@ export default function OripaDetailPage() {
                 </div>
               )}
 
-              <div className="bg-[#1a1208] border border-[#2e2318] rounded-xl px-4 py-3 flex items-center justify-between">
+              <div className="bg-surface-2 border border-line rounded-xl px-4 py-3 flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-[#7a6040] uppercase tracking-wider font-semibold">총 비용</p>
-                  <p className="text-2xl font-bold text-[#f0a832] tabular-nums">{(oripa.pricePerDraw * drawCount).toLocaleString()}P</p>
+                  <p className="text-xs text-muted-2 uppercase tracking-wider font-semibold">총 비용</p>
+                  <p className="text-2xl font-bold text-accent-2 tabular-nums">{(oripa.pricePerDraw * drawCount).toLocaleString()}P</p>
                 </div>
                 {user && (
                   <div className="text-right">
-                    <p className="text-xs text-[#7a6040] uppercase tracking-wider font-semibold">내 잔액</p>
-                    <p className={`text-sm font-medium tabular-nums ${user.balance < oripa.pricePerDraw * drawCount ? 'text-red-400' : 'text-[#f5ead8]'}`}>
+                    <p className="text-xs text-muted-2 uppercase tracking-wider font-semibold">내 잔액</p>
+                    <p className={`text-sm font-medium tabular-nums ${user.balance < oripa.pricePerDraw * drawCount ? 'text-red-400' : 'text-fg'}`}>
                       {user.balance.toLocaleString()}P
                     </p>
                   </div>
@@ -667,9 +667,9 @@ export default function OripaDetailPage() {
 
         {/* Results */}
         {results && (
-          <div ref={resultsRef} className="bg-[#1a1410] border border-[#2e2318] rounded-xl p-5 space-y-5">
+          <div ref={resultsRef} className="bg-surface border border-line rounded-xl p-5 space-y-5">
             <div className="flex items-center justify-between">
-              <h2 className="font-semibold flex items-center gap-2 text-lg text-[#f5ead8]">
+              <h2 className="font-semibold flex items-center gap-2 text-lg text-fg">
                 <Sparkles size={18} className="text-yellow-400" />
                 뽑기 결과!
               </h2>
@@ -683,7 +683,7 @@ export default function OripaDetailPage() {
               ) : (
                 <button
                   onClick={() => { setResults(null); setRevealed(false) }}
-                  className="text-sm text-[#5a4830] hover:text-[#8a7055] transition-colors"
+                  className="text-sm text-subtle hover:text-muted transition-colors"
                 >
                   닫기
                 </button>
@@ -707,7 +707,7 @@ export default function OripaDetailPage() {
             </div>
 
             {revealed && (
-              <div className="border-t border-[#2e2318] pt-4 space-y-2">
+              <div className="border-t border-line pt-4 space-y-2">
                 <div className="flex gap-4 text-sm flex-wrap">
                   {results.filter(r => r.isLastOne).length > 0 && (
                     <span className="text-orange-400 font-medium flex items-center gap-1">
@@ -720,7 +720,7 @@ export default function OripaDetailPage() {
                   {results.filter(r => r.grade === 2).length > 0 && (
                     <span className="text-purple-300">★★ {results.filter(r => r.grade === 2).length}개</span>
                   )}
-                  <span className="text-[#5a4830]">★ {results.filter(r => r.grade === 1).length}개</span>
+                  <span className="text-subtle">★ {results.filter(r => r.grade === 1).length}개</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {results.map((r, i) => (
@@ -728,7 +728,7 @@ export default function OripaDetailPage() {
                       r.isLastOne ? 'border-orange-400/50 bg-orange-400/10 text-orange-300'
                       : r.grade === 3 ? 'border-yellow-400/40 bg-yellow-400/10 text-yellow-300'
                       : r.grade === 2 ? 'border-purple-400/40 bg-purple-400/10 text-purple-300'
-                      : 'border-[#2e2318] text-[#5a4830]'
+                      : 'border-line text-subtle'
                     }`}>
                       {r.card.name}
                     </span>
@@ -740,14 +740,14 @@ export default function OripaDetailPage() {
         )}
 
         {/* Tabs: card list & history */}
-        <div className="bg-[#1a1410] border border-[#2e2318] rounded-xl overflow-hidden">
-          <div className="flex border-b border-[#2e2318]">
+        <div className="bg-surface border border-line rounded-xl overflow-hidden">
+          <div className="flex border-b border-line">
             <button
               onClick={() => setActiveTab('items')}
               className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-sm font-medium transition-colors ${
                 activeTab === 'items'
-                  ? 'text-[#f5ead8] border-b-2 border-pink-500 -mb-px'
-                  : 'text-[#5a4830] hover:text-[#8a7055]'
+                  ? 'text-fg border-b-2 border-pink-500 -mb-px'
+                  : 'text-subtle hover:text-muted'
               }`}
             >
               <BarChart2 size={15} /> 수록 카드 &amp; 확률
@@ -756,8 +756,8 @@ export default function OripaDetailPage() {
               onClick={() => setActiveTab('history')}
               className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-sm font-medium transition-colors ${
                 activeTab === 'history'
-                  ? 'text-[#f5ead8] border-b-2 border-pink-500 -mb-px'
-                  : 'text-[#5a4830] hover:text-[#8a7055]'
+                  ? 'text-fg border-b-2 border-pink-500 -mb-px'
+                  : 'text-subtle hover:text-muted'
               }`}
             >
               <History size={15} /> 최근 뽑기
@@ -767,12 +767,12 @@ export default function OripaDetailPage() {
           {activeTab === 'items' && (
             <>
               {items.length === 0 ? (
-                <p className="p-8 text-center text-[#5a4830] text-sm">수록 카드가 없습니다.</p>
+                <p className="p-8 text-center text-subtle text-sm">수록 카드가 없습니다.</p>
               ) : (
-                <div className="divide-y divide-[#2e2318]">
+                <div className="divide-y divide-line">
                   {items.map(item => (
-                    <div key={item.id} className={`flex items-center gap-3 px-4 py-3 hover:bg-[#1a1208] transition-colors ${item.isLastOne ? 'bg-orange-500/5' : ''}`}>
-                      <div className="relative w-9 h-12 shrink-0 rounded overflow-hidden bg-[#1a1208]">
+                    <div key={item.id} className={`flex items-center gap-3 px-4 py-3 hover:bg-surface-2 transition-colors ${item.isLastOne ? 'bg-orange-500/5' : ''}`}>
+                      <div className="relative w-9 h-12 shrink-0 rounded overflow-hidden bg-surface-2">
                         {item.card.imageUrl ? (
                           <Image src={item.card.imageUrl} alt={item.card.name} fill className="object-cover" />
                         ) : (
@@ -781,22 +781,22 @@ export default function OripaDetailPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <p className="text-sm font-medium truncate text-[#f5ead8]">{item.card.name}</p>
+                          <p className="text-sm font-medium truncate text-fg">{item.card.name}</p>
                           {item.isLastOne && (
                             <span className="text-[10px] bg-orange-500/20 text-orange-300 border border-orange-500/40 px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0">
                               <Trophy size={8} /> Last One
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-[#5a4830]">{item.card.setName} · {item.card.rarity}</p>
+                        <p className="text-xs text-subtle">{item.card.setName} · {item.card.rarity}</p>
                       </div>
                       <div className="flex items-center gap-3 shrink-0">
                         <Badge variant={item.grade === 3 ? 'yellow' : item.grade === 2 ? 'indigo' : 'default'}>
                           {item.grade === 3 ? '★★★' : item.grade === 2 ? '★★' : '★'}
                         </Badge>
                         <div className="text-right min-w-[52px]">
-                          <p className="text-xs font-semibold text-[#f5ead8]">{(item.probability * 100).toFixed(2)}%</p>
-                          <p className="text-[10px] text-[#5a4830]">{item.quantity}장</p>
+                          <p className="text-xs font-semibold text-fg">{(item.probability * 100).toFixed(2)}%</p>
+                          <p className="text-[10px] text-subtle">{item.quantity}장</p>
                         </div>
                       </div>
                     </div>
@@ -804,7 +804,7 @@ export default function OripaDetailPage() {
                 </div>
               )}
               {items.some(i => i.isLastOne) && (
-                <div className="px-4 py-3 border-t border-[#2e2318] bg-orange-500/5 flex items-center gap-2 text-xs text-orange-300">
+                <div className="px-4 py-3 border-t border-line bg-orange-500/5 flex items-center gap-2 text-xs text-orange-300">
                   <Trophy size={12} />
                   Last One 보장: {items.filter(i => i.isLastOne).map(i => i.card.name).join(', ')} — 마지막 슬롯에서 확정 획득
                 </div>
@@ -813,9 +813,9 @@ export default function OripaDetailPage() {
           )}
 
           {activeTab === 'history' && (
-            <div className="divide-y divide-[#2e2318]">
+            <div className="divide-y divide-line">
               {!history || history.length === 0 ? (
-                <p className="p-8 text-center text-[#5a4830] text-sm">아직 뽑기 기록이 없습니다.</p>
+                <p className="p-8 text-center text-subtle text-sm">아직 뽑기 기록이 없습니다.</p>
               ) : (history ?? []).map(purchase => {
                 const safeResults = Array.isArray(purchase.results) ? purchase.results : []
                 const topResult = safeResults.length > 0
@@ -828,7 +828,7 @@ export default function OripaDetailPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         {topResult?.card.imageUrl ? (
-                          <div className="relative w-7 h-9 rounded overflow-hidden bg-[#1a1208] shrink-0">
+                          <div className="relative w-7 h-9 rounded overflow-hidden bg-surface-2 shrink-0">
                             <Image src={topResult.card.imageUrl} alt={topResult.card.name} fill className="object-cover" />
                           </div>
                         ) : (
@@ -836,18 +836,18 @@ export default function OripaDetailPage() {
                         )}
                         <div>
                           <div className="flex items-center gap-1.5">
-                            <span className="text-sm font-medium text-[#f5ead8]">{purchase.user.nickname}</span>
-                            <span className="text-xs text-[#5a4830]">{purchase.draws}회 뽑기</span>
+                            <span className="text-sm font-medium text-fg">{purchase.user.nickname}</span>
+                            <span className="text-xs text-subtle">{purchase.draws}회 뽑기</span>
                             {hasLastOne && (
                               <span className="text-[10px] text-orange-400 flex items-center gap-0.5 font-medium">
                                 <Trophy size={9} /> Last One!
                               </span>
                             )}
                           </div>
-                          <p className="text-[11px] text-[#5a4830]">
+                          <p className="text-[11px] text-subtle">
                             {formatDistanceToNow(new Date(purchase.createdAt), { addSuffix: true, locale: ko })}
                             {' · '}
-                            <span className="text-[#f0a832] font-bold tabular-nums">{purchase.totalPaid.toLocaleString()}P</span>
+                            <span className="text-accent-2 font-bold tabular-nums">{purchase.totalPaid.toLocaleString()}P</span>
                           </p>
                         </div>
                       </div>
@@ -860,7 +860,7 @@ export default function OripaDetailPage() {
                             r.isLastOne ? 'border-orange-400/50 bg-orange-400/10 text-orange-300'
                             : r.grade === 3 ? 'border-yellow-400/40 bg-yellow-400/10 text-yellow-300'
                             : r.grade === 2 ? 'border-purple-400/40 bg-purple-400/10 text-purple-300'
-                            : 'border-[#2e2318] text-[#5a4830]'
+                            : 'border-line text-subtle'
                           }`}>
                             {r.card.name}
                           </span>

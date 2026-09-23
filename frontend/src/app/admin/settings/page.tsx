@@ -11,7 +11,7 @@ interface MaintenanceConfig {
   endsAt: string | null
 }
 
-const inputCls = 'w-full bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] focus:border-[#d4a853]/40 rounded-xl px-4 py-2.5 text-sm text-[#f5ead8] placeholder:text-[#5a4830] focus:outline-none transition-colors'
+const inputCls = 'w-full bg-surface border border-line hover:border-line-strong focus:border-accent/40 rounded-xl px-4 py-2.5 text-sm text-fg placeholder:text-subtle focus:outline-none transition-colors'
 
 export default function AdminSettingsPage() {
   const qc = useQueryClient()
@@ -57,8 +57,8 @@ export default function AdminSettingsPage() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-[#f5ead8]">사이트 설정</h1>
-        <div className="h-48 bg-[#1a1410] border border-[#2e2318] rounded-2xl animate-pulse" />
+        <h1 className="text-[26px] sm:text-3xl font-bold tracking-tight text-fg">사이트 설정</h1>
+        <div className="h-48 bg-surface border border-line rounded-2xl animate-pulse" />
       </div>
     )
   }
@@ -66,25 +66,25 @@ export default function AdminSettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[#f5ead8]">사이트 설정</h1>
-        <p className="text-sm text-[#8a7055] mt-1">점검 모드 및 공지 안내를 관리합니다.</p>
+        <h1 className="text-[26px] sm:text-3xl font-bold tracking-tight text-fg">사이트 설정</h1>
+        <p className="text-sm text-muted mt-1">점검 모드 및 공지 안내를 관리합니다.</p>
       </div>
 
       {/* 점검 모드 카드 */}
-      <div className={`bg-[#1a1410] border rounded-2xl p-6 space-y-5 transition-colors ${
-        isEnabled ? 'border-amber-500/40' : 'border-[#2e2318]'
+      <div className={`bg-surface border rounded-2xl p-6 space-y-5 transition-colors ${
+        isEnabled ? 'border-amber-500/40' : 'border-line'
       }`}>
         {/* 헤더 */}
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
-              isEnabled ? 'bg-amber-500/10 text-amber-400' : 'bg-[#2a1c0c] text-[#7a6040]'
+              isEnabled ? 'bg-amber-500/10 text-amber-400' : 'bg-accent-tint text-muted-2'
             }`}>
               <Construction size={20} />
             </div>
             <div>
-              <h2 className="font-semibold text-[#f5ead8]">서버 점검 모드</h2>
-              <p className="text-xs text-[#7a6040] mt-0.5">
+              <h2 className="font-semibold text-fg">서버 점검 모드</h2>
+              <p className="text-xs text-muted-2 mt-0.5">
                 {isEnabled
                   ? '현재 점검 중 — 일반 유저에게 안내 화면이 표시됩니다'
                   : '비활성화 상태 — 사이트가 정상 운영 중입니다'}
@@ -117,11 +117,11 @@ export default function AdminSettingsPage() {
           {isEnabled ? '점검 모드 활성화 중' : '정상 운영 중'}
         </div>
 
-        <hr className="border-[#2e2318]" />
+        <hr className="border-line" />
 
         {/* 안내 메시지 */}
         <div className="space-y-1.5">
-          <label className="text-xs text-[#7a6040] uppercase tracking-wider font-semibold">
+          <label className="text-xs text-muted-2 uppercase tracking-wider font-semibold">
             점검 안내 메시지
           </label>
           <textarea
@@ -135,8 +135,8 @@ export default function AdminSettingsPage() {
 
         {/* 예상 종료 시간 */}
         <div className="space-y-1.5">
-          <label className="text-xs text-[#7a6040] uppercase tracking-wider font-semibold flex items-center gap-1.5">
-            <Clock size={11} /> 예상 종료 시간 <span className="normal-case font-normal text-[#4a3820]">(선택)</span>
+          <label className="text-xs text-muted-2 uppercase tracking-wider font-semibold flex items-center gap-1.5">
+            <Clock size={11} /> 예상 종료 시간 <span className="normal-case font-normal text-subtle">(선택)</span>
           </label>
           <input
             type="datetime-local"
@@ -151,7 +151,7 @@ export default function AdminSettingsPage() {
           <button
             onClick={saveMessage}
             disabled={mut.isPending}
-            className="flex items-center gap-2 px-5 py-2 bg-[#d4a853] hover:bg-[#c49440] disabled:opacity-50 text-white rounded-xl text-sm font-semibold transition-colors"
+            className="flex items-center gap-2 px-5 py-2 bg-accent hover:bg-accent-strong disabled:opacity-50 text-white rounded-xl text-sm font-semibold transition-colors"
           >
             <Save size={14} />
             {mut.isPending ? '저장 중...' : '저장'}

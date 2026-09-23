@@ -62,7 +62,7 @@ function MarketStatsPanel({ cardMarket, currentPrice, listingType }: { cardMarke
 
   const PriceIndicator = () => {
     if (pricePct === null) return null
-    if (Math.abs(pricePct) < 3) return <Minus size={12} className="text-[#7a6040]" />
+    if (Math.abs(pricePct) < 3) return <Minus size={12} className="text-muted-2" />
     if (pricePct > 0)  return <TrendingUp size={12} className="text-red-400" />
     return <TrendingDown size={12} className="text-emerald-400" />
   }
@@ -72,47 +72,47 @@ function MarketStatsPanel({ cardMarket, currentPrice, listingType }: { cardMarke
     : `시세보다 ${Math.abs(pricePct)}% 낮음`
 
   return (
-    <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl px-4 py-4 space-y-3">
+    <div className="bg-surface/70 border border-line rounded-3xl p-5 space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-[10px] text-[#5a4830] uppercase tracking-wider font-semibold flex items-center gap-1.5">
-          <BarChart2 size={11} className="text-[#d4a853]" /> 시세 현황
+        <p className="text-[10px] text-subtle uppercase tracking-wider font-semibold flex items-center gap-1.5">
+          <BarChart2 size={11} className="text-accent-fg" /> 시세 현황
         </p>
-        <span className="text-[10px] text-[#4a3820]">활성 리스팅 {cardMarket.activeCount}개</span>
+        <span className="text-[10px] text-subtle">활성 리스팅 {cardMarket.activeCount}개</span>
       </div>
 
       <div className="grid grid-cols-3 gap-3 text-center">
         {cardMarket.minPrice != null && (
           <div>
             <p className="text-sm font-bold text-emerald-400 tabular-nums">{cardMarket.minPrice.toLocaleString()}<span className="text-[10px] ml-0.5">P</span></p>
-            <p className="text-[10px] text-[#5a4830] mt-0.5">최저가</p>
+            <p className="text-[10px] text-subtle mt-0.5">최저가</p>
           </div>
         )}
         {cardMarket.avgBuyNow != null && (
           <div>
-            <p className="text-sm font-bold text-[#e0b878] tabular-nums">{cardMarket.avgBuyNow.toLocaleString()}<span className="text-[10px] ml-0.5">P</span></p>
-            <p className="text-[10px] text-[#5a4830] mt-0.5">평균 즉구가</p>
+            <p className="text-sm font-bold text-accent-soft tabular-nums">{cardMarket.avgBuyNow.toLocaleString()}<span className="text-[10px] ml-0.5">P</span></p>
+            <p className="text-[10px] text-subtle mt-0.5">평균 즉구가</p>
           </div>
         )}
         {cardMarket.maxPrice != null && (
           <div>
-            <p className="text-sm font-bold text-[#f0a832] tabular-nums">{cardMarket.maxPrice.toLocaleString()}<span className="text-[10px] ml-0.5">P</span></p>
-            <p className="text-[10px] text-[#5a4830] mt-0.5">최고가</p>
+            <p className="text-sm font-bold text-accent-2 tabular-nums">{cardMarket.maxPrice.toLocaleString()}<span className="text-[10px] ml-0.5">P</span></p>
+            <p className="text-[10px] text-subtle mt-0.5">최고가</p>
           </div>
         )}
       </div>
 
       {cardMarket.recentAvgPrice != null && (
-        <div className="flex items-center justify-between pt-2 border-t border-[#2e2318]">
+        <div className="flex items-center justify-between pt-2 border-t border-line">
           <div>
-            <p className="text-[10px] text-[#5a4830]">30일 평균 체결가 ({cardMarket.recentTxCount}건)</p>
-            <p className="text-sm font-bold text-[#f5ead8] tabular-nums mt-0.5">
+            <p className="text-[10px] text-subtle">30일 평균 체결가 ({cardMarket.recentTxCount}건)</p>
+            <p className="text-sm font-bold text-fg tabular-nums mt-0.5">
               {cardMarket.recentAvgPrice.toLocaleString()}P
             </p>
           </div>
           {diffLabel && listingType !== 'OFFER' && (
             <div className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-semibold border ${
               pricePct === null || Math.abs(pricePct) < 3
-                ? 'bg-[#1a1208] border-[#2e2318] text-[#7a6040]'
+                ? 'bg-surface-2 border-line text-muted-2'
                 : pricePct > 0
                   ? 'bg-red-900/20 border-red-700/40 text-red-400'
                   : 'bg-emerald-900/20 border-emerald-700/40 text-emerald-400'
@@ -178,37 +178,37 @@ function ComparableListings({ cardId, currentListingId }: { cardId: string; curr
   const price = (l: ComparableListing) => l.buyNowPrice ?? l.currentPrice ?? l.minOfferPrice
 
   return (
-    <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl overflow-hidden">
-      <div className="px-4 py-3 border-b border-[#2e2318] flex items-center justify-between">
-        <p className="text-[10px] text-[#5a4830] uppercase tracking-wider font-semibold flex items-center gap-1.5">
-          <BarChart2 size={11} className="text-[#d4a853]" /> 이 카드의 다른 리스팅 ({listings.length})
+    <div className="bg-surface border border-line rounded-2xl overflow-hidden">
+      <div className="px-4 py-3 border-b border-line flex items-center justify-between">
+        <p className="text-[10px] text-subtle uppercase tracking-wider font-semibold flex items-center gap-1.5">
+          <BarChart2 size={11} className="text-accent-fg" /> 이 카드의 다른 리스팅 ({listings.length})
         </p>
-        <Link href={`/cards/${cardId}`} className="flex items-center gap-1 text-[10px] text-[#5a4830] hover:text-[#d4a853] transition-colors">
+        <Link href={`/cards/${cardId}`} className="flex items-center gap-1 text-[10px] text-subtle hover:text-accent-fg transition-colors">
           카드 도감 <ArrowRight size={10} />
         </Link>
       </div>
-      <div className="divide-y divide-[#1a1208]">
+      <div className="divide-y divide-surface-2">
         {listings.map(l => (
-          <Link key={l.id} href={`/listings/${l.id}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#1a1208] transition-colors group">
+          <Link key={l.id} href={`/listings/${l.id}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-2 transition-colors group">
             <div className={`flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded border ${
-              l.listingType === 'AUCTION' ? 'text-[#f0a832] border-[#3d2e0c] bg-[#2a1f08]'
+              l.listingType === 'AUCTION' ? 'text-accent-2 border-accent-line bg-accent-tint'
               : l.listingType === 'OFFER' ? 'text-emerald-400 border-emerald-700/40 bg-emerald-900/20'
-              : 'text-[#d4a853] border-[#3d2a0c] bg-[#2a1c08]'
+              : 'text-accent-fg border-accent-line bg-accent-tint'
             }`}>
               {typeIcon(l.listingType)}
               {l.listingType === 'AUCTION' ? '경매' : l.listingType === 'OFFER' ? '제안' : '즉구'}
             </div>
-            <span className="text-[11px] text-[#7a6040]">{CONDITION_LABELS[l.condition as keyof typeof CONDITION_LABELS] ?? l.condition}</span>
+            <span className="text-[11px] text-muted-2">{CONDITION_LABELS[l.condition as keyof typeof CONDITION_LABELS] ?? l.condition}</span>
             {l.gradingCompany && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#2a1c08] border border-[#3d2a0c] text-[#e0b878] font-bold">
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-tint border border-accent-line text-accent-soft font-bold">
                 {l.gradingCompany}{l.gradingGrade ? ` ${l.gradingGrade}` : ''}
               </span>
             )}
-            <span className="text-[11px] text-[#5a4830] truncate">{l.seller.nickname}</span>
+            <span className="text-[11px] text-subtle truncate">{l.seller.nickname}</span>
             {l.listingType === 'AUCTION' && l._count.bids > 0 && (
-              <span className="text-[10px] text-[#7a6040]">{l._count.bids}입찰</span>
+              <span className="text-[10px] text-muted-2">{l._count.bids}입찰</span>
             )}
-            <span className="ml-auto text-sm font-bold text-[#f0a832] tabular-nums shrink-0 group-hover:text-white transition-colors">
+            <span className="ml-auto text-sm font-bold text-accent-2 tabular-nums shrink-0 group-hover:text-white transition-colors">
               {price(l) != null ? `${price(l)!.toLocaleString()}P` : '—'}
             </span>
           </Link>
@@ -255,41 +255,41 @@ function SellerReviews({ sellerId, viewerId }: { sellerId: string; viewerId: str
   const isSeller = viewerId === sellerId
 
   return (
-    <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl overflow-hidden">
-      <div className="px-4 py-3 border-b border-[#2e2318] flex items-center justify-between">
-        <p className="text-[10px] text-[#5a4830] uppercase tracking-wider font-semibold flex items-center gap-1.5">
-          <Star size={11} className="text-[#f0a832] fill-[#f0a832]" /> 판매자 리뷰 ({data?.total ?? 0})
+    <div className="bg-surface border border-line rounded-2xl overflow-hidden">
+      <div className="px-4 py-3 border-b border-line flex items-center justify-between">
+        <p className="text-[10px] text-subtle uppercase tracking-wider font-semibold flex items-center gap-1.5">
+          <Star size={11} className="text-accent-2 fill-accent-2" /> 판매자 리뷰 ({data?.total ?? 0})
         </p>
         {data?.avgRating && (
-          <span className="text-xs text-[#f0a832] font-bold tabular-nums">★ {Number(data.avgRating).toFixed(1)}</span>
+          <span className="text-xs text-accent-2 font-bold tabular-nums">★ {Number(data.avgRating).toFixed(1)}</span>
         )}
       </div>
-      <div className="divide-y divide-[#1e1810]">
+      <div className="divide-y divide-surface-2">
         {reviews.map(rv => (
           <div key={rv.id} className="px-4 py-3 space-y-2">
             <div className="flex items-start gap-2">
-              <div className="w-7 h-7 rounded-full bg-[#2a1c0c] border border-[#3a2510] shrink-0 flex items-center justify-center text-xs font-bold text-[#f0a832] overflow-hidden">
+              <div className="w-7 h-7 rounded-full bg-accent-tint border border-accent-line shrink-0 flex items-center justify-center text-xs font-bold text-accent-2 overflow-hidden">
                 {rv.reviewer.avatarUrl
                   ? <img src={rv.reviewer.avatarUrl} alt="" className="w-full h-full object-cover" />
                   : rv.reviewer.nickname[0].toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-[#c8b48a]">{rv.reviewer.nickname}</span>
-                  <span className="text-xs text-[#f0a832]">{'★'.repeat(rv.rating)}{'☆'.repeat(5 - rv.rating)}</span>
-                  <span className="text-[10px] text-[#4a3820] ml-auto">{format(new Date(rv.createdAt), 'yy.MM.dd')}</span>
+                  <span className="text-xs font-medium text-[#8c60f2]">{rv.reviewer.nickname}</span>
+                  <span className="text-xs text-accent-2">{'★'.repeat(rv.rating)}{'☆'.repeat(5 - rv.rating)}</span>
+                  <span className="text-[10px] text-subtle ml-auto">{format(new Date(rv.createdAt), 'yy.MM.dd')}</span>
                 </div>
-                {rv.comment && <p className="text-xs text-[#9e8a6a] mt-1 leading-relaxed">{rv.comment}</p>}
+                {rv.comment && <p className="text-xs text-fg-3 mt-1 leading-relaxed">{rv.comment}</p>}
               </div>
             </div>
 
             {/* 판매자 답글 표시 */}
             {rv.sellerReply && (
-              <div className="ml-9 bg-[#1a1208] border border-[#2e2318] rounded-xl px-3 py-2 space-y-0.5">
-                <p className="text-[10px] text-[#d4a853] font-semibold flex items-center gap-1">
+              <div className="ml-9 bg-surface-2 border border-line rounded-xl px-3 py-2 space-y-0.5">
+                <p className="text-[10px] text-accent-fg font-semibold flex items-center gap-1">
                   <Reply size={9} /> 판매자 답글
                 </p>
-                <p className="text-xs text-[#9e8a6a] leading-relaxed">{rv.sellerReply}</p>
+                <p className="text-xs text-fg-3 leading-relaxed">{rv.sellerReply}</p>
               </div>
             )}
 
@@ -303,20 +303,20 @@ function SellerReviews({ sellerId, viewerId }: { sellerId: string; viewerId: str
                     maxLength={500}
                     rows={2}
                     placeholder="구매자 리뷰에 답글을 남겨보세요..."
-                    className="w-full bg-[#1a1208] border border-[#2e2318] focus:border-[#d4a853]/60 rounded-xl px-3 py-2 text-xs text-[#f5ead8] placeholder:text-[#4a3820] outline-none resize-none"
+                    className="w-full bg-surface-2 border border-line focus:border-accent/60 rounded-xl px-3 py-2 text-xs text-fg placeholder:text-subtle outline-none resize-none"
                   />
                   {replyErr && <p className="text-[10px] text-red-400">{replyErr}</p>}
                   <div className="flex gap-2">
                     <button
                       onClick={() => replyMut.mutate(rv.id)}
                       disabled={replyText.trim().length < 1 || replyMut.isPending}
-                      className="px-3 py-1.5 bg-[#d4a853] hover:bg-[#c49440] disabled:opacity-40 text-white rounded-lg text-[11px] font-medium"
+                      className="px-3 py-1.5 bg-accent hover:bg-accent-strong disabled:opacity-40 text-white rounded-lg text-[11px] font-medium"
                     >
                       등록
                     </button>
                     <button
                       onClick={() => { setReplyId(null); setReplyText(''); setReplyErr('') }}
-                      className="px-3 py-1.5 bg-[#1a1208] border border-[#2e2318] text-[#7a6040] rounded-lg text-[11px]"
+                      className="px-3 py-1.5 bg-surface-2 border border-line text-muted-2 rounded-lg text-[11px]"
                     >
                       취소
                     </button>
@@ -325,7 +325,7 @@ function SellerReviews({ sellerId, viewerId }: { sellerId: string; viewerId: str
               ) : (
                 <button
                   onClick={() => { setReplyId(rv.id); setReplyText('') }}
-                  className="ml-9 flex items-center gap-1 text-[10px] text-[#5a4830] hover:text-[#d4a853] transition-colors"
+                  className="ml-9 flex items-center gap-1 text-[10px] text-subtle hover:text-accent-fg transition-colors"
                 >
                   <Reply size={10} /> 답글 달기
                 </button>
@@ -361,7 +361,7 @@ function Lightbox({ src, onClose }: { src: string; onClose: () => void }) {
         />
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 w-9 h-9 flex items-center justify-center bg-[#0f0b08]/80 text-white border border-[#2e2318] rounded-full hover:bg-[#1a1410] transition-colors text-lg"
+          className="absolute top-3 right-3 w-9 h-9 flex items-center justify-center bg-bg/80 text-white border border-line rounded-full hover:bg-surface transition-colors text-lg"
         >
           ✕
         </button>
@@ -377,24 +377,24 @@ function ImageGallery({ images, onLightbox }: { images: string[]; onLightbox: (s
   return (
     <div className="space-y-3">
       <div
-        className="relative aspect-[3/4] bg-[#100c08] rounded-2xl overflow-hidden border border-[#2e2318] cursor-zoom-in group"
+        className="relative aspect-[3/4] bg-[radial-gradient(ellipse_at_top,var(--color-surface-2),var(--color-sunken))] rounded-[28px] overflow-hidden border border-white/10 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.8)] cursor-zoom-in group"
         onClick={() => onLightbox(images[active])}
       >
         <Image src={images[active]} alt={`사진 ${active + 1}`} fill className="object-contain" />
         {/* 확대 힌트 */}
         <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
-          <span className="flex items-center gap-1 px-2 py-1 bg-[#0f0b08]/80 text-white text-[10px] rounded-lg border border-[#2e2318] backdrop-blur-sm">
+          <span className="flex items-center gap-1 h-7 px-3 glass text-white text-[11px] rounded-full border border-white/10">
             <Expand size={10} /> 확대
           </span>
         </div>
         {images.length > 1 && (
           <>
             <button onClick={e => { e.stopPropagation(); setActive(a => (a - 1 + images.length) % images.length) }}
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center bg-[#0f0b08]/80 hover:bg-[#1a1410] backdrop-blur-sm text-white rounded-full border border-[#2e2318] transition-colors">
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center glass hover:bg-white/10 text-white rounded-full border border-white/10 transition-colors">
               <ChevronLeft size={16} />
             </button>
             <button onClick={e => { e.stopPropagation(); setActive(a => (a + 1) % images.length) }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center bg-[#0f0b08]/80 hover:bg-[#1a1410] backdrop-blur-sm text-white rounded-full border border-[#2e2318] transition-colors">
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center glass hover:bg-white/10 text-white rounded-full border border-white/10 transition-colors">
               <ChevronRight size={16} />
             </button>
             <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
@@ -410,8 +410,8 @@ function ImageGallery({ images, onLightbox }: { images: string[]; onLightbox: (s
         <div className="flex gap-2 overflow-x-auto pb-1">
           {images.map((url, i) => (
             <button key={url} onClick={() => setActive(i)}
-              className={`relative shrink-0 w-16 h-20 rounded-xl overflow-hidden border-2 transition-all ${
-                i === active ? 'border-[#d4a853] shadow-[0_0_10px_rgba(212,168,83,0.3)]' : 'border-[#2e2318] hover:border-[#4a3520]'
+              className={`relative shrink-0 w-16 h-20 rounded-2xl overflow-hidden border-2 transition-all ${
+                i === active ? 'border-accent shadow-[0_0_10px_rgba(139,92,246,0.3)]' : 'border-line hover:border-line-strong'
               }`}>
               <Image src={url} alt={`썸네일 ${i + 1}`} fill className="object-cover" />
             </button>
@@ -437,7 +437,7 @@ function ChatButton({ listingId }: { listingId: string }) {
   }
   return (
     <button onClick={openChat} disabled={loading}
-      className="w-full h-11 flex items-center justify-center gap-2 bg-[#1a1410] hover:bg-[#221a12] border border-[#2e2318] hover:border-[#4a3520] disabled:opacity-50 text-[#9e8a6a] hover:text-[#e8d5b0] rounded-xl text-sm font-medium transition-all duration-200">
+      className="w-full h-12 flex items-center justify-center gap-2 bg-white/[0.03] hover:bg-white/[0.06] border border-line-strong disabled:opacity-50 text-fg-2 hover:text-fg rounded-full text-sm font-medium transition-colors">
       <MessageCircle size={15} />
       {loading ? '채팅방 여는 중...' : '판매자와 채팅'}
     </button>
@@ -447,14 +447,14 @@ function ChatButton({ listingId }: { listingId: string }) {
 /* ─── Inline field row ─────────────────────────── */
 function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-start justify-between py-2.5 border-b border-[#2e2318] last:border-0">
-      <span className="text-[12px] text-[#7a6040] font-medium uppercase tracking-wider">{label}</span>
-      <span className="text-[13px] text-[#e8d5b0] text-right">{children}</span>
+    <div className="flex items-center justify-between gap-4 py-3 border-b border-line last:border-0">
+      <span className="text-sm text-muted">{label}</span>
+      <span className="text-sm text-fg text-right">{children}</span>
     </div>
   )
 }
 
-const inputCls = 'w-full bg-[#100c08] border border-[#2e2318] hover:border-[#4a3520] focus:border-[#d4a853]/40 rounded-xl px-4 py-3 text-sm text-[#f5ead8] placeholder:text-[#5a4830] focus:outline-none transition-colors'
+const inputCls = 'w-full h-12 bg-sunken/80 border border-line hover:border-line-strong focus:border-accent/60 focus:ring-4 focus:ring-accent/15 rounded-full px-5 text-sm text-fg placeholder:text-subtle focus:outline-none transition-all'
 
 /* ─── Main page ────────────────────────────────── */
 export default function ListingDetailPage() {
@@ -610,14 +610,14 @@ export default function ListingDetailPage() {
 
   /* ── Loading ── */
   if (isLoading) return (
-    <div className="max-w-4xl mx-auto">
-      <div className="h-5 w-20 bg-[#1a1410] rounded-lg mb-6 animate-pulse" />
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-pulse">
-        <div className="aspect-[3/4] bg-[#1a1410] rounded-2xl border border-[#2e2318]" />
+    <div className="max-w-6xl mx-auto">
+      <div className="h-5 w-20 bg-surface rounded-lg mb-6 animate-pulse" />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 animate-pulse">
+        <div className="aspect-[3/4] bg-surface rounded-2xl border border-line" />
         <div className="space-y-4">
-          <div className="h-6 bg-[#1a1410] rounded-lg w-3/4" />
-          <div className="h-4 bg-[#1a1410] rounded-lg w-1/2" />
-          <div className="h-32 bg-[#1a1410] rounded-2xl mt-4" />
+          <div className="h-6 bg-surface rounded-lg w-3/4" />
+          <div className="h-4 bg-surface rounded-lg w-1/2" />
+          <div className="h-32 bg-surface rounded-2xl mt-4" />
         </div>
       </div>
     </div>
@@ -626,8 +626,8 @@ export default function ListingDetailPage() {
   if (!listing) return (
     <div className="text-center py-24">
       <p className="text-5xl mb-4 opacity-20">🃏</p>
-      <p className="text-[#7a6040]">리스팅을 찾을 수 없습니다.</p>
-      <Link href="/listings" className="mt-4 inline-flex items-center gap-1 text-[#d4a853] hover:underline text-sm">
+      <p className="text-muted-2">리스팅을 찾을 수 없습니다.</p>
+      <Link href="/listings" className="mt-4 inline-flex items-center gap-1 text-accent-fg hover:underline text-sm">
         <ChevronLeft size={14} /> 목록으로
       </Link>
     </div>
@@ -647,30 +647,31 @@ export default function ListingDetailPage() {
   const statusLabel = listing.status === 'SOLD' ? '판매완료' : listing.status === 'EXPIRED' ? '유찰' : listing.status === 'CANCELLED' ? '취소됨' : null
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       {/* Breadcrumb */}
       <Link href="/listings"
-        className="inline-flex items-center gap-1.5 text-sm text-[#7a6040] hover:text-[#e8d5b0] transition-colors group">
+        className="inline-flex items-center gap-1 h-8 pl-2 pr-3 rounded-full border border-line bg-surface/60 text-sm text-muted hover:text-fg hover:border-line-strong transition-colors group">
         <ChevronLeft size={15} className="group-hover:-translate-x-0.5 transition-transform" />
-        마켓플레이스로 돌아가기
+        마켓플레이스
       </Link>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-start">
         {/* ── Left: Image ── */}
-        <div className="relative">
+        <div className="relative lg:sticky lg:top-24">
+          <div className="absolute inset-[10%] rounded-full bg-accent/25 blur-3xl pointer-events-none" />
           {lightboxOpen && <Lightbox src={lightboxImg} onClose={() => setLightboxOpen(false)} />}
           {galleryImages.length > 0 ? (
             <ImageGallery images={galleryImages} onLightbox={src => { setLightboxImg(src); setLightboxOpen(true) }} />
           ) : (
-            <div className="aspect-[3/4] bg-[#100c08] rounded-2xl border border-[#2e2318] flex items-center justify-center">
+            <div className="relative aspect-[3/4] bg-sunken rounded-[28px] border border-line flex items-center justify-center">
               <div className="text-center">
                 <span className="text-7xl opacity-20">🃏</span>
-                <p className="text-sm text-[#5a4830] mt-2">{listing.card.name}</p>
+                <p className="text-sm text-subtle mt-2">{listing.card.name}</p>
               </div>
             </div>
           )}
           {listing.status === 'SOLD' && (
-            <div className="absolute inset-0 bg-[#0f0b08]/70 backdrop-blur-[2px] rounded-2xl flex items-center justify-center">
+            <div className="absolute inset-0 bg-bg/70 backdrop-blur-[2px] rounded-[28px] flex items-center justify-center">
               <span className="text-4xl font-black text-red-400 border-4 border-red-400 px-5 py-2 rounded-xl rotate-[-12deg] shadow-[0_0_40px_rgba(239,68,68,0.3)]">
                 SOLD
               </span>
@@ -692,12 +693,12 @@ export default function ListingDetailPage() {
           {/* Title */}
           <div>
             {listing.card.cardNumber && (
-              <span className="inline-block mb-2 px-2 py-[3px] rounded font-mono text-xs font-semibold bg-[#1a1208] border border-[#d4a853]/20 text-[#d4a853]/70 tracking-wider">
+              <span className="inline-block mb-3 px-2 py-[3px] rounded-md font-mono text-xs font-semibold bg-accent/10 text-accent-fg tracking-wider">
                 [{listing.card.cardNumber}]
               </span>
             )}
             <div className="flex items-start gap-3 mb-0.5">
-              <h1 className="text-2xl font-bold text-white tracking-tight flex-1">
+              <h1 className="text-3xl sm:text-[40px] font-extrabold tracking-[-0.03em] leading-[1.1] text-fg flex-1">
                 {listing.card.nameKo ?? listing.card.name}
               </h1>
               <div className="flex items-center gap-2 shrink-0 mt-1">
@@ -709,94 +710,46 @@ export default function ListingDetailPage() {
                     setTimeout(() => setCopied(false), 2000)
                   }}
                   title="링크 복사"
-                  className="flex items-center gap-1 h-8 px-2.5 rounded-lg border border-[#2e2318] bg-[#1a1410] hover:border-[#4a3520] text-[#7a6040] hover:text-[#c9a860] transition-all text-[11px] font-medium"
+                  className="flex items-center gap-1.5 h-9 px-3.5 rounded-full border border-line bg-surface hover:border-line-strong text-muted hover:text-fg transition-all text-xs font-medium"
                 >
                   {copied ? <><Check size={11} className="text-emerald-400" /> 복사됨</> : <><Share2 size={11} /> 공유</>}
                 </button>
               </div>
             </div>
             {listing.card.nameKo && listing.card.nameKo !== listing.card.name && (
-              <p className="text-sm text-[#5a4830] mb-1">{listing.card.name}</p>
+              <p className="text-sm text-subtle mb-1">{listing.card.name}</p>
             )}
-            <p className="text-sm text-[#7a6040]">
+            <p className="text-sm text-muted mt-1">
               {listing.card.setName}
               {listing.card.rarity && ` · ${rarityLabel(listing.card.rarity)}`}
             </p>
           </div>
 
-          {/* Card info panel */}
-          <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl px-4">
-            <InfoRow label="컨디션">{CONDITION_LABELS[listing.condition]}</InfoRow>
-            <InfoRow label="그레이딩">
-              {listing.gradingCompany
-                ? <span className="flex items-center gap-1.5 justify-end">
-                    <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-[#2a1c08] text-[#e0b878] border border-[#3d2a0c]">{listing.gradingCompany}</span>
-                    {listing.gradingGrade && <span className="font-bold text-white">{listing.gradingGrade}</span>}
-                  </span>
-                : <span className="text-[#5a4830]">None</span>}
-            </InfoRow>
-            <InfoRow label="수량">{listing.quantity}장</InfoRow>
-            <InfoRow label="판매자">
-              <span className="flex items-center gap-2 flex-wrap">
-                <Link href={`/users/${listing.sellerId}`} className="hover:text-[#d4a853] transition-colors">
-                  {listing.seller.nickname}
-                </Link>
-                <RatingBadge avgRating={listing.seller.avgRating ?? null} reviewCount={listing.seller.reviewCount ?? 0} />
-                <SellerGradeBadge sellerId={listing.sellerId} />
-              </span>
-            </InfoRow>
-            <InfoRow label="등록일">{format(new Date(listing.createdAt), 'yyyy.MM.dd HH:mm')}</InfoRow>
-            {listing.viewCount > 0 && (
-              <InfoRow label="조회수">
-                <span className="flex items-center gap-1 text-[#7a6040]">
-                  <Eye size={11} /> {listing.viewCount.toLocaleString()}명이 봤어요
-                </span>
-              </InfoRow>
-            )}
-          </div>
-
-          {/* Description */}
-          {listing.description && (
-            <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl p-4 text-sm text-[#9e8a6a] whitespace-pre-wrap leading-relaxed">
-              {listing.description}
-            </div>
-          )}
-
-          {/* Official card image (when real photos exist) */}
-          {listing.imageUrls?.length > 0 && listing.card.imageUrl && (
-            <div className="flex items-center gap-3 bg-[#1a1410] border border-[#2e2318] rounded-xl p-3">
-              <div className="relative w-10 h-14 shrink-0 rounded-lg overflow-hidden border border-[#2e2318]">
-                <Image src={resolveImageSrc(listing.card.imageUrl)!} alt={listing.card.name} fill className="object-cover" />
-              </div>
-              <p className="text-xs text-[#5a4830]">공식 카드 이미지</p>
-            </div>
-          )}
-
           {/* ── Action panel ── */}
-          <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl p-5 space-y-4">
+          <div className="relative overflow-hidden rounded-3xl border border-line bg-gradient-to-br from-surface-2 via-surface to-surface p-6 space-y-5">
+            <div className="absolute -top-20 -right-12 w-64 h-64 rounded-full bg-accent/15 blur-3xl pointer-events-none" />
 
             {/* BUY NOW */}
             {listing.listingType === 'BUY_NOW' && (
               <>
                 <div>
-                  <p className="text-[10px] text-[#5a4830] uppercase tracking-wider font-semibold mb-1">판매가</p>
+                  <p className="relative text-xs text-muted mb-2">판매가</p>
                   <div className="flex items-center gap-2">
-                    <Tag size={18} className="text-[#d4a853]" />
-                    <span className="text-3xl font-bold text-[#f0a832] tabular-nums">{listing.buyNowPrice?.toLocaleString()}</span>
-                    <span className="text-lg text-[#6b4c1a]">P</span>
+                    <span className="font-display text-[40px] font-semibold text-fg tabular-nums leading-none">{listing.buyNowPrice?.toLocaleString()}</span>
+                    <span className="text-lg text-muted font-medium self-end mb-1">P</span>
                   </div>
                 </div>
                 {!isSeller && isActive && (
                   <div className="space-y-2.5">
                     <button onClick={() => { if (!user) { router.push('/login'); return } buyMut.mutate() }}
                       disabled={buyMut.isPending}
-                      className="w-full h-12 flex items-center justify-center gap-2 bg-[#d4a853] hover:bg-[#c49440] disabled:opacity-50 text-white font-bold rounded-xl transition-all shadow-[0_0_20px_rgba(212,168,83,0.25)] hover:shadow-[0_0_28px_rgba(212,168,83,0.4)]">
+                      className="relative w-full h-13 py-3.5 flex items-center justify-center gap-2 bg-gradient-to-r from-accent to-accent-strong disabled:opacity-50 text-white font-semibold rounded-full transition-shadow shadow-[0_8px_28px_-6px_rgba(139,92,246,0.6)] hover:shadow-[0_8px_36px_-4px_rgba(139,92,246,0.8)]">
                       {buyMut.isPending
                         ? <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
                         : <><Tag size={16} /> 즉시구매</>}
                     </button>
                     <ChatButton listingId={listing.id} />
-                    <div className="flex items-center justify-center gap-1.5 text-[10px] text-[#4a3820]">
+                    <div className="flex items-center justify-center gap-1.5 text-[10px] text-subtle">
                       <ShieldCheck size={11} className="text-emerald-500/60" />
                       결제 완료 → 판매자 발송 → 수령 확인 → 포인트 정산
                     </div>
@@ -814,47 +767,46 @@ export default function ListingDetailPage() {
                   </div>
                 )}
                 {auctionStatus === 'expired' && (
-                  <div className="flex items-center gap-2 bg-[#221a12] border border-[#2e2318] text-[#7a6040] rounded-xl px-4 py-3 text-sm">
+                  <div className="flex items-center gap-2 bg-surface-2 border border-line text-muted-2 rounded-xl px-4 py-3 text-sm">
                     <AlertCircle size={14} /> 경매가 유찰되었습니다.
                   </div>
                 )}
                 {lastBidder && (
-                  <div className="flex items-center gap-2 text-xs text-[#f0a832] bg-[#1a1000] border border-[#3d2e0c]/60 rounded-lg px-3 py-2">
+                  <div className="flex items-center gap-2 text-xs text-accent-2 bg-accent-tint border border-accent-line/60 rounded-lg px-3 py-2">
                     <Zap size={11} className="animate-live" /> {lastBidder}님이 방금 입찰했습니다
                   </div>
                 )}
                 {extendMsg && (
-                  <div className="flex items-center gap-2 text-xs text-[#e0b878] bg-[#2a1c0c] border border-[#3d2a0c]/50 rounded-lg px-3 py-2">
+                  <div className="flex items-center gap-2 text-xs text-accent-soft bg-accent-tint border border-accent-line/50 rounded-lg px-3 py-2">
                     <ShieldAlert size={11} /> {extendMsg}
                   </div>
                 )}
 
                 <div>
-                  <p className="text-[10px] text-[#5a4830] uppercase tracking-wider font-semibold mb-1">
+                  <p className="relative text-xs text-muted mb-2">
                     현재가 {livePrice && livePrice !== listing.currentPrice && (
-                      <span className="ml-1 text-[#f0a832] normal-case">실시간</span>
+                      <span className="ml-1 text-accent-2 normal-case">실시간</span>
                     )}
                   </p>
                   <div className="flex items-center gap-2 mb-1">
-                    <Gavel size={18} className="text-[#f0a832]" />
-                    <span className="text-3xl font-bold text-[#f0a832] tabular-nums">{currentPrice?.toLocaleString()}</span>
-                    <span className="text-lg text-[#6b4c1a]">P</span>
+                    <span className="font-display text-[40px] font-semibold text-fg tabular-nums leading-none">{currentPrice?.toLocaleString()}</span>
+                    <span className="text-lg text-muted font-medium self-end mb-1">P</span>
                   </div>
-                  <p className="text-xs text-[#5a4830]">시작가: {listing.startingPrice?.toLocaleString()}P</p>
+                  <p className="text-xs text-subtle">시작가: {listing.startingPrice?.toLocaleString()}P</p>
                 </div>
 
                 {listing.instantBuyPrice && isActive && (
-                  <div className="flex items-center gap-2 bg-[#1e1000] border border-[#3d2510]/60 rounded-xl px-3 py-2">
+                  <div className="flex items-center gap-2 bg-orange-500/10 border border-orange-400/20 rounded-full px-4 h-9">
                     <Flame size={13} className="text-orange-400" />
                     <span className="text-xs text-orange-300 font-medium">즉시낙찰가: {listing.instantBuyPrice.toLocaleString()}P</span>
                   </div>
                 )}
 
                 {endsAt && (
-                  <div className={`flex items-center gap-2 rounded-xl px-3 py-2.5 border text-sm font-medium ${
+                  <div className={`flex items-center gap-2 rounded-full px-4 h-10 border text-sm font-medium tabular-nums ${
                     urgent
-                      ? 'bg-red-950/50 border-red-800/40 text-red-400'
-                      : 'bg-[#221a12] border-[#2e2318] text-[#f0a832]'
+                      ? 'bg-rose-500/10 border-rose-400/30 text-rose-300'
+                      : 'bg-cyan-400/10 border-cyan-300/20 text-cyan-200'
                   }`}>
                     <Clock size={14} className={urgent ? 'animate-live' : ''} />
                     {new Date(endsAt) > new Date() ? `${remaining} 남음` : '경매 종료'}
@@ -862,8 +814,8 @@ export default function ListingDetailPage() {
                 )}
 
                 {listing.autoExtendMinutes && isActive && (
-                  <div className="flex items-center gap-2 text-xs text-[#7a6040]">
-                    <ShieldAlert size={11} className="text-[#d4a853]/60" />
+                  <div className="flex items-center gap-2 text-xs text-muted-2">
+                    <ShieldAlert size={11} className="text-accent-fg/60" />
                     마감 {listing.autoExtendMinutes}분 전 입찰 시 {listing.autoExtendMinutes}분 연장 (최대 {listing.maxAutoExtends}회)
                   </div>
                 )}
@@ -877,25 +829,25 @@ export default function ListingDetailPage() {
                     <div className="flex gap-2">
                       <button onClick={() => { if (!user) { router.push('/login'); return } bidMut.mutate(Number(bidAmount)) }}
                         disabled={bidMut.isPending || !bidAmount}
-                        className="flex-1 h-12 flex items-center justify-center gap-2 bg-[#f0a832] hover:bg-[#d4922a] disabled:opacity-50 text-[#0f0b08] font-bold rounded-xl transition-all shadow-[0_0_16px_rgba(240,168,50,0.2)] hover:shadow-[0_0_24px_rgba(240,168,50,0.35)]">
+                        className="flex-1 h-12 flex items-center justify-center gap-2 bg-gradient-to-r from-accent to-accent-strong disabled:opacity-50 text-white font-semibold rounded-full transition-shadow shadow-[0_8px_28px_-6px_rgba(139,92,246,0.6)] hover:shadow-[0_8px_36px_-4px_rgba(139,92,246,0.8)]">
                         {bidMut.isPending
-                          ? <span className="w-4 h-4 rounded-full border-2 border-[#0f0b08]/30 border-t-[#0f0b08] animate-spin" />
+                          ? <span className="w-4 h-4 rounded-full border-2 border-bg/30 border-t-bg animate-spin" />
                           : <><Gavel size={16} /> 입찰하기</>}
                       </button>
                       {listing.instantBuyPrice && (
                         <button onClick={() => { if (!user) { router.push('/login'); return } bidMut.mutate(listing.instantBuyPrice!) }}
                           disabled={bidMut.isPending}
-                          className="flex items-center gap-1.5 px-4 h-12 bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-bold rounded-xl text-sm transition-all whitespace-nowrap">
+                          className="flex items-center gap-1.5 px-5 h-12 bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white font-semibold rounded-full text-sm transition-colors whitespace-nowrap">
                           <Flame size={14} /> 즉시낙찰
                         </button>
                       )}
                     </div>
 
                     {/* 자동 입찰 패널 */}
-                    <div className="border-t border-[#2e2318] pt-2.5">
+                    <div className="border-t border-line pt-2.5">
                       {myAutoBid ? (
-                        <div className="flex items-center justify-between bg-[#1a1000] border border-[#3d2e0c]/60 rounded-xl px-3 py-2.5">
-                          <div className="flex items-center gap-2 text-xs text-[#f0a832]">
+                        <div className="flex items-center justify-between bg-accent-tint border border-accent-line/60 rounded-xl px-3 py-2.5">
+                          <div className="flex items-center gap-2 text-xs text-accent-2">
                             <Bot size={13} />
                             <span>자동 입찰 설정됨: <strong className="tabular-nums">{myAutoBid.maxAmount.toLocaleString()}P</strong> 한도</span>
                           </div>
@@ -910,10 +862,10 @@ export default function ListingDetailPage() {
                       ) : (
                         <button
                           onClick={() => setShowAutoBid(v => !v)}
-                          className={`w-full flex items-center justify-center gap-1.5 h-9 rounded-xl text-xs font-medium border transition-all ${
+                          className={`w-full flex items-center justify-center gap-1.5 h-10 rounded-full text-xs font-medium border transition-all ${
                             showAutoBid
-                              ? 'bg-[#1a1000] border-[#3d2e0c] text-[#f0a832]'
-                              : 'bg-transparent border-[#2e2318] text-[#5a4830] hover:border-[#4a3520] hover:text-[#9e8a6a]'
+                              ? 'bg-accent-tint border-accent-line text-accent-2'
+                              : 'bg-transparent border-line text-subtle hover:border-line-strong hover:text-fg-3'
                           }`}
                         >
                           <Bot size={13} /> 자동 입찰 설정
@@ -921,7 +873,7 @@ export default function ListingDetailPage() {
                       )}
                       {showAutoBid && !myAutoBid && (
                         <div className="mt-2 space-y-2">
-                          <p className="text-[10px] text-[#5a4830] leading-relaxed">
+                          <p className="text-[10px] text-subtle leading-relaxed">
                             최대 입찰 한도를 설정하면 다른 입찰자가 나타날 때 자동으로 1P씩 올려 입찰합니다.
                           </p>
                           <div className="flex gap-2">
@@ -935,7 +887,7 @@ export default function ListingDetailPage() {
                             <button
                               onClick={() => { if (!user) { router.push('/login'); return } autoBidMut.mutate(Number(autoBidAmount)) }}
                               disabled={autoBidMut.isPending || !autoBidAmount}
-                              className="px-4 h-11 bg-[#f0a832] hover:bg-[#d4922a] disabled:opacity-50 text-[#0f0b08] font-bold rounded-xl text-sm transition-all whitespace-nowrap"
+                              className="px-5 h-12 bg-accent hover:bg-accent-strong disabled:opacity-50 text-white font-semibold rounded-full text-sm transition-colors whitespace-nowrap"
                             >
                               {autoBidMut.isPending ? '...' : '설정'}
                             </button>
@@ -947,19 +899,19 @@ export default function ListingDetailPage() {
                 )}
 
                 {listing.bids?.length > 0 && (
-                  <div className="space-y-1 pt-3 border-t border-[#2e2318]">
-                    <p className="text-xs text-[#5a4830] font-semibold uppercase tracking-wider mb-2">
+                  <div className="space-y-1 pt-3 border-t border-line">
+                    <p className="text-xs text-subtle font-semibold uppercase tracking-wider mb-2">
                       입찰 내역 ({listing.bids.length}건)
                     </p>
                     {listing.bids.slice(0, 5).map((bid: { id: string; bidder: { nickname: string }; amount: number; createdAt: string; isWinning: boolean; isAuto?: boolean }) => (
-                      <div key={bid.id} className={`flex justify-between items-center py-1.5 text-xs ${bid.isWinning ? 'text-[#f0a832]' : 'text-[#7a6040]'}`}>
+                      <div key={bid.id} className={`flex justify-between items-center py-1.5 text-xs ${bid.isWinning ? 'text-accent-2' : 'text-muted-2'}`}>
                         <span className="flex items-center gap-1.5">
-                          {bid.isWinning && <Check size={10} className="text-[#f0a832]" />}
-                          {bid.isAuto && <Bot size={10} className="text-[#7a6040]" />}
+                          {bid.isWinning && <Check size={10} className="text-accent-2" />}
+                          {bid.isAuto && <Bot size={10} className="text-muted-2" />}
                           {bid.bidder.nickname}
                         </span>
                         <span className="font-semibold tabular-nums">{bid.amount.toLocaleString()}P</span>
-                        <span className="text-[#4a3820]">{format(new Date(bid.createdAt), 'MM/dd HH:mm')}</span>
+                        <span className="text-subtle">{format(new Date(bid.createdAt), 'MM/dd HH:mm')}</span>
                       </div>
                     ))}
                   </div>
@@ -971,11 +923,10 @@ export default function ListingDetailPage() {
             {listing.listingType === 'OFFER' && (
               <>
                 <div>
-                  <p className="text-[10px] text-[#5a4830] uppercase tracking-wider font-semibold mb-1">최소 제안가</p>
+                  <p className="relative text-xs text-muted mb-2">최소 제안가</p>
                   <div className="flex items-center gap-2">
-                    <Handshake size={18} className="text-emerald-400" />
-                    <span className="text-3xl font-bold text-[#f0a832] tabular-nums">{listing.minOfferPrice?.toLocaleString()}</span>
-                    <span className="text-lg text-[#6b4c1a]">P</span>
+                    <span className="font-display text-[40px] font-semibold text-fg tabular-nums leading-none">{listing.minOfferPrice?.toLocaleString()}</span>
+                    <span className="text-lg text-muted font-medium self-end mb-1">P</span>
                   </div>
                 </div>
                 {!isSeller && isActive && (
@@ -986,7 +937,7 @@ export default function ListingDetailPage() {
                       placeholder="메시지 (선택)" className={inputCls} />
                     <button onClick={() => { if (!user) { router.push('/login'); return } offerMut.mutate() }}
                       disabled={offerMut.isPending || !offerAmount}
-                      className="w-full h-12 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold rounded-xl transition-all shadow-[0_0_16px_rgba(16,185,129,0.2)]">
+                      className="w-full h-12 flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-white font-semibold rounded-full transition-colors shadow-[0_8px_28px_-8px_rgba(16,185,129,0.6)]">
                       {offerMut.isPending
                         ? <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
                         : <><Handshake size={16} /> 가격 제안하기</>}
@@ -1010,6 +961,54 @@ export default function ListingDetailPage() {
             )}
           </div>
 
+          {/* Card info panel */}
+          <div className="bg-surface/70 border border-line rounded-3xl px-5">
+            <InfoRow label="컨디션">{CONDITION_LABELS[listing.condition]}</InfoRow>
+            <InfoRow label="그레이딩">
+              {listing.gradingCompany
+                ? <span className="flex items-center gap-1.5 justify-end">
+                    <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-accent-tint text-accent-soft border border-accent-line">{listing.gradingCompany}</span>
+                    {listing.gradingGrade && <span className="font-bold text-white">{listing.gradingGrade}</span>}
+                  </span>
+                : <span className="text-subtle">None</span>}
+            </InfoRow>
+            <InfoRow label="수량">{listing.quantity}장</InfoRow>
+            <InfoRow label="판매자">
+              <span className="flex items-center gap-2 flex-wrap">
+                <Link href={`/users/${listing.sellerId}`} className="hover:text-accent-fg transition-colors">
+                  {listing.seller.nickname}
+                </Link>
+                <RatingBadge avgRating={listing.seller.avgRating ?? null} reviewCount={listing.seller.reviewCount ?? 0} />
+                <SellerGradeBadge sellerId={listing.sellerId} />
+              </span>
+            </InfoRow>
+            <InfoRow label="등록일">{format(new Date(listing.createdAt), 'yyyy.MM.dd HH:mm')}</InfoRow>
+            {listing.viewCount > 0 && (
+              <InfoRow label="조회수">
+                <span className="flex items-center gap-1 text-muted-2">
+                  <Eye size={11} /> {listing.viewCount.toLocaleString()}명이 봤어요
+                </span>
+              </InfoRow>
+            )}
+          </div>
+
+          {/* Description */}
+          {listing.description && (
+            <div className="bg-surface/70 border border-line rounded-3xl p-5 text-sm text-fg-3 whitespace-pre-wrap leading-relaxed">
+              {listing.description}
+            </div>
+          )}
+
+          {/* Official card image (when real photos exist) */}
+          {listing.imageUrls?.length > 0 && listing.card.imageUrl && (
+            <div className="flex items-center gap-3 bg-surface border border-line rounded-xl p-3">
+              <div className="relative w-10 h-14 shrink-0 rounded-lg overflow-hidden border border-line">
+                <Image src={resolveImageSrc(listing.card.imageUrl)!} alt={listing.card.name} fill className="object-cover" />
+              </div>
+              <p className="text-xs text-subtle">공식 카드 이미지</p>
+            </div>
+          )}
+
           {/* 시세 현황 */}
           {listing.cardMarket && (
             <MarketStatsPanel
@@ -1025,34 +1024,34 @@ export default function ListingDetailPage() {
 
           {/* 판매자 신뢰 지표 */}
           {listing.sellerStats && (
-            <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl px-4 py-4 space-y-3">
+            <div className="bg-surface/70 border border-line rounded-3xl p-5 space-y-3">
               <div className="flex items-center justify-between">
-                <p className="text-[10px] text-[#5a4830] uppercase tracking-wider font-semibold">판매자 신뢰도</p>
+                <p className="text-[10px] text-subtle uppercase tracking-wider font-semibold">판매자 신뢰도</p>
                 <RatingBadge avgRating={listing.seller.avgRating ?? null} reviewCount={listing.seller.reviewCount ?? 0} />
               </div>
               <div className="grid grid-cols-3 gap-3 text-center">
                 <div>
-                  <p className="text-lg font-bold text-[#f5ead8] tabular-nums">{listing.sellerStats.totalSales}</p>
-                  <p className="text-[10px] text-[#5a4830] mt-0.5">총 거래</p>
+                  <p className="font-display text-2xl font-semibold text-fg tabular-nums">{listing.sellerStats.totalSales}</p>
+                  <p className="text-[10px] text-subtle mt-0.5">총 거래</p>
                 </div>
                 <div>
-                  <p className="text-lg font-bold text-emerald-400 tabular-nums">{listing.sellerStats.completedSales}</p>
-                  <p className="text-[10px] text-[#5a4830] mt-0.5">완료</p>
+                  <p className="font-display text-2xl font-semibold text-emerald-400 tabular-nums">{listing.sellerStats.completedSales}</p>
+                  <p className="text-[10px] text-subtle mt-0.5">완료</p>
                 </div>
                 <div>
                   <p className={`text-lg font-bold tabular-nums ${
-                    listing.sellerStats.completionRate === null ? 'text-[#5a4830]'
+                    listing.sellerStats.completionRate === null ? 'text-subtle'
                     : listing.sellerStats.completionRate >= 90 ? 'text-emerald-400'
                     : listing.sellerStats.completionRate >= 70 ? 'text-yellow-400'
                     : 'text-red-400'
                   }`}>
                     {listing.sellerStats.completionRate === null ? '—' : `${listing.sellerStats.completionRate}%`}
                   </p>
-                  <p className="text-[10px] text-[#5a4830] mt-0.5">거래완료율</p>
+                  <p className="text-[10px] text-subtle mt-0.5">거래완료율</p>
                 </div>
               </div>
               {listing.sellerStats.totalSales === 0 && (
-                <p className="text-[10px] text-[#5a4830] text-center">첫 거래 판매자입니다. 거래 시 유의하세요.</p>
+                <p className="text-[10px] text-subtle text-center">첫 거래 판매자입니다. 거래 시 유의하세요.</p>
               )}
             </div>
           )}
@@ -1071,7 +1070,7 @@ export default function ListingDetailPage() {
             <div className="flex justify-end">
               <button
                 onClick={() => { setReportOpen(true); setReportMsg(null) }}
-                className="flex items-center gap-1.5 text-xs text-[#5a4830] hover:text-red-400 transition-colors"
+                className="flex items-center gap-1.5 text-xs text-subtle hover:text-red-400 transition-colors"
               >
                 <Flag size={11} />
                 판매자 신고
@@ -1084,8 +1083,8 @@ export default function ListingDetailPage() {
       {/* 신고 모달 */}
       {reportOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-[#150f0c] border border-[#2e2318] rounded-2xl w-full max-w-md space-y-5 p-6">
-            <h3 className="text-base font-bold text-[#f5ead8] flex items-center gap-2">
+          <div className="bg-sunken border border-line rounded-2xl w-full max-w-md space-y-5 p-6">
+            <h3 className="text-base font-bold text-fg flex items-center gap-2">
               <Flag size={15} className="text-red-400" />
               판매자 신고
             </h3>
@@ -1102,7 +1101,7 @@ export default function ListingDetailPage() {
             ) : (
               <>
                 <div className="space-y-2">
-                  <label className="text-xs text-[#7a6040] font-semibold uppercase tracking-wider">신고 유형</label>
+                  <label className="text-xs text-muted-2 font-semibold uppercase tracking-wider">신고 유형</label>
                   <div className="grid grid-cols-2 gap-1.5">
                     {[
                       { value: 'FAKE_ITEM',    label: '가짜/위조 카드' },
@@ -1119,7 +1118,7 @@ export default function ListingDetailPage() {
                         className={`px-3 py-2 rounded-xl text-xs font-medium border text-left transition-colors ${
                           reportReason === opt.value
                             ? 'bg-red-900/30 text-red-400 border-red-700/40'
-                            : 'bg-[#1a1410] text-[#7a6040] border-[#2e2318] hover:border-[#4a3520] hover:text-[#9e8a6a]'
+                            : 'bg-surface text-muted-2 border-line hover:border-line-strong hover:text-fg-3'
                         }`}
                       >
                         {opt.label}
@@ -1129,17 +1128,17 @@ export default function ListingDetailPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs text-[#7a6040] font-semibold uppercase tracking-wider">상세 내용 (선택)</label>
+                  <label className="text-xs text-muted-2 font-semibold uppercase tracking-wider">상세 내용 (선택)</label>
                   <textarea
                     value={reportDetail}
                     onChange={e => setReportDetail(e.target.value)}
                     rows={3}
                     placeholder="구체적인 상황을 설명해주세요..."
-                    className="w-full bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] focus:border-[#d4a853]/40 rounded-xl px-4 py-2.5 text-sm text-[#f5ead8] placeholder:text-[#5a4830] focus:outline-none resize-none transition-colors"
+                    className="w-full bg-surface border border-line hover:border-line-strong focus:border-accent/40 rounded-xl px-4 py-2.5 text-sm text-fg placeholder:text-subtle focus:outline-none resize-none transition-colors"
                   />
                 </div>
 
-                <p className="text-[10px] text-[#5a4830] leading-relaxed">
+                <p className="text-[10px] text-subtle leading-relaxed">
                   허위 신고는 계정 제재를 받을 수 있습니다. 관리자 검토 후 처리됩니다.
                 </p>
               </>
@@ -1148,7 +1147,7 @@ export default function ListingDetailPage() {
             <div className="flex gap-2">
               <button
                 onClick={() => { setReportOpen(false); setReportReason(''); setReportDetail(''); setReportMsg(null) }}
-                className="flex-1 py-2.5 rounded-xl border border-[#2e2318] text-[#7a6040] hover:text-[#9e8a6a] hover:border-[#4a3520] text-sm transition-colors"
+                className="flex-1 py-2.5 rounded-xl border border-line text-muted-2 hover:text-fg-3 hover:border-line-strong text-sm transition-colors"
               >
                 {reportMsg ? '닫기' : '취소'}
               </button>

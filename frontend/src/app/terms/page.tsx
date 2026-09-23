@@ -6,8 +6,8 @@ export const metadata: Metadata = {
 
 const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <div className="space-y-3">
-    <h2 className="text-base font-bold text-white border-l-2 border-[#d4a853] pl-3">{title}</h2>
-    <div className="text-sm text-[#8a7055] leading-relaxed space-y-2 pl-3">{children}</div>
+    <h2 className="text-base font-bold text-white border-l-2 border-accent pl-3">{title}</h2>
+    <div className="text-sm text-muted leading-relaxed space-y-2 pl-3">{children}</div>
   </div>
 )
 
@@ -15,11 +15,11 @@ export default function TermsPage() {
   return (
     <div className="max-w-3xl mx-auto py-12 space-y-10">
       <div>
-        <h1 className="text-2xl font-bold text-white mb-2">이용약관</h1>
-        <p className="text-sm text-[#5a4830]">시행일: 2025년 1월 1일 &nbsp;|&nbsp; 최종 수정: 2025년 1월 1일</p>
+        <h1 className="text-[26px] sm:text-3xl font-bold tracking-tight text-fg mb-2">이용약관</h1>
+        <p className="text-sm text-subtle">시행일: 2025년 1월 1일 &nbsp;|&nbsp; 최종 수정: 2025년 1월 1일</p>
       </div>
 
-      <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl p-6 space-y-8">
+      <div className="bg-surface border border-line rounded-2xl p-6 space-y-8">
 
         <Section title="제1조 (목적)">
           <p>이 약관은 로켓옥션하우스(이하 "회사")가 운영하는 Rocket Auction House 서비스(이하 "서비스")의 이용 조건 및 절차, 회사와 이용자 간의 권리·의무 및 책임사항 등을 규정함을 목적으로 합니다.</p>
@@ -80,7 +80,7 @@ export default function TermsPage() {
 
       </div>
 
-      <p className="text-xs text-[#4a3820] text-center">본 약관은 [20XX년 XX월 XX일]부터 시행됩니다.</p>
+      <p className="text-xs text-subtle text-center">본 약관은 [20XX년 XX월 XX일]부터 시행됩니다.</p>
     </div>
   )
 }

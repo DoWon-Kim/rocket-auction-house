@@ -1,45 +1,42 @@
-﻿'use client'
+'use client'
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { Gavel, Tag, Handshake, Package, ChevronRight, ShieldCheck, Zap, TrendingUp, BarChart2 } from 'lucide-react'
+import { Gavel, Tag, Handshake, Package, ArrowRight, ArrowUpRight, ShieldCheck, Zap, TrendingUp, Radio } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
+import { useAuthStore } from '@/lib/store'
 import ListingCard from '@/components/ListingCard'
 import { TCG_LABELS, resolveImageSrc } from '@/lib/utils'
 
 const FEATURES = [
   {
-    icon: <Tag size={22} className="text-[#e0b878]" />,
-    iconBg: 'bg-[#2a1c08] border-[#3d2a0c]',
+    icon: Tag,
+    tone: 'from-violet-500/25 to-violet-500/5 text-violet-300 ring-violet-400/20',
     title: '즉시구매',
-    desc: '원하는 카드를 고정 가격으로 즉시 구매',
+    desc: '원하는 카드를 고정 가격으로 바로 구매',
     href: '/listings?type=BUY_NOW',
-    color: 'hover:border-[#d4a853]/30',
   },
   {
-    icon: <Gavel size={22} className="text-[#f0a832]" />,
-    iconBg: 'bg-[#2a1f08] border-[#3d2e0c]',
+    icon: Gavel,
+    tone: 'from-cyan-400/25 to-cyan-400/5 text-cyan-300 ring-cyan-300/20',
     title: '경매',
-    desc: '시간 제한 경매에 참여해 최고가 낙찰',
+    desc: '실시간 입찰로 최고가에 낙찰',
     href: '/listings?type=AUCTION',
-    color: 'hover:border-[#f0a832]/30',
   },
   {
-    icon: <Handshake size={22} className="text-[#4ade80]" />,
-    iconBg: 'bg-[#0d2820] border-[#1a4030]',
+    icon: Handshake,
+    tone: 'from-emerald-400/25 to-emerald-400/5 text-emerald-300 ring-emerald-300/20',
     title: '가격 제안',
     desc: '원하는 가격을 직접 제안하고 협상',
     href: '/listings?type=OFFER',
-    color: 'hover:border-[#4ade80]/30',
   },
   {
-    icon: <Package size={22} className="text-[#c084fc]" />,
-    iconBg: 'bg-[#1e0d2e] border-[#2e1a45]',
+    icon: Package,
+    tone: 'from-fuchsia-400/25 to-fuchsia-400/5 text-fuchsia-300 ring-fuchsia-300/20',
     title: '오리파 뽑기',
-    desc: '랜덤 뽑기로 레어 카드를 획득',
+    desc: '랜덤 뽑기로 레어 카드 획득',
     href: '/shop?tab=oripa',
-    color: 'hover:border-[#c084fc]/30',
   },
 ]
 
@@ -52,46 +49,43 @@ interface MarketSummary {
   recentDeals: { id: string; finalPrice: number; completedAt: string; cardName: string; cardImage: string | null; tcgType: string; listingType: string }[]
 }
 
-function MarketStatsBanner({ data }: { data: MarketSummary | undefined }) {
-  if (!data) return null
-  const stats = [
-    { label: '활성 리스팅', value: data.activeCount.toLocaleString(), suffix: '개', color: 'text-[#e0b878]' },
-    { label: '진행 중 경매', value: data.activeAuctions.toLocaleString(), suffix: '개', color: 'text-[#f0a832]' },
-    { label: '24h 체결', value: data.tx24h.count.toLocaleString(), suffix: '건', color: 'text-emerald-400' },
-    { label: '7일 거래량', value: data.tx7d.count.toLocaleString(), suffix: '건', color: 'text-blue-400' },
-    { label: '24h 거래액', value: data.tx24h.volume > 0 ? `${(data.tx24h.volume / 10000).toFixed(1)}만` : '0', suffix: 'P', color: 'text-purple-400' },
-  ]
+const TCG_TICKER = ['POKÉMON', 'YU-GI-OH!', 'MAGIC: THE GATHERING', 'ONE PIECE', 'DIGIMON', 'WEISS SCHWARZ', 'LORCANA', 'UNION ARENA']
+
+function SectionHeader({ eyebrow, title, desc, href, live }: { eyebrow: string; title: string; desc?: string; href?: string; live?: boolean }) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-      {stats.map(s => (
-        <div key={s.label} className="bg-[#1a1410] border border-[#2e2318] hover:border-[#3a2a18] rounded-xl px-4 py-3 transition-colors">
-          <p className={`text-xl font-extrabold tabular-nums leading-none ${s.color}`}>
-            {s.value}<span className="text-sm ml-0.5">{s.suffix}</span>
-          </p>
-          <p className="text-[11px] text-[#5a4830] mt-1">{s.label}</p>
-        </div>
-      ))}
+    <div className="flex items-end justify-between gap-4 mb-6">
+      <div>
+        <p className="font-display text-[11px] font-semibold tracking-[0.2em] text-accent-fg uppercase mb-2 flex items-center gap-2">
+          {live && <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-live" />}
+          {eyebrow}
+        </p>
+        <h2 className="text-2xl sm:text-[28px] font-bold text-fg tracking-tight">{title}</h2>
+        {desc && <p className="text-sm text-muted mt-1">{desc}</p>}
+      </div>
+      {href && (
+        <Link href={href}
+          className="shrink-0 inline-flex items-center gap-1.5 h-9 px-4 rounded-full border border-line hover:border-line-strong bg-surface/60 text-sm text-fg-3 hover:text-fg transition-colors">
+          전체 보기 <ArrowRight size={14} />
+        </Link>
+      )}
     </div>
   )
 }
 
-const TCG_LIST = [
-  { name: '포켓몬', emoji: '⚡' },
-  { name: '유희왕', emoji: '👁' },
-  { name: 'MTG', emoji: '✦' },
-  { name: '디지몬', emoji: '🌐' },
-  { name: '원피스', emoji: '⚓' },
-  { name: '바이스', emoji: '⚔' },
-  { name: '기타', emoji: '🃏' },
-]
-
-const TRUST_ITEMS = [
-  { icon: <ShieldCheck size={18} className="text-[#4ade80]" />, label: '에스크로 보호', desc: '결제 후 수령 확인까지 안전 보관' },
-  { icon: <Zap size={18} className="text-[#f0a832]" />, label: '빠른 정산', desc: '수령 확인 즉시 포인트 자동 정산' },
-  { icon: <TrendingUp size={18} className="text-[#e0b878]" />, label: '실시간 경매', desc: '입찰 현황을 실시간으로 확인' },
-]
+function StatTile({ label, value, suffix, accent }: { label: string; value: string; suffix: string; accent?: boolean }) {
+  return (
+    <div className="relative rounded-2xl border border-line bg-surface/70 px-5 py-4 overflow-hidden">
+      {accent && <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full bg-accent/20 blur-2xl" />}
+      <p className="text-xs text-muted mb-2">{label}</p>
+      <p className="font-display text-[26px] font-semibold tabular-nums leading-none text-fg">
+        {value}<span className="text-sm text-muted ml-1 font-sans font-medium">{suffix}</span>
+      </p>
+    </div>
+  )
+}
 
 export default function Home() {
+  const user = useAuthStore(s => s.user)
   const { data: recentData } = useQuery({
     queryKey: ['listings', 'recent-home'],
     queryFn: () => api.get('/listings', { params: { limit: 8, sort: 'newest' } }).then(r => r.data),
@@ -113,119 +107,128 @@ export default function Home() {
   const topCards = marketData?.topCards ?? []
 
   return (
-    <div className="space-y-20">
+    <div className="space-y-24">
 
       {/* ── Hero ─────────────────────────────── */}
-      <section className="relative -mx-4 px-4 pt-20 pb-24 overflow-hidden">
-        {/* Background image */}
-        <div className="absolute inset-0">
-          <Image
-            src="/tcg_background.png"
-            alt=""
-            fill
-            priority
-            className="object-cover object-center"
-            sizes="100vw"
-          />
-        </div>
-        {/* Dark overlay to keep text readable */}
-        <div className="absolute inset-0 bg-[#0f0b08]/72" />
-        {/* Warm golden radial glow */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_55%_at_50%_10%,rgba(212,168,83,0.14)_0%,rgba(184,134,11,0.06)_45%,transparent_70%)]" />
-        {/* Vignette */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_100%_80%_at_50%_50%,transparent_50%,rgba(15,11,8,0.6)_100%)]" />
-        {/* Bottom fade */}
-        <div className="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-t from-[#0f0b08] to-transparent" />
+      <section className="relative pt-6 sm:pt-12 overflow-x-clip lg:overflow-visible">
+        <div className="absolute inset-x-0 -top-8 h-[520px] dot-grid [mask-image:radial-gradient(ellipse_at_top,black_20%,transparent_70%)] pointer-events-none" />
 
-        <div className="relative z-10 text-center space-y-6 max-w-3xl mx-auto">
-          {/* Eyebrow */}
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#221a12] border border-[#3a2510] text-[#8a7055] text-xs font-medium tracking-wider uppercase">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#4ade80] animate-live" />
-            TCG 전문 거래소
+        <div className="relative grid lg:grid-cols-[1.05fr_1fr] gap-12 lg:gap-10 items-center">
+          {/* Copy */}
+          <div className="animate-fade-up">
+            <div className="inline-flex items-center gap-2 h-8 pl-1.5 pr-3.5 rounded-full border border-line bg-surface/70 text-xs text-fg-3">
+              <span className="inline-flex items-center gap-1 h-5 px-2 rounded-full bg-accent/15 text-accent-soft font-display font-semibold text-[10px] tracking-wider">
+                <Radio size={10} /> LIVE
+              </span>
+              TCG 전문 거래소 · 에스크로 보호
+            </div>
+
+            <h1 className="mt-6 text-[44px] sm:text-6xl lg:text-[68px] font-extrabold tracking-[-0.035em] leading-[1.05] text-fg">
+              희귀 카드를<br />
+              <span className="gradient-text">가장 안전하게.</span>
+            </h1>
+
+            <p className="mt-6 text-base sm:text-lg text-muted max-w-md leading-relaxed">
+              포켓몬·유희왕·MTG·원피스까지. 실시간 경매와 즉시구매,
+              수령 확인 전까지 결제금을 보호하는 에스크로로 거래하세요.
+            </p>
+
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Link href="/listings"
+                className="group h-12 pl-6 pr-5 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-accent to-accent-strong text-white text-sm font-semibold shadow-[0_8px_32px_-6px_rgba(139,92,246,0.6)] hover:shadow-[0_8px_40px_-4px_rgba(139,92,246,0.8)] transition-shadow">
+                마켓 둘러보기
+                <ArrowRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
+              </Link>
+              <Link href="/sell"
+                className="h-12 px-6 inline-flex items-center rounded-full border border-line-strong bg-surface/60 hover:bg-surface-2 text-sm font-semibold text-fg-2 transition-colors">
+                카드 판매하기
+              </Link>
+            </div>
+
+            <div className="mt-10 flex flex-wrap gap-x-6 gap-y-3 text-sm text-fg-3">
+              <span className="inline-flex items-center gap-2"><ShieldCheck size={16} className="text-emerald-400" /> 에스크로 보호</span>
+              <span className="inline-flex items-center gap-2"><Zap size={16} className="text-accent-2" /> 수령 즉시 정산</span>
+              <span className="inline-flex items-center gap-2"><TrendingUp size={16} className="text-accent-fg" /> 실시간 입찰</span>
+            </div>
           </div>
 
-          {/* Headline */}
-          <h1 className="text-5xl sm:text-6xl font-extrabold tracking-tight leading-[1.08]">
-            <span className="text-white">Rocket</span>
-            <br />
-            <span className="gradient-text">Auction House</span>
-          </h1>
-
-          <p className="text-[#b8997a] text-lg max-w-md mx-auto leading-relaxed">
-            포켓몬·유희왕·MTG 등 모든 TCG 카드를<br className="hidden sm:block" />
-            에스크로 보호 아래 안전하게 거래하세요
-          </p>
-
-          {/* CTA buttons */}
-          <div className="flex items-center justify-center gap-3 pt-2">
-            <Link href="/listings"
-              className="h-11 px-7 flex items-center gap-2 bg-[#d4a853] hover:bg-[#c49440] text-white text-sm font-semibold rounded-xl transition-all duration-200 shadow-[0_0_24px_rgba(212,168,83,0.35)] hover:shadow-[0_0_32px_rgba(212,168,83,0.5)]">
-              마켓 둘러보기
-              <ChevronRight size={14} />
-            </Link>
-            <Link href="/register"
-              className="h-11 px-7 flex items-center text-sm font-semibold text-[#9e8a6a] bg-[#1a1410] hover:bg-[#221a12] border border-[#2e2318] hover:border-[#4a3520] rounded-xl transition-all duration-200">
-              무료 가입
-            </Link>
-          </div>
-
-          {/* Trust strip */}
-          <div className="flex items-center justify-center gap-6 pt-4 flex-wrap">
-            {TRUST_ITEMS.map(t => (
-              <div key={t.label} className="flex items-center gap-2">
-                {t.icon}
-                <div className="text-left">
-                  <p className="text-xs font-semibold text-[#e8d5b0]">{t.label}</p>
-                  <p className="text-[10px] text-[#5a4830]">{t.desc}</p>
-                </div>
+          {/* Showcase */}
+          <div className="relative animate-fade-up [animation-delay:120ms]">
+            <div className="absolute -inset-6 bg-[radial-gradient(closest-side,rgba(139,92,246,0.35),transparent)] blur-2xl" />
+            <div className="relative rounded-[28px] p-px bg-gradient-to-br from-accent/70 via-line-strong to-accent-2/50">
+              <div className="relative aspect-[4/3] rounded-[27px] overflow-hidden bg-surface">
+                <Image src="/tcg_background.png" alt="" fill priority sizes="(max-width: 1024px) 100vw, 50vw" className="object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-bg/80 via-transparent to-transparent" />
               </div>
-            ))}
+            </div>
+
+            {/* Floating glass chips */}
+            <div className="absolute left-3 lg:-left-8 bottom-6 lg:bottom-10 glass border border-white/10 rounded-2xl px-4 py-3 shadow-2xl">
+              <p className="text-[11px] text-muted">진행 중 경매</p>
+              <p className="font-display text-xl font-semibold text-fg tabular-nums">
+                {(marketData?.activeAuctions ?? 0).toLocaleString()}<span className="text-xs text-muted ml-1 font-sans">건</span>
+              </p>
+            </div>
+            <div className="absolute right-3 lg:-right-6 top-4 lg:top-8 glass border border-white/10 rounded-2xl px-4 py-3 shadow-2xl">
+              <p className="text-[11px] text-muted flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-live" /> 24h 거래액
+              </p>
+              <p className="font-display text-xl font-semibold text-accent-2 tabular-nums">
+                {(marketData?.tx24h.volume ?? 0).toLocaleString()}<span className="text-xs text-muted ml-1 font-sans">P</span>
+              </p>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ── Market Stats ─────────────────────── */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <BarChart2 size={17} className="text-[#d4a853]" />
-            <h2 className="text-lg font-bold text-white">시장 현황</h2>
-          </div>
-          <Link href="/market" className="flex items-center gap-1 text-sm text-[#7a6040] hover:text-[#d4a853] transition-colors">
-            상세 분석 <ChevronRight size={14} />
-          </Link>
+      {/* ── TCG ticker ─────────────────────────── */}
+      <section aria-label="취급 TCG 종목" className="-mx-4 sm:-mx-6 border-y border-line bg-surface/40 overflow-hidden [mask-image:linear-gradient(90deg,transparent,black_10%,black_90%,transparent)]">
+        <div className="flex w-max animate-marquee py-4">
+          {[...TCG_TICKER, ...TCG_TICKER].map((t, i) => (
+            <span key={i} className="font-display text-sm font-semibold tracking-[0.18em] text-subtle px-8 flex items-center gap-8">
+              {t}<span className="text-accent/60">✦</span>
+            </span>
+          ))}
         </div>
-        <MarketStatsBanner data={marketData} />
+      </section>
 
-        {/* 7일 인기 카드 */}
+      {/* ── Market stats ─────────────────────── */}
+      <section>
+        <SectionHeader eyebrow="Market" title="시장 현황" desc="지금 이 순간의 거래 흐름" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <StatTile label="활성 리스팅" value={(marketData?.activeCount ?? 0).toLocaleString()} suffix="개" accent />
+          <StatTile label="24시간 체결" value={(marketData?.tx24h.count ?? 0).toLocaleString()} suffix="건" />
+          <StatTile label="7일 거래량" value={(marketData?.tx7d.count ?? 0).toLocaleString()} suffix="건" />
+          <StatTile label="24시간 평균가" value={(marketData?.tx24h.avgPrice ?? 0).toLocaleString()} suffix="P" />
+        </div>
+
         {topCards.length > 0 && (
-          <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-[#2e2318]">
-              <p className="text-[10px] text-[#5a4830] uppercase tracking-wider font-semibold flex items-center gap-1.5">
-                <TrendingUp size={11} className="text-[#d4a853]" /> 7일 인기 카드 TOP {topCards.length}
+          <div className="mt-3 rounded-2xl border border-line bg-surface/70 overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-line flex items-center justify-between">
+              <p className="text-sm font-semibold text-fg-2 flex items-center gap-2">
+                <TrendingUp size={15} className="text-accent-fg" /> 7일 인기 카드
               </p>
+              <Link href="/market" className="text-xs text-muted hover:text-fg transition-colors">상세 분석</Link>
             </div>
-            <div className="divide-y divide-[#150f0c]">
+            <div className="divide-y divide-line">
               {topCards.map((card, idx) => (
                 <Link key={card.cardId} href={`/cards/${card.cardId}`}
-                  className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#1a1208] transition-colors group">
-                  <span className={`w-5 text-center text-xs font-black shrink-0 ${
-                    idx === 0 ? 'text-[#f0a832]' : idx === 1 ? 'text-[#9e9e9e]' : idx === 2 ? 'text-[#cd7f32]' : 'text-[#4a3820]'
-                  }`}>{idx + 1}</span>
+                  className="flex items-center gap-4 px-5 py-3 hover:bg-surface-2 transition-colors group">
+                  <span className={`font-display w-5 text-center text-sm font-bold shrink-0 ${idx === 0 ? 'text-accent-2' : idx < 3 ? 'text-accent-fg' : 'text-subtle'}`}>{idx + 1}</span>
                   {card.imageUrl
-                    ? <div className="relative w-8 h-11 shrink-0 rounded overflow-hidden bg-[#0f0b08]">
-                        <Image src={resolveImageSrc(card.imageUrl)!} alt={card.name ?? ''} fill className="object-contain" sizes="32px" />
+                    ? <div className="relative w-9 h-12 shrink-0 rounded-md overflow-hidden bg-sunken">
+                        <Image src={resolveImageSrc(card.imageUrl)!} alt={card.name ?? ''} fill className="object-contain" sizes="36px" />
                       </div>
-                    : <div className="w-8 h-11 shrink-0 rounded bg-[#1a1208] flex items-center justify-center text-xs">🃏</div>
+                    : <div className="w-9 h-12 shrink-0 rounded-md bg-surface-2 flex items-center justify-center text-xs">🃏</div>
                   }
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-[#e8d5b0] truncate group-hover:text-white transition-colors font-medium">{card.name}</p>
-                    <p className="text-[10px] text-[#5a4830]">{TCG_LABELS[card.tcgType] ?? card.tcgType} · {card.txCount}건 거래</p>
+                    <p className="text-sm text-fg-2 truncate group-hover:text-fg transition-colors font-medium">{card.name}</p>
+                    <p className="text-xs text-subtle">{TCG_LABELS[card.tcgType] ?? card.tcgType} · {card.txCount}건 거래</p>
                   </div>
                   {card.avgPrice && (
-                    <p className="text-sm font-bold text-[#f0a832] tabular-nums shrink-0">{card.avgPrice.toLocaleString()}<span className="text-[10px] ml-0.5">P</span></p>
+                    <p className="font-display text-sm font-semibold text-fg tabular-nums shrink-0">{card.avgPrice.toLocaleString()}<span className="text-xs text-muted ml-0.5">P</span></p>
                   )}
-                  <ChevronRight size={13} className="text-[#3a2818] group-hover:text-[#7a6040] transition-colors shrink-0" />
+                  <ArrowUpRight size={15} className="text-subtle group-hover:text-accent-fg transition-colors shrink-0" />
                 </Link>
               ))}
             </div>
@@ -233,26 +236,22 @@ export default function Home() {
         )}
       </section>
 
-      {/* ── Trade types ──────────────────────── */}
+      {/* ── Trade types (bento) ──────────────── */}
       <section>
-        <div className="flex items-center justify-between mb-7">
-          <div>
-            <h2 className="text-xl font-bold text-white">거래 방식</h2>
-            <p className="text-sm text-[#5a4830] mt-0.5">목적에 맞는 방식으로 거래하세요</p>
-          </div>
-        </div>
+        <SectionHeader eyebrow="How to trade" title="거래 방식" desc="목적에 맞는 방식으로 거래하세요" />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {FEATURES.map(f => (
-            <Link key={f.href} href={f.href} className="group">
-              <div className={`bg-[#1a1410] border border-[#2e2318] ${f.color} rounded-2xl p-5 space-y-4 transition-all duration-250 hover:shadow-[0_4px_32px_rgba(0,0,0,0.4)] hover:-translate-y-0.5`}>
-                <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl border ${f.iconBg}`}>
-                  {f.icon}
+          {FEATURES.map((f, i) => (
+            <Link key={f.href} href={f.href}
+              className="neon-border group relative rounded-2xl border border-line bg-surface/70 hover:bg-surface-2/80 p-5 sm:p-6 transition-colors">
+              <div className="flex items-start justify-between">
+                <div className={`w-11 h-11 rounded-xl bg-gradient-to-b ring-1 ${f.tone} flex items-center justify-center`}>
+                  <f.icon size={20} />
                 </div>
-                <div>
-                  <h3 className="font-bold text-[#e8d5b0] text-sm mb-1">{f.title}</h3>
-                  <p className="text-[11px] text-[#5a4830] leading-relaxed">{f.desc}</p>
-                </div>
+                <span className="font-display text-xs text-subtle">0{i + 1}</span>
               </div>
+              <h3 className="mt-8 font-bold text-fg text-base">{f.title}</h3>
+              <p className="mt-1 text-sm text-muted leading-relaxed">{f.desc}</p>
+              <ArrowUpRight size={16} className="absolute right-5 bottom-5 text-subtle group-hover:text-fg group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-all" />
             </Link>
           ))}
         </div>
@@ -261,24 +260,7 @@ export default function Home() {
       {/* ── Live auctions ─────────────────────── */}
       {liveAuctions.length > 0 && (
         <section>
-          <div className="flex items-center justify-between mb-7">
-            <div className="flex items-center gap-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-xl font-bold text-white">진행 중인 경매</h2>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-red-950/60 border border-red-800/40 rounded-full text-[10px] font-bold text-red-400 uppercase tracking-wider">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-live" />
-                    LIVE
-                  </span>
-                </div>
-                <p className="text-sm text-[#5a4830] mt-0.5">종료 임박 순으로 정렬됩니다</p>
-              </div>
-            </div>
-            <Link href="/listings?type=AUCTION"
-              className="flex items-center gap-1 text-sm text-[#7a6040] hover:text-[#d4a853] transition-colors">
-              전체 보기 <ChevronRight size={14} />
-            </Link>
-          </div>
+          <SectionHeader eyebrow="Live auction" live title="진행 중인 경매" desc="종료 임박 순" href="/listings?type=AUCTION" />
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {liveAuctions.map((l: Parameters<typeof ListingCard>[0]['listing']) => (
               <ListingCard key={l.id} listing={l} />
@@ -290,16 +272,7 @@ export default function Home() {
       {/* ── Recent listings ───────────────────── */}
       {recentListings.length > 0 && (
         <section>
-          <div className="flex items-center justify-between mb-7">
-            <div>
-              <h2 className="text-xl font-bold text-white">최근 등록</h2>
-              <p className="text-sm text-[#5a4830] mt-0.5">새롭게 등록된 카드를 확인하세요</p>
-            </div>
-            <Link href="/listings"
-              className="flex items-center gap-1 text-sm text-[#7a6040] hover:text-[#d4a853] transition-colors">
-              전체 보기 <ChevronRight size={14} />
-            </Link>
-          </div>
+          <SectionHeader eyebrow="New arrivals" title="최근 등록" desc="새롭게 등록된 카드" href="/listings" />
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {recentListings.map((l: Parameters<typeof ListingCard>[0]['listing']) => (
               <ListingCard key={l.id} listing={l} />
@@ -308,27 +281,29 @@ export default function Home() {
         </section>
       )}
 
-      {/* ── Supported TCG ─────────────────────── */}
-      <section className="py-14 border-t border-[#2e2318] relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_100%_at_50%_100%,rgba(212,168,83,0.04)_0%,transparent_70%)]" />
-        <div className="relative">
-          <div className="flex items-center justify-center gap-3 mb-2">
-            <div className="h-px w-12 bg-gradient-to-r from-transparent to-[#d4a853]/40" />
-            <p className="text-center text-[11px] text-[#7a6040] uppercase tracking-[0.25em] font-semibold">취급 TCG 종목</p>
-            <div className="h-px w-12 bg-gradient-to-l from-transparent to-[#d4a853]/40" />
+      {/* ── CTA band ─────────────────────────── */}
+      {!user && (
+        <section className="relative overflow-hidden rounded-[28px] border border-accent-line bg-gradient-to-br from-accent-tint via-surface to-surface p-8 sm:p-12">
+          <div className="absolute -top-24 -right-16 w-80 h-80 rounded-full bg-accent/30 blur-3xl" />
+          <div className="absolute -bottom-24 left-1/3 w-72 h-72 rounded-full bg-accent-2/15 blur-3xl" />
+          <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-fg tracking-tight">첫 거래를 시작해 보세요</h2>
+              <p className="mt-2 text-muted">가입은 무료, 수수료는 투명하게. 1분이면 충분합니다.</p>
+            </div>
+            <div className="flex gap-3">
+              <Link href="/register"
+                className="h-12 px-6 inline-flex items-center gap-2 rounded-full bg-white text-bg text-sm font-semibold hover:bg-fg-2 transition-colors">
+                무료 가입 <ArrowRight size={16} />
+              </Link>
+              <Link href="/login"
+                className="h-12 px-6 inline-flex items-center rounded-full border border-line-strong text-sm font-semibold text-fg-2 hover:bg-surface-2 transition-colors">
+                로그인
+              </Link>
+            </div>
           </div>
-          <p className="text-center text-xs text-[#4a3820] mb-8">모든 주요 TCG 카드를 거래하세요</p>
-          <div className="flex flex-wrap justify-center gap-2">
-            {TCG_LIST.map(t => (
-              <span key={t.name}
-                className="flex items-center gap-2 px-5 py-2.5 bg-[#1a1410] border border-[#2e2318] hover:border-[#d4a853]/30 hover:bg-[#221a12] rounded-xl text-sm text-[#7a6040] hover:text-[#d4a853] transition-all duration-200 cursor-default">
-                <span className="text-base">{t.emoji}</span>
-                {t.name}
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
     </div>
   )

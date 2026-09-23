@@ -65,26 +65,26 @@ function MaintenancePage({ data }: { data: MaintenanceData }) {
       <div className="max-w-md w-full text-center space-y-6">
         {/* 아이콘 */}
         <div className="flex justify-center">
-          <div className="w-20 h-20 rounded-2xl bg-[#1a2a4a] border border-[#d4a853]/20 flex items-center justify-center shadow-[0_0_40px_rgba(212,168,83,0.1)]">
-            <Construction size={36} className="text-[#d4a853]" />
+          <div className="w-20 h-20 rounded-2xl bg-[#1a2a4a] border border-accent/20 flex items-center justify-center shadow-[0_0_40px_rgba(139,92,246,0.1)]">
+            <Construction size={36} className="text-accent-fg" />
           </div>
         </div>
 
         {/* 제목 */}
         <div className="space-y-2">
           <h1 className="text-2xl font-bold text-white">서버 점검 중</h1>
-          <p className="text-[#8a7055] text-sm leading-relaxed">
+          <p className="text-muted text-sm leading-relaxed">
             {data.message || '더 나은 서비스를 위해 점검을 진행하고 있습니다.\n잠시 후 다시 접속해 주세요.'}
           </p>
         </div>
 
         {/* 예상 종료 시간 */}
         {data.endsAt && (
-          <div className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#1a1410] border border-[#2e2318] rounded-xl text-sm text-[#9e8a6a]">
-            <Clock size={14} className="text-[#d4a853]" />
+          <div className="inline-flex items-center gap-2 px-4 py-2.5 bg-surface border border-line rounded-xl text-sm text-fg-3">
+            <Clock size={14} className="text-accent-fg" />
             <span>
               예상 종료:{' '}
-              <span className="text-[#e8d5b0] font-semibold">
+              <span className="text-fg-2 font-semibold">
                 {format(new Date(data.endsAt), 'M월 d일 (E) HH:mm', { locale: ko })}
               </span>
             </span>
@@ -93,12 +93,12 @@ function MaintenancePage({ data }: { data: MaintenanceData }) {
 
         {/* 장식선 */}
         <div className="flex items-center gap-3">
-          <div className="flex-1 h-px bg-[#2e2318]" />
-          <span className="text-xs text-[#4a3820]">Rocket Auction House</span>
-          <div className="flex-1 h-px bg-[#2e2318]" />
+          <div className="flex-1 h-px bg-line" />
+          <span className="text-xs text-subtle">Rocket Auction House</span>
+          <div className="flex-1 h-px bg-line" />
         </div>
 
-        <p className="text-xs text-[#4a3820]">
+        <p className="text-xs text-subtle">
           불편을 드려 죄송합니다. 빠르게 점검을 마치겠습니다.
         </p>
       </div>

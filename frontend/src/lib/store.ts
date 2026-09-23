@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from 'react'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
@@ -46,3 +47,13 @@ export const useAuthStore = create<AuthStore>()(
     { name: 'auth-storage' }
   )
 )
+
+// localStorage 복원이 끝났는지 여부. SSR/첫 렌더에서는 false라서
+// 복원 전 user === null 을 "비로그인"으로 오판해 리다이렉트하지 않도록 사용
+export function useAuthHydrated() {
+  return useSyncExternalStore(
+    (cb) => useAuthStore.persist.onFinishHydration(cb),
+    () => useAuthStore.persist.hasHydrated(),
+    () => false,
+  )
+}

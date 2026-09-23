@@ -82,17 +82,17 @@ const TYPE_CONFIG = {
   BUY_NOW: {
     icon: <Tag size={10} strokeWidth={2.5} />,
     label: '즉시구매',
-    cls: 'bg-[#1e1a10]/80 text-[#f5e6b8] border border-[#3a3018]/60',
+    cls: 'bg-black/45 text-violet-200 border border-white/10',
   },
   AUCTION: {
     icon: <Gavel size={10} strokeWidth={2.5} />,
     label: '경매',
-    cls: 'bg-[#2a1608]/80 text-[#f0a832] border border-[#4a2808]/60',
+    cls: 'bg-black/45 text-cyan-200 border border-white/10',
   },
   OFFER: {
     icon: <Handshake size={10} strokeWidth={2.5} />,
     label: '가격제안',
-    cls: 'bg-[#0d2820]/80 text-[#4ade80] border border-[#1a4030]/60',
+    cls: 'bg-black/45 text-emerald-200 border border-white/10',
   },
 }
 
@@ -109,7 +109,7 @@ function CardImageWithFallback({ src, alt }: { src: string; alt: string }) {
     return (
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
         <span className="text-4xl opacity-20">🃏</span>
-        <span className="text-[11px] text-[#4a3020] text-center px-3 leading-relaxed">{alt}</span>
+        <span className="text-[11px] text-subtle text-center px-3 leading-relaxed">{alt}</span>
       </div>
     )
   }
@@ -147,24 +147,26 @@ export default function ListingCard({ listing }: { listing: Listing }) {
 
   return (
     <Link href={`/listings/${listing.id}`} className="group block">
-      <article className="bg-[#1a1410] border border-[#2e2318] rounded-2xl overflow-hidden card-hover">
+      <article className="bg-surface/80 border border-line rounded-[20px] overflow-hidden card-hover p-1.5">
         {/* Image area */}
-        <div className="relative aspect-[3/4] bg-[#100c08] overflow-hidden">
+        <div className="relative aspect-[3/4] rounded-[14px] bg-[radial-gradient(ellipse_at_top,var(--color-surface-2),var(--color-sunken))] overflow-hidden">
           {displayImage ? (
             <CardImageWithFallback src={displayImage} alt={listing.card.name} />
           ) : (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
               <span className="text-4xl opacity-20">🃏</span>
-              <span className="text-[11px] text-[#4a3020] text-center px-3 leading-relaxed">{listing.card.name}</span>
+              <span className="text-[11px] text-subtle text-center px-3 leading-relaxed">{listing.card.name}</span>
             </div>
           )}
 
           {/* Bottom gradient */}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0f0b08]/90 via-[#0f0b08]/20 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+          {/* Holo sheen */}
+          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-[linear-gradient(115deg,transparent_30%,rgba(167,139,250,0.18)_45%,rgba(34,211,238,0.14)_55%,transparent_70%)] mix-blend-screen pointer-events-none" />
 
           {/* Type badge */}
           <div className="absolute top-2.5 left-2.5">
-            <span className={`inline-flex items-center gap-1 px-2 py-[3px] rounded-md text-[10px] font-bold tracking-wide backdrop-blur-md ${cfg.cls}`}>
+            <span className={`inline-flex items-center gap-1 h-6 px-2.5 rounded-full text-[10px] font-semibold tracking-wide backdrop-blur-md ${cfg.cls}`}>
               {cfg.icon}
               {cfg.label}
             </span>
@@ -172,7 +174,7 @@ export default function ListingCard({ listing }: { listing: Listing }) {
 
           {/* TCG badge */}
           <div className="absolute top-2.5 right-2.5">
-            <span className="inline-flex items-center px-2 py-[3px] rounded-md text-[10px] font-semibold bg-[#0f0b08]/70 backdrop-blur-md text-[#8a7055] border border-[#2e2318]/80">
+            <span className="inline-flex items-center h-6 px-2.5 rounded-full text-[10px] font-semibold bg-black/45 backdrop-blur-md text-fg-3 border border-white/10">
               {TCG_LABELS[listing.card.tcgType] ?? listing.card.tcgType}
             </span>
           </div>
@@ -187,10 +189,10 @@ export default function ListingCard({ listing }: { listing: Listing }) {
 
           {/* Auction timer */}
           {listing.listingType === 'AUCTION' && listing.auctionEndsAt && timerLabel && (
-            <div className={`absolute bottom-2.5 left-2.5 inline-flex items-center gap-1 px-2 py-[3px] rounded-md text-[10px] font-semibold backdrop-blur-md border ${
+            <div className={`absolute bottom-2.5 left-2.5 inline-flex items-center gap-1 h-6 px-2.5 rounded-full text-[10px] font-semibold tabular-nums backdrop-blur-md border ${
               isEndingSoon
-                ? 'bg-red-950/70 text-red-400 border-red-800/50'
-                : 'bg-[#0f0b08]/70 text-[#f0a832] border-[#3d2e0c]/60'
+                ? 'bg-rose-500/20 text-rose-200 border-rose-400/30'
+                : 'bg-black/45 text-cyan-200 border-white/10'
             }`}>
               <Clock size={10} className={isEndingSoon ? 'animate-live' : ''} />
               {timerLabel}
@@ -199,62 +201,62 @@ export default function ListingCard({ listing }: { listing: Listing }) {
 
           {/* Bid count badge */}
           {listing.listingType === 'AUCTION' && listing._count.bids > 0 && (
-            <div className="absolute bottom-2.5 right-2.5 px-1.5 py-[3px] rounded-md text-[10px] text-[#f0a832] bg-[#2a1608]/80 backdrop-blur-md border border-[#4a2808]/60 font-semibold">
+            <div className="absolute bottom-2.5 right-2.5 h-6 px-2.5 inline-flex items-center rounded-full text-[10px] text-cyan-200 bg-black/45 backdrop-blur-md border border-white/10 font-semibold">
               {listing._count.bids}입찰
             </div>
           )}
 
           {/* Multiple images indicator */}
           {listing.listingType !== 'AUCTION' && listing.imageUrls && listing.imageUrls.length > 1 && (
-            <div className="absolute bottom-2.5 right-2.5 px-1.5 py-[3px] rounded-md text-[10px] text-[#8a7055] bg-[#0f0b08]/70 backdrop-blur-md border border-[#2e2318]/70">
+            <div className="absolute bottom-2.5 right-2.5 h-6 px-2.5 inline-flex items-center rounded-full text-[10px] text-fg-3 bg-black/45 backdrop-blur-md border border-white/10">
               +{listing.imageUrls.length - 1}
             </div>
           )}
         </div>
 
         {/* Info area */}
-        <div className="p-3">
+        <div className="px-2 pt-3 pb-2">
           {/* 카드번호 chip */}
           {listing.card.cardNumber && (
-            <span className="inline-block mb-1 px-1.5 py-[2px] rounded text-[9px] font-mono font-semibold bg-[#1a1208] border border-[#d4a853]/20 text-[#d4a853]/70 tracking-wide">
+            <span className="inline-block mb-1.5 px-1.5 py-[2px] rounded-md text-[9px] font-mono font-semibold bg-accent/10 text-accent-fg tracking-wide">
               [{listing.card.cardNumber}]
             </span>
           )}
-          <p className="font-semibold text-[13px] text-[#e8d5b0] line-clamp-1 mb-0.5">
+          <p className="font-semibold text-sm text-fg line-clamp-1 mb-0.5">
             {listing.card.nameKo ?? listing.card.name}
           </p>
           {listing.card.nameKo && listing.card.nameKo !== listing.card.name && (
-            <p className="text-[10px] text-[#5a4830] line-clamp-1 mb-0.5">{listing.card.name}</p>
+            <p className="text-[10px] text-subtle line-clamp-1 mb-0.5">{listing.card.name}</p>
           )}
-          <p className="text-[11px] text-[#5a4830] line-clamp-1 mb-2">
+          <p className="text-[11px] text-subtle line-clamp-1 mb-2">
             {listing.card.setName}
             {listing.card.rarity ? ` · ${rarityLabel(listing.card.rarity)}` : ''}
           </p>
 
           {/* Price row */}
-          <div className="flex items-end justify-between mb-2">
+          <div className="flex items-end justify-between pt-2.5 mb-2 border-t border-line">
             <div>
-              <p className="text-[10px] text-[#4a3820] mb-0.5 uppercase tracking-wider font-medium">
+              <p className="text-[10px] text-muted mb-1 font-medium">
                 {listing.listingType === 'AUCTION' ? '현재가' : listing.listingType === 'OFFER' ? '최소제안' : '판매가'}
               </p>
-              <p className="text-[15px] font-bold text-[#f0a832] tabular-nums leading-none">
+              <p className="font-display text-[17px] font-semibold text-fg tabular-nums leading-none">
                 {price?.toLocaleString()}
-                <span className="text-[11px] ml-0.5 text-[#6b4c1a] font-normal">P</span>
+                <span className="text-[11px] ml-0.5 text-muted font-sans font-medium">P</span>
               </p>
             </div>
             {/* Condition pill */}
-            <span className={`text-[9px] font-bold px-1.5 py-[2px] rounded border ${conditionColor}`}>
+            <span className={`text-[10px] font-semibold px-2 py-[3px] rounded-full border ${conditionColor}`}>
               {CONDITION_LABELS[listing.condition]}
             </span>
           </div>
 
           {/* Seller row */}
           <div className="flex items-center justify-between">
-            <span className="text-[10px] text-[#4a3820] truncate max-w-[70%]">
+            <span className="text-[10px] text-subtle truncate max-w-[70%]">
               {listing.seller.nickname}
             </span>
             {listing.seller.avgRating != null && (
-              <span className="flex items-center gap-0.5 text-[10px] text-[#c8a035]">
+              <span className="flex items-center gap-0.5 text-[10px] text-accent-fg">
                 <Star size={9} fill="currentColor" strokeWidth={0} />
                 {listing.seller.avgRating.toFixed(1)}
               </span>

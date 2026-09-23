@@ -52,21 +52,21 @@ function VerifyEmailContent() {
 
   return (
     <div className="min-h-[60vh] flex items-center justify-center">
-      <div className="bg-[#1a1208] border border-[#3d2e1a] rounded-2xl p-10 max-w-md w-full text-center">
+      <div className="bg-surface-2 border border-[#211f34] rounded-2xl p-10 max-w-md w-full text-center">
         {status === 'verifying' && (
           <>
-            <Loader2 className="w-12 h-12 text-[#d4a853] mx-auto mb-4 animate-spin" />
-            <h1 className="text-lg font-semibold text-[#e8d5b0] mb-2">이메일 인증 중...</h1>
-            <p className="text-sm text-[#7a6040]">잠시만 기다려 주세요.</p>
+            <Loader2 className="w-12 h-12 text-accent-fg mx-auto mb-4 animate-spin" />
+            <h1 className="text-lg font-semibold text-fg-2 mb-2">이메일 인증 중...</h1>
+            <p className="text-sm text-muted-2">잠시만 기다려 주세요.</p>
           </>
         )}
 
         {status === 'success' && (
           <>
             <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-4" />
-            <h1 className="text-lg font-semibold text-[#e8d5b0] mb-2">이메일 인증 완료!</h1>
-            <p className="text-sm text-[#7a6040] mb-6">3초 후 홈으로 이동합니다.</p>
-            <Link href="/" className="text-sm text-[#d4a853] hover:underline">
+            <h1 className="text-lg font-semibold text-fg-2 mb-2">이메일 인증 완료!</h1>
+            <p className="text-sm text-muted-2 mb-6">3초 후 홈으로 이동합니다.</p>
+            <Link href="/" className="text-sm text-accent-fg hover:underline">
               바로 이동
             </Link>
           </>
@@ -75,18 +75,18 @@ function VerifyEmailContent() {
         {status === 'error' && (
           <>
             <XCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-            <h1 className="text-lg font-semibold text-[#e8d5b0] mb-2">인증 실패</h1>
-            <p className="text-sm text-[#7a6040] mb-6">{errorMsg}</p>
+            <h1 className="text-lg font-semibold text-fg-2 mb-2">인증 실패</h1>
+            <p className="text-sm text-muted-2 mb-6">{errorMsg}</p>
             {user && !user.emailVerified && (
               <button
                 onClick={resend}
-                className="px-5 py-2 text-sm bg-[#d4a853] text-[#0f0b08] font-semibold rounded-lg hover:bg-[#e8c06a] transition-colors"
+                className="px-5 py-2 text-sm bg-accent text-on-accent font-semibold rounded-lg hover:bg-accent-fg transition-colors"
               >
                 인증 메일 재전송
               </button>
             )}
             <div className="mt-4">
-              <Link href="/" className="text-sm text-[#5a4830] hover:text-[#d4a853] transition-colors">
+              <Link href="/" className="text-sm text-subtle hover:text-accent-fg transition-colors">
                 홈으로
               </Link>
             </div>
@@ -95,17 +95,17 @@ function VerifyEmailContent() {
 
         {status === 'resending' && (
           <>
-            <Loader2 className="w-12 h-12 text-[#d4a853] mx-auto mb-4 animate-spin" />
-            <h1 className="text-lg font-semibold text-[#e8d5b0] mb-2">재전송 중...</h1>
+            <Loader2 className="w-12 h-12 text-accent-fg mx-auto mb-4 animate-spin" />
+            <h1 className="text-lg font-semibold text-fg-2 mb-2">재전송 중...</h1>
           </>
         )}
 
         {status === 'resent' && (
           <>
-            <Mail className="w-12 h-12 text-[#d4a853] mx-auto mb-4" />
-            <h1 className="text-lg font-semibold text-[#e8d5b0] mb-2">메일을 재전송했습니다</h1>
-            <p className="text-sm text-[#7a6040] mb-6">받은 편지함을 확인해 주세요. 스팸 폴더도 확인해 보세요.</p>
-            <Link href="/" className="text-sm text-[#5a4830] hover:text-[#d4a853] transition-colors">
+            <Mail className="w-12 h-12 text-accent-fg mx-auto mb-4" />
+            <h1 className="text-lg font-semibold text-fg-2 mb-2">메일을 재전송했습니다</h1>
+            <p className="text-sm text-muted-2 mb-6">받은 편지함을 확인해 주세요. 스팸 폴더도 확인해 보세요.</p>
+            <Link href="/" className="text-sm text-subtle hover:text-accent-fg transition-colors">
               홈으로
             </Link>
           </>
@@ -119,7 +119,7 @@ export default function VerifyEmailPage() {
   return (
     <Suspense fallback={
       <div className="min-h-[60vh] flex items-center justify-center">
-        <Loader2 className="w-10 h-10 text-[#d4a853] animate-spin" />
+        <Loader2 className="w-10 h-10 text-accent-fg animate-spin" />
       </div>
     }>
       <VerifyEmailContent />

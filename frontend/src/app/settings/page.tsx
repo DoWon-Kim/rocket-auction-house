@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import { useAuthStore } from '@/lib/store'
+import { useAuthStore, useAuthHydrated } from '@/lib/store'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import {
@@ -16,7 +16,7 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
     <button
       role="switch" aria-checked={checked} onClick={() => onChange(!checked)} disabled={disabled}
       className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border-2 transition-colors duration-200 focus:outline-none disabled:opacity-40 ${
-        checked ? 'bg-[#d4a853] border-[#d4a853]' : 'bg-[#2e2318] border-[#3a2818]'
+        checked ? 'bg-accent border-accent' : 'bg-line border-line-strong'
       }`}>
       <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
     </button>
@@ -25,10 +25,10 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
 
 function SectionCard({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl overflow-hidden">
-      <div className="flex items-center gap-3 px-5 py-4 border-b border-[#2e2318]">
-        <span className="text-[#d4a853]">{icon}</span>
-        <h2 className="font-semibold text-sm text-[#f5ead8]">{title}</h2>
+    <div className="bg-surface border border-line rounded-2xl overflow-hidden">
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-line">
+        <span className="text-accent-fg">{icon}</span>
+        <h2 className="font-semibold text-sm text-fg">{title}</h2>
       </div>
       {children}
     </div>
@@ -111,9 +111,11 @@ export default function SettingsPage() {
     },
   })
 
+  const hydrated = useAuthHydrated()
+
   useEffect(() => {
-    if (!user) router.replace('/login')
-  }, [user, router])
+    if (hydrated && !user) router.replace('/login')
+  }, [hydrated, user, router])
 
   if (!user) return null
 
@@ -124,8 +126,8 @@ export default function SettingsPage() {
   return (
     <div className="max-w-xl mx-auto space-y-5">
       <div className="flex items-center gap-3">
-        <Settings size={20} className="text-[#d4a853]" />
-        <h1 className="text-xl font-bold text-[#f5ead8]">설정</h1>
+        <Settings size={20} className="text-accent-fg" />
+        <h1 className="text-xl font-bold text-fg">설정</h1>
       </div>
 
       {/* ── 프로필 편집 ── */}
@@ -134,32 +136,32 @@ export default function SettingsPage() {
           {/* 아바타 */}
           <div className="flex items-center gap-4">
             <div className="relative">
-              <div className="w-16 h-16 rounded-full overflow-hidden bg-[#2a1c0c] border-2 border-[#3a2510]">
+              <div className="w-16 h-16 rounded-full overflow-hidden bg-accent-tint border-2 border-accent-line">
                 {user.avatarUrl
                   ? <Image src={user.avatarUrl} alt={user.nickname} width={64} height={64} className="object-cover w-full h-full" />
-                  : <div className="flex items-center justify-center h-full text-[#5a4830] text-2xl font-bold">
+                  : <div className="flex items-center justify-center h-full text-subtle text-2xl font-bold">
                       {user.nickname[0].toUpperCase()}
                     </div>}
               </div>
               <button
                 onClick={() => fileRef.current?.click()}
                 disabled={avatarMut.isPending}
-                className="absolute -bottom-1 -right-1 w-6 h-6 bg-[#d4a853] hover:bg-[#c49440] rounded-full flex items-center justify-center transition-colors disabled:opacity-50">
+                className="absolute -bottom-1 -right-1 w-6 h-6 bg-accent hover:bg-accent-strong rounded-full flex items-center justify-center transition-colors disabled:opacity-50">
                 <Camera size={12} className="text-white" />
               </button>
               <input ref={fileRef} type="file" accept="image/*" className="hidden"
                 onChange={e => { const f = e.target.files?.[0]; if (f) avatarMut.mutate(f); e.target.value = '' }} />
             </div>
             <div>
-              <p className="text-sm font-semibold text-[#f5ead8]">{user.nickname}</p>
-              <p className="text-xs text-[#5a4830]">{user.email}</p>
-              <p className="text-[11px] text-[#4a3820] mt-0.5">카메라 아이콘을 눌러 프로필 사진 변경</p>
+              <p className="text-sm font-semibold text-fg">{user.nickname}</p>
+              <p className="text-xs text-subtle">{user.email}</p>
+              <p className="text-[11px] text-subtle mt-0.5">카메라 아이콘을 눌러 프로필 사진 변경</p>
             </div>
           </div>
 
           {/* 닉네임 변경 */}
           <div className="space-y-1.5">
-            <label className="block text-xs text-[#7a6040]">닉네임 변경</label>
+            <label className="block text-xs text-muted-2">닉네임 변경</label>
             <div className="flex gap-2">
               <input
                 type="text"
@@ -167,16 +169,16 @@ export default function SettingsPage() {
                 onChange={e => setNickname(e.target.value)}
                 placeholder={`현재: ${user.nickname}`}
                 maxLength={20}
-                className="flex-1 bg-[#1a1208] border border-[#2e2318] focus:border-[#d4a853]/60 rounded-xl px-3 py-2 text-sm text-[#f5ead8] placeholder:text-[#4a3820] outline-none transition-colors"
+                className="flex-1 bg-surface-2 border border-line focus:border-accent/60 rounded-xl px-3 py-2 text-sm text-fg placeholder:text-subtle outline-none transition-colors"
               />
               <button
                 onClick={() => { if (nickname.trim().length >= 2) profileMut.mutate({ nickname: nickname.trim() }) }}
                 disabled={nickname.trim().length < 2 || profileMut.isPending}
-                className="px-4 py-2 bg-[#d4a853] hover:bg-[#c49440] disabled:opacity-40 text-white rounded-xl text-sm font-medium transition-colors">
+                className="px-4 py-2 bg-accent hover:bg-accent-strong disabled:opacity-40 text-white rounded-xl text-sm font-medium transition-colors">
                 변경
               </button>
             </div>
-            <p className="text-[11px] text-[#4a3820]">2~20자, 중복 불가</p>
+            <p className="text-[11px] text-subtle">2~20자, 중복 불가</p>
           </div>
 
           {profileMsg && (
@@ -201,18 +203,18 @@ export default function SettingsPage() {
             { key: 'confirm' as const, label: '새 비밀번호 확인', placeholder: '새 비밀번호 재입력' },
           ].map(({ key, label, placeholder }) => (
             <div key={key} className="space-y-1">
-              <label className="block text-xs text-[#7a6040]">{label}</label>
+              <label className="block text-xs text-muted-2">{label}</label>
               <div className="relative">
                 <input
                   type={showPw[key] ? 'text' : 'password'}
                   value={pwForm[key]}
                   onChange={e => setPwForm(p => ({ ...p, [key]: e.target.value }))}
                   placeholder={placeholder}
-                  className="w-full bg-[#1a1208] border border-[#2e2318] focus:border-[#d4a853]/60 rounded-xl px-3 py-2 pr-10 text-sm text-[#f5ead8] placeholder:text-[#4a3820] outline-none transition-colors"
+                  className="w-full bg-surface-2 border border-line focus:border-accent/60 rounded-xl px-3 py-2 pr-10 text-sm text-fg placeholder:text-subtle outline-none transition-colors"
                 />
                 <button type="button"
                   onClick={() => setShowPw(p => ({ ...p, [key]: !p[key] }))}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#5a4830] hover:text-[#9e8a6a]">
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle hover:text-fg-3">
                   {showPw[key] ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
               </div>
@@ -236,7 +238,7 @@ export default function SettingsPage() {
           <button
             onClick={() => pwMut.mutate()}
             disabled={!pwValid || pwMut.isPending}
-            className="w-full bg-[#d4a853] hover:bg-[#c49440] disabled:opacity-40 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
+            className="w-full bg-accent hover:bg-accent-strong disabled:opacity-40 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
             {pwMut.isPending ? '변경 중...' : '비밀번호 변경'}
           </button>
         </div>
@@ -245,13 +247,13 @@ export default function SettingsPage() {
       {/* ── 알림 설정 ── */}
       <SectionCard icon={<Bell size={16} />} title="알림 설정">
         <div>
-          <div className="px-5 py-4 border-b border-[#2e2318]">
+          <div className="px-5 py-4 border-b border-line">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-start gap-3">
-                <Mail size={16} className="text-[#7a6040] mt-0.5 shrink-0" />
+                <Mail size={16} className="text-muted-2 mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-sm font-medium text-[#f5ead8]">이메일 알림 수신</p>
-                  <p className="text-[12px] text-[#5a4830] mt-0.5">
+                  <p className="text-sm font-medium text-fg">이메일 알림 수신</p>
+                  <p className="text-[12px] text-subtle mt-0.5">
                     중요한 거래 알림을 {user.email}로 발송합니다.
                   </p>
                 </div>
@@ -262,35 +264,35 @@ export default function SettingsPage() {
 
           <div className={`transition-opacity ${emailOn ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
             {EMAIL_EVENTS.map((ev, i) => (
-              <div key={ev.label} className={`flex items-center justify-between px-5 py-3 ${i < EMAIL_EVENTS.length - 1 ? 'border-b border-[#1e1810]' : ''}`}>
+              <div key={ev.label} className={`flex items-center justify-between px-5 py-3 ${i < EMAIL_EVENTS.length - 1 ? 'border-b border-surface-2' : ''}`}>
                 <div className="pl-7">
-                  <p className="text-sm text-[#c8b48a]">{ev.label}</p>
-                  <p className="text-[11px] text-[#4a3820] mt-0.5">{ev.desc}</p>
+                  <p className="text-sm text-[#8c60f2]">{ev.label}</p>
+                  <p className="text-[11px] text-subtle mt-0.5">{ev.desc}</p>
                 </div>
-                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${emailOn ? 'border-[#d4a853] bg-[#d4a853]/20' : 'border-[#2e2318]'}`}>
-                  {emailOn && <div className="w-1.5 h-1.5 rounded-full bg-[#d4a853]" />}
+                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${emailOn ? 'border-accent bg-accent/20' : 'border-line'}`}>
+                  {emailOn && <div className="w-1.5 h-1.5 rounded-full bg-accent" />}
                 </div>
               </div>
             ))}
           </div>
 
           {emailSaved && (
-            <div className="flex items-center gap-2 px-5 py-3 border-t border-[#2e2318] bg-[#d4a853]/5">
-              <CheckCircle2 size={14} className="text-[#d4a853]" />
-              <span className="text-xs text-[#d4a853]">설정이 저장되었습니다.</span>
+            <div className="flex items-center gap-2 px-5 py-3 border-t border-line bg-accent/5">
+              <CheckCircle2 size={14} className="text-accent-fg" />
+              <span className="text-xs text-accent-fg">설정이 저장되었습니다.</span>
             </div>
           )}
         </div>
       </SectionCard>
 
       {/* SMTP 안내 */}
-      <div className="flex items-start gap-3 bg-[#1a1410] border border-[#2e2318] rounded-2xl px-5 py-4 text-[12px] text-[#5a4830]">
-        <Shield size={14} className="shrink-0 mt-0.5 text-[#4a3820]" />
+      <div className="flex items-start gap-3 bg-surface border border-line rounded-2xl px-5 py-4 text-[12px] text-subtle">
+        <Shield size={14} className="shrink-0 mt-0.5 text-subtle" />
         <span>
           이메일 발송은 서버의 SMTP 설정이 완료된 경우에만 작동합니다.
-          관리자가 <code className="text-[#7a6040] bg-[#120d08] px-1 rounded">SMTP_HOST</code>,{' '}
-          <code className="text-[#7a6040] bg-[#120d08] px-1 rounded">SMTP_USER</code>,{' '}
-          <code className="text-[#7a6040] bg-[#120d08] px-1 rounded">SMTP_PASS</code> 환경 변수를 설정해야 합니다.
+          관리자가 <code className="text-muted-2 bg-sunken px-1 rounded">SMTP_HOST</code>,{' '}
+          <code className="text-muted-2 bg-sunken px-1 rounded">SMTP_USER</code>,{' '}
+          <code className="text-muted-2 bg-sunken px-1 rounded">SMTP_PASS</code> 환경 변수를 설정해야 합니다.
         </span>
       </div>
     </div>

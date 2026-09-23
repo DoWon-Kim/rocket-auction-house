@@ -120,7 +120,7 @@ export default function AdminOripasPage() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">오리파 관리</h1>
+        <h1 className="text-[26px] sm:text-3xl font-bold tracking-tight">오리파 관리</h1>
         <button onClick={() => { setShowForm(true); setEditOripa(null); setForm(emptyForm) }}
           className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
           <Plus size={16} /> 오리파 생성

@@ -19,7 +19,7 @@ const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
   PENDING:       { label: '접수',   cls: 'bg-yellow-900/40 text-yellow-400 border-yellow-700/40' },
   INVESTIGATING: { label: '조사 중', cls: 'bg-blue-900/40 text-blue-400 border-blue-700/40' },
   RESOLVED:      { label: '해결됨', cls: 'bg-emerald-900/40 text-emerald-400 border-emerald-700/40' },
-  DISMISSED:     { label: '기각',   cls: 'bg-[#2e2318] text-[#7a6040] border-[#4a3520]' },
+  DISMISSED:     { label: '기각',   cls: 'bg-line text-muted-2 border-line-strong' },
 }
 
 const STATUS_OPTIONS = ['ALL', 'PENDING', 'INVESTIGATING', 'RESOLVED', 'DISMISSED']
@@ -89,7 +89,7 @@ export default function AdminReportsPage() {
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <ShieldAlert size={20} className="text-red-400" />
-        <h1 className="text-xl font-bold text-[#f5ead8]">신고 관리</h1>
+        <h1 className="text-xl font-bold text-fg">신고 관리</h1>
         {data?.total > 0 && (
           <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-900/40 text-red-400 border border-red-700/40">
             {data.total}건
@@ -106,8 +106,8 @@ export default function AdminReportsPage() {
               onClick={() => { setStatusFilter(s); setPage(1) }}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
                 statusFilter === s
-                  ? 'bg-[#d4a853]/10 text-[#e0b878] border-[#d4a853]/30'
-                  : 'bg-transparent text-[#7a6040] border-[#2e2318] hover:border-[#4a3520] hover:text-[#9e8a6a]'
+                  ? 'bg-accent/10 text-accent-soft border-accent/30'
+                  : 'bg-transparent text-muted-2 border-line hover:border-line-strong hover:text-fg-3'
               }`}
             >
               {s === 'ALL' ? '전체' : STATUS_LABELS[s]?.label}
@@ -115,21 +115,21 @@ export default function AdminReportsPage() {
           ))}
         </div>
         <div className="relative ml-auto">
-          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5a4830]" />
+          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle" />
           <input
             value={q}
             onChange={e => { setQ(e.target.value); setPage(1) }}
             placeholder="닉네임·내용 검색..."
-            className="pl-8 pr-4 py-1.5 bg-[#150f0c] border border-[#2e2318] hover:border-[#4a3520] focus:border-[#d4a853]/40 rounded-lg text-sm text-[#f5ead8] placeholder:text-[#5a4830] focus:outline-none transition-colors w-52"
+            className="pl-8 pr-4 py-1.5 bg-sunken border border-line hover:border-line-strong focus:border-accent/40 rounded-lg text-sm text-fg placeholder:text-subtle focus:outline-none transition-colors w-52"
           />
         </div>
       </div>
 
       {/* 테이블 */}
-      <div className="bg-[#150f0c] border border-[#2e2318] rounded-2xl overflow-hidden">
+      <div className="bg-sunken border border-line rounded-2xl overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-[#2e2318] text-[#5a4830] text-xs uppercase tracking-wider">
+            <tr className="border-b border-line text-subtle text-xs uppercase tracking-wider">
               <th className="px-4 py-3 text-left">신고 유형</th>
               <th className="px-4 py-3 text-left">피신고자</th>
               <th className="px-4 py-3 text-left">신고자</th>
@@ -139,20 +139,20 @@ export default function AdminReportsPage() {
               <th className="px-4 py-3" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#2e2318]">
+          <tbody className="divide-y divide-line">
             {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i}>
                   {Array.from({ length: 7 }).map((_, j) => (
                     <td key={j} className="px-4 py-3">
-                      <div className="h-4 bg-[#2e2318] rounded animate-pulse" />
+                      <div className="h-4 bg-line rounded animate-pulse" />
                     </td>
                   ))}
                 </tr>
               ))
             ) : reports.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-[#5a4830] text-sm">
+                <td colSpan={7} className="px-4 py-12 text-center text-subtle text-sm">
                   신고 내역이 없습니다.
                 </td>
               </tr>
@@ -160,26 +160,26 @@ export default function AdminReportsPage() {
               reports.map(r => {
                 const st = STATUS_LABELS[r.status]
                 return (
-                  <tr key={r.id} className="hover:bg-[#1a1410] transition-colors">
+                  <tr key={r.id} className="hover:bg-surface transition-colors">
                     <td className="px-4 py-3">
-                      <span className="text-[#e8d5b0] font-medium">{REASON_LABELS[r.reason] ?? r.reason}</span>
+                      <span className="text-fg-2 font-medium">{REASON_LABELS[r.reason] ?? r.reason}</span>
                       {r.detail && (
-                        <p className="text-xs text-[#7a6040] mt-0.5 line-clamp-1">{r.detail}</p>
+                        <p className="text-xs text-muted-2 mt-0.5 line-clamp-1">{r.detail}</p>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-[#9e8a6a] font-semibold">{r.reportedUser.nickname}</td>
-                    <td className="px-4 py-3 text-[#7a6040]">{r.reporter.nickname}</td>
+                    <td className="px-4 py-3 text-fg-3 font-semibold">{r.reportedUser.nickname}</td>
+                    <td className="px-4 py-3 text-muted-2">{r.reporter.nickname}</td>
                     <td className="px-4 py-3 hidden md:table-cell">
                       {r.transaction ? (
-                        <span className="text-xs text-[#7a6040]">
+                        <span className="text-xs text-muted-2">
                           거래 {r.transaction.finalPrice.toLocaleString()}P
                         </span>
                       ) : r.listing ? (
-                        <span className="text-xs text-[#7a6040]">
+                        <span className="text-xs text-muted-2">
                           {r.listing.card.nameKo ?? r.listing.card.name}
                         </span>
                       ) : (
-                        <span className="text-xs text-[#4a3520]">—</span>
+                        <span className="text-xs text-subtle">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
@@ -189,13 +189,13 @@ export default function AdminReportsPage() {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-[#5a4830] text-xs hidden md:table-cell">
+                    <td className="px-4 py-3 text-subtle text-xs hidden md:table-cell">
                       {new Date(r.createdAt).toLocaleDateString('ko-KR')}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button
                         onClick={() => openModal(r)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] hover:text-[#f5ead8] transition-colors"
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface border border-line hover:border-line-strong text-fg-3 hover:text-fg transition-colors"
                       >
                         처리
                       </button>
@@ -212,12 +212,12 @@ export default function AdminReportsPage() {
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
           <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-            className="p-2 rounded-lg bg-[#1a1410] border border-[#2e2318] text-[#7a6040] disabled:opacity-30 hover:border-[#4a3520] hover:text-[#9e8a6a] transition-colors">
+            className="p-2 rounded-lg bg-surface border border-line text-muted-2 disabled:opacity-30 hover:border-line-strong hover:text-fg-3 transition-colors">
             <ChevronLeft size={14} />
           </button>
-          <span className="text-sm text-[#7a6040]">{page} / {totalPages}</span>
+          <span className="text-sm text-muted-2">{page} / {totalPages}</span>
           <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-            className="p-2 rounded-lg bg-[#1a1410] border border-[#2e2318] text-[#7a6040] disabled:opacity-30 hover:border-[#4a3520] hover:text-[#9e8a6a] transition-colors">
+            className="p-2 rounded-lg bg-surface border border-line text-muted-2 disabled:opacity-30 hover:border-line-strong hover:text-fg-3 transition-colors">
             <ChevronRight size={14} />
           </button>
         </div>
@@ -226,45 +226,45 @@ export default function AdminReportsPage() {
       {/* 처리 모달 */}
       {selected && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-[#150f0c] border border-[#2e2318] rounded-2xl w-full max-w-lg space-y-5 p-6">
-            <h3 className="text-base font-bold text-[#f5ead8] flex items-center gap-2">
+          <div className="bg-sunken border border-line rounded-2xl w-full max-w-lg space-y-5 p-6">
+            <h3 className="text-base font-bold text-fg flex items-center gap-2">
               <ShieldAlert size={16} className="text-red-400" />
               신고 처리
             </h3>
 
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
-                <span className="text-[#7a6040]">신고 유형</span>
-                <span className="text-[#e8d5b0] font-medium">{REASON_LABELS[selected.reason]}</span>
+                <span className="text-muted-2">신고 유형</span>
+                <span className="text-fg-2 font-medium">{REASON_LABELS[selected.reason]}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-[#7a6040]">피신고자</span>
-                <span className="text-[#e8d5b0] font-semibold">{selected.reportedUser.nickname}</span>
+                <span className="text-muted-2">피신고자</span>
+                <span className="text-fg-2 font-semibold">{selected.reportedUser.nickname}</span>
               </div>
               {selected.detail && (
-                <div className="bg-[#1a1410] border border-[#2e2318] rounded-xl p-3 text-xs text-[#9e8a6a] whitespace-pre-wrap leading-relaxed">
+                <div className="bg-surface border border-line rounded-xl p-3 text-xs text-fg-3 whitespace-pre-wrap leading-relaxed">
                   {selected.detail}
                 </div>
               )}
             </div>
 
             {selected.transaction && (
-              <div className="bg-[#221a12] border border-[#2e2318] rounded-xl p-4 space-y-3">
-                <p className="text-xs font-semibold text-[#7a6040] uppercase tracking-wider">관련 거래</p>
+              <div className="bg-surface-2 border border-line rounded-xl p-4 space-y-3">
+                <p className="text-xs font-semibold text-muted-2 uppercase tracking-wider">관련 거래</p>
                 <div className="flex justify-between text-sm">
-                  <span className="text-[#7a6040]">거래금액</span>
-                  <span className="text-[#f0a832] font-semibold">{selected.transaction.finalPrice.toLocaleString()}P</span>
+                  <span className="text-muted-2">거래금액</span>
+                  <span className="text-accent-2 font-semibold">{selected.transaction.finalPrice.toLocaleString()}P</span>
                 </div>
                 <label className="flex items-center gap-2.5 cursor-pointer group">
                   <div
                     onClick={() => setRefundBuyer(v => !v)}
                     className={`w-10 h-5 rounded-full border transition-colors relative cursor-pointer ${
-                      refundBuyer ? 'bg-red-500 border-red-500' : 'bg-[#2e2318] border-[#4a3520]'
+                      refundBuyer ? 'bg-red-500 border-red-500' : 'bg-line border-line-strong'
                     }`}
                   >
                     <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${refundBuyer ? 'left-5' : 'left-0.5'}`} />
                   </div>
-                  <span className="text-sm text-[#9e8a6a] group-hover:text-[#e8d5b0] transition-colors">
+                  <span className="text-sm text-fg-3 group-hover:text-fg-2 transition-colors">
                     구매자 에스크로 환불 처리
                   </span>
                 </label>
@@ -272,7 +272,7 @@ export default function AdminReportsPage() {
             )}
 
             <div className="space-y-2">
-              <label className="text-xs text-[#7a6040] font-semibold uppercase tracking-wider">상태 변경</label>
+              <label className="text-xs text-muted-2 font-semibold uppercase tracking-wider">상태 변경</label>
               <div className="flex flex-wrap gap-1.5">
                 {NEXT_STATUS[selected.status]?.length > 0 ? (
                   NEXT_STATUS[selected.status].map(s => (
@@ -281,34 +281,34 @@ export default function AdminReportsPage() {
                       onClick={() => setNextStatus(s)}
                       className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
                         nextStatus === s
-                          ? 'bg-[#d4a853]/10 text-[#e0b878] border-[#d4a853]/30'
-                          : 'bg-transparent text-[#7a6040] border-[#2e2318] hover:border-[#4a3520] hover:text-[#9e8a6a]'
+                          ? 'bg-accent/10 text-accent-soft border-accent/30'
+                          : 'bg-transparent text-muted-2 border-line hover:border-line-strong hover:text-fg-3'
                       }`}
                     >
                       {STATUS_LABELS[s]?.label}
                     </button>
                   ))
                 ) : (
-                  <span className="text-xs text-[#5a4830]">이미 처리 완료된 신고입니다.</span>
+                  <span className="text-xs text-subtle">이미 처리 완료된 신고입니다.</span>
                 )}
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs text-[#7a6040] font-semibold uppercase tracking-wider">관리자 메모</label>
+              <label className="text-xs text-muted-2 font-semibold uppercase tracking-wider">관리자 메모</label>
               <textarea
                 value={adminNote}
                 onChange={e => setAdminNote(e.target.value)}
                 rows={3}
                 placeholder="처리 내용, 사유 등 메모..."
-                className="w-full bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] focus:border-[#d4a853]/40 rounded-xl px-4 py-2.5 text-sm text-[#f5ead8] placeholder:text-[#5a4830] focus:outline-none resize-none transition-colors"
+                className="w-full bg-surface border border-line hover:border-line-strong focus:border-accent/40 rounded-xl px-4 py-2.5 text-sm text-fg placeholder:text-subtle focus:outline-none resize-none transition-colors"
               />
             </div>
 
             <div className="flex gap-2 pt-1">
               <button
                 onClick={() => { setSelected(null); setAdminNote(''); setRefundBuyer(false) }}
-                className="flex-1 py-2.5 rounded-xl border border-[#2e2318] text-[#7a6040] hover:text-[#9e8a6a] hover:border-[#4a3520] text-sm transition-colors"
+                className="flex-1 py-2.5 rounded-xl border border-line text-muted-2 hover:text-fg-3 hover:border-line-strong text-sm transition-colors"
               >
                 취소
               </button>
@@ -323,7 +323,7 @@ export default function AdminReportsPage() {
                   })
                 }}
                 disabled={updateMut.isPending || (NEXT_STATUS[selected.status]?.length > 0 && !nextStatus)}
-                className="flex-1 py-2.5 rounded-xl bg-[#d4a853] hover:bg-[#c49440] text-white font-semibold text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-strong text-white font-semibold text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {updateMut.isPending ? '처리 중...' : '저장'}
               </button>

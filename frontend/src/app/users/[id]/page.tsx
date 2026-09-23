@@ -95,34 +95,34 @@ export default function UserProfilePage() {
   if (!user && !userData) {
     return (
       <div className="max-w-2xl mx-auto space-y-4">
-        <div className="h-32 bg-[#1a1410] border border-[#2e2318] rounded-2xl animate-pulse" />
-        <div className="h-64 bg-[#1a1410] border border-[#2e2318] rounded-2xl animate-pulse" />
+        <div className="h-32 bg-surface border border-line rounded-2xl animate-pulse" />
+        <div className="h-64 bg-surface border border-line rounded-2xl animate-pulse" />
       </div>
     )
   }
 
-  if (!user) return <div className="text-center py-24 text-[#5a4830]">유저를 찾을 수 없습니다.</div>
+  if (!user) return <div className="text-center py-24 text-subtle">유저를 찾을 수 없습니다.</div>
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
-      <button onClick={() => router.back()} className="inline-flex items-center gap-1 text-sm text-[#8a7055] hover:text-[#f5ead8] transition-colors">
+      <button onClick={() => router.back()} className="inline-flex items-center gap-1 text-sm text-muted hover:text-fg transition-colors">
         <ChevronLeft size={16} /> 뒤로
       </button>
 
       {/* 프로필 헤더 */}
-      <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl p-6">
+      <div className="bg-surface border border-line rounded-2xl p-6">
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-full overflow-hidden bg-[#2a1c0c] border-2 border-[#3a2510] shrink-0 flex items-center justify-center text-2xl font-bold text-[#f0a832]">
+          <div className="w-16 h-16 rounded-full overflow-hidden bg-accent-tint border-2 border-accent-line shrink-0 flex items-center justify-center text-2xl font-bold text-accent-2">
             {user.avatarUrl
               ? <Image src={user.avatarUrl} alt={user.nickname} width={64} height={64} className="object-cover" />
               : user.nickname[0].toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-lg font-bold text-[#f5ead8]">{user.nickname}</h1>
+            <h1 className="text-lg font-bold text-fg">{user.nickname}</h1>
             <div className="flex items-center gap-2 mt-0.5">
               <RatingBadge avgRating={user.avgRating ?? null} reviewCount={user.reviewCount ?? 0} />
             </div>
-            <p className="text-xs text-[#4a3820] mt-1">
+            <p className="text-xs text-subtle mt-1">
               {format(new Date(user.createdAt), 'yyyy년 MM월 가입', { locale: ko })}
             </p>
           </div>
@@ -135,8 +135,8 @@ export default function UserProfilePage() {
                   isFriend
                     ? 'bg-emerald-900/30 border border-emerald-700/40 text-emerald-400'
                     : isPending
-                    ? 'bg-[#2a1c08] border border-[#3a2510] text-[#8a7055]'
-                    : 'bg-[#d4a853] hover:bg-[#c49440] text-white'
+                    ? 'bg-accent-tint border border-accent-line text-muted'
+                    : 'bg-accent hover:bg-accent-strong text-white'
                 }`}
               >
                 {isFriend ? <UserCheck size={12} /> : <UserPlus size={12} />}
@@ -144,7 +144,7 @@ export default function UserProfilePage() {
               </button>
               <Link
                 href={`/dm/with/${id}`}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-[#1a1208] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] hover:text-[#e8d5b0] transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-surface-2 border border-line hover:border-line-strong text-fg-3 hover:text-fg-2 transition-colors"
               >
                 <MessageCircle size={12} /> 메시지
               </Link>
@@ -154,13 +154,13 @@ export default function UserProfilePage() {
       </div>
 
       {/* 탭 */}
-      <div className="flex gap-1 bg-[#150f0c] border border-[#2e2318] rounded-xl p-1 w-fit">
+      <div className="flex gap-1 bg-sunken border border-line rounded-xl p-1 w-fit">
         {([
           ['reviews', <Star key="s" size={14} />, `리뷰 (${reviewData?.total ?? 0})`],
           ['listings', <ShoppingBag key="sb" size={14} />, '판매 중'],
         ] as const).map(([key, icon, label]) => (
           <button key={key} onClick={() => setActiveTab(key)}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === key ? 'bg-[#2a1c08] text-[#e0b878]' : 'text-[#7a6040] hover:text-[#9e8a6a]'}`}>
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === key ? 'bg-accent-tint text-accent-soft' : 'text-muted-2 hover:text-fg-3'}`}>
             {icon}{label}
           </button>
         ))}
@@ -168,40 +168,40 @@ export default function UserProfilePage() {
 
       {/* 리뷰 탭 */}
       {activeTab === 'reviews' && (
-        <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl overflow-hidden">
+        <div className="bg-surface border border-line rounded-2xl overflow-hidden">
           {reviews.length === 0 ? (
-            <p className="p-10 text-center text-[#5a4830] text-sm">아직 리뷰가 없습니다.</p>
+            <p className="p-10 text-center text-subtle text-sm">아직 리뷰가 없습니다.</p>
           ) : (
-            <div className="divide-y divide-[#1e1810]">
+            <div className="divide-y divide-surface-2">
               {reviews.map(rv => (
                 <div key={rv.id} className="p-4 space-y-2">
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-[#2a1c0c] border border-[#3a2510] shrink-0 flex items-center justify-center text-xs font-bold text-[#f0a832] overflow-hidden">
+                    <div className="w-8 h-8 rounded-full bg-accent-tint border border-accent-line shrink-0 flex items-center justify-center text-xs font-bold text-accent-2 overflow-hidden">
                       {rv.reviewer.avatarUrl
                         ? <img src={rv.reviewer.avatarUrl} alt="" className="w-full h-full object-cover" />
                         : rv.reviewer.nickname[0].toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-medium text-[#c8b48a]">{rv.reviewer.nickname}</span>
-                        <span className="text-xs text-[#f0a832]">{'★'.repeat(rv.rating)}{'☆'.repeat(5 - rv.rating)}</span>
+                        <span className="text-xs font-medium text-[#8c60f2]">{rv.reviewer.nickname}</span>
+                        <span className="text-xs text-accent-2">{'★'.repeat(rv.rating)}{'☆'.repeat(5 - rv.rating)}</span>
                         {rv.transaction?.listing?.card && (
-                          <span className="text-[10px] text-[#4a3820]">
+                          <span className="text-[10px] text-subtle">
                             {rv.transaction.listing.card.nameKo ?? rv.transaction.listing.card.name}
                           </span>
                         )}
-                        <span className="text-[10px] text-[#4a3820] ml-auto">{format(new Date(rv.createdAt), 'yy.MM.dd')}</span>
+                        <span className="text-[10px] text-subtle ml-auto">{format(new Date(rv.createdAt), 'yy.MM.dd')}</span>
                       </div>
-                      {rv.comment && <p className="text-xs text-[#9e8a6a] mt-1 leading-relaxed">{rv.comment}</p>}
+                      {rv.comment && <p className="text-xs text-fg-3 mt-1 leading-relaxed">{rv.comment}</p>}
                     </div>
                   </div>
 
                   {rv.sellerReply && (
-                    <div className="ml-11 bg-[#1a1208] border border-[#2e2318] rounded-xl px-3 py-2">
-                      <p className="text-[10px] text-[#d4a853] font-semibold flex items-center gap-1 mb-0.5">
+                    <div className="ml-11 bg-surface-2 border border-line rounded-xl px-3 py-2">
+                      <p className="text-[10px] text-accent-fg font-semibold flex items-center gap-1 mb-0.5">
                         <Reply size={9} /> 판매자 답글
                       </p>
-                      <p className="text-xs text-[#9e8a6a] leading-relaxed">{rv.sellerReply}</p>
+                      <p className="text-xs text-fg-3 leading-relaxed">{rv.sellerReply}</p>
                     </div>
                   )}
 
@@ -214,25 +214,25 @@ export default function UserProfilePage() {
                           maxLength={500}
                           rows={2}
                           placeholder="구매자 리뷰에 답글을 남겨보세요..."
-                          className="w-full bg-[#1a1208] border border-[#2e2318] focus:border-[#d4a853]/60 rounded-xl px-3 py-2 text-xs text-[#f5ead8] placeholder:text-[#4a3820] outline-none resize-none"
+                          className="w-full bg-surface-2 border border-line focus:border-accent/60 rounded-xl px-3 py-2 text-xs text-fg placeholder:text-subtle outline-none resize-none"
                         />
                         {replyErr && <p className="text-[10px] text-red-400">{replyErr}</p>}
                         <div className="flex gap-2">
                           <button
                             onClick={() => replyMut.mutate(rv.id)}
                             disabled={replyText.trim().length < 1 || replyMut.isPending}
-                            className="px-3 py-1.5 bg-[#d4a853] hover:bg-[#c49440] disabled:opacity-40 text-white rounded-lg text-[11px] font-medium"
+                            className="px-3 py-1.5 bg-accent hover:bg-accent-strong disabled:opacity-40 text-white rounded-lg text-[11px] font-medium"
                           >등록</button>
                           <button
                             onClick={() => { setReplyId(null); setReplyText('') }}
-                            className="px-3 py-1.5 bg-[#1a1208] border border-[#2e2318] text-[#7a6040] rounded-lg text-[11px]"
+                            className="px-3 py-1.5 bg-surface-2 border border-line text-muted-2 rounded-lg text-[11px]"
                           >취소</button>
                         </div>
                       </div>
                     ) : (
                       <button
                         onClick={() => setReplyId(rv.id)}
-                        className="ml-11 flex items-center gap-1 text-[10px] text-[#5a4830] hover:text-[#d4a853] transition-colors"
+                        className="ml-11 flex items-center gap-1 text-[10px] text-subtle hover:text-accent-fg transition-colors"
                       >
                         <Reply size={10} /> 답글 달기
                       </button>
@@ -243,12 +243,12 @@ export default function UserProfilePage() {
             </div>
           )}
           {(reviewData?.totalPages ?? 0) > 1 && (
-            <div className="flex justify-center gap-2 px-4 py-3 border-t border-[#2e2318]">
+            <div className="flex justify-center gap-2 px-4 py-3 border-t border-line">
               <button disabled={reviewPage <= 1} onClick={() => setReviewPage(p => p - 1)}
-                className="px-3 py-1 text-xs rounded-lg bg-[#1a1208] border border-[#2e2318] text-[#8a7055] disabled:opacity-40">이전</button>
-              <span className="px-3 py-1 text-xs text-[#5a4830]">{reviewPage} / {reviewData?.totalPages}</span>
+                className="px-3 py-1 text-xs rounded-lg bg-surface-2 border border-line text-muted disabled:opacity-40">이전</button>
+              <span className="px-3 py-1 text-xs text-subtle">{reviewPage} / {reviewData?.totalPages}</span>
               <button disabled={reviewPage >= (reviewData?.totalPages ?? 1)} onClick={() => setReviewPage(p => p + 1)}
-                className="px-3 py-1 text-xs rounded-lg bg-[#1a1208] border border-[#2e2318] text-[#8a7055] disabled:opacity-40">다음</button>
+                className="px-3 py-1 text-xs rounded-lg bg-surface-2 border border-line text-muted disabled:opacity-40">다음</button>
             </div>
           )}
         </div>
@@ -257,7 +257,7 @@ export default function UserProfilePage() {
       {/* 판매 중 탭 */}
       {activeTab === 'listings' && (
         listings.length === 0
-          ? <div className="text-center py-16 text-[#5a4830] text-sm">현재 판매 중인 상품이 없습니다.</div>
+          ? <div className="text-center py-16 text-subtle text-sm">현재 판매 중인 상품이 없습니다.</div>
           : <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {listings.map((listing: Parameters<typeof ListingCard>[0]['listing']) => (
                 <ListingCard key={listing.id} listing={listing} />

@@ -46,8 +46,8 @@ export function ImageUpload({ value, onChange, label = '이미지' }: Props) {
 
   return (
     <div className="space-y-1.5">
-      <label className="text-xs text-[#7a6040] uppercase tracking-wider font-semibold flex items-center gap-1.5">
-        <ImageIcon size={12} /> {label} <span className="text-[#4a3820] normal-case font-normal">(선택)</span>
+      <label className="text-xs text-muted-2 uppercase tracking-wider font-semibold flex items-center gap-1.5">
+        <ImageIcon size={12} /> {label} <span className="text-subtle normal-case font-normal">(선택)</span>
       </label>
 
       <input
@@ -59,7 +59,7 @@ export function ImageUpload({ value, onChange, label = '이미지' }: Props) {
       />
 
       {value ? (
-        <div className="relative rounded-xl overflow-hidden border border-[#2e2318] bg-[#2a1c0c]">
+        <div className="relative rounded-xl overflow-hidden border border-line bg-accent-tint">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={value} alt="첨부 이미지" className="w-full max-h-64 object-contain" />
           <button
@@ -82,18 +82,18 @@ export function ImageUpload({ value, onChange, label = '이미지' }: Props) {
           onClick={() => !uploading && inputRef.current?.click()}
           onDrop={handleDrop}
           onDragOver={(e) => e.preventDefault()}
-          className="border-2 border-dashed border-[#2e2318] hover:border-[#4a3520] rounded-xl p-8 flex flex-col items-center gap-2 cursor-pointer transition-colors group"
+          className="border-2 border-dashed border-line hover:border-line-strong rounded-xl p-8 flex flex-col items-center gap-2 cursor-pointer transition-colors group"
         >
           {uploading ? (
             <>
-              <div className="w-6 h-6 rounded-full border-2 border-[#2e2318] border-t-[#d4a853] animate-spin" />
-              <span className="text-xs text-[#7a6040]">업로드 중...</span>
+              <div className="w-6 h-6 rounded-full border-2 border-line border-t-accent animate-spin" />
+              <span className="text-xs text-muted-2">업로드 중...</span>
             </>
           ) : (
             <>
-              <Upload size={20} className="text-[#4a3520] group-hover:text-[#7a6040] transition-colors" />
-              <span className="text-xs text-[#9e8a6a]">클릭하거나 이미지를 드래그하세요</span>
-              <span className="text-xs text-[#4a3820]">PNG · JPG · GIF · WEBP · 최대 5MB</span>
+              <Upload size={20} className="text-subtle group-hover:text-muted-2 transition-colors" />
+              <span className="text-xs text-fg-3">클릭하거나 이미지를 드래그하세요</span>
+              <span className="text-xs text-subtle">PNG · JPG · GIF · WEBP · 최대 5MB</span>
             </>
           )}
         </div>

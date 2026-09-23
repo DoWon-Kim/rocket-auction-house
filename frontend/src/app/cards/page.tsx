@@ -101,17 +101,17 @@ function rarityColorClass(rarity: string): string {
     return 'text-blue-400 border-blue-400/40 bg-blue-400/8'
   if (r === 'uncommon' || r === 'u' || r === 'promo' || r === '프로모')
     return 'text-emerald-400 border-emerald-400/40 bg-emerald-400/8'
-  return 'text-[#7a6040] border-[#2e2318] bg-[#1a1208]'
+  return 'text-muted-2 border-line bg-surface-2'
 }
 
 function CardSkeleton() {
   return (
-    <div className="bg-[#1a1410] border border-[#2e2318] rounded-xl overflow-hidden animate-pulse">
-      <div className="aspect-[3/4] bg-[#1a1208]" />
+    <div className="bg-surface border border-line rounded-xl overflow-hidden animate-pulse">
+      <div className="aspect-[3/4] bg-surface-2" />
       <div className="p-3 space-y-2">
-        <div className="h-3.5 bg-[#2e2318] rounded w-4/5" />
-        <div className="h-3 bg-[#2e2318] rounded w-2/3" />
-        <div className="h-3 bg-[#2e2318] rounded w-1/2" />
+        <div className="h-3.5 bg-line rounded w-4/5" />
+        <div className="h-3 bg-line rounded w-2/3" />
+        <div className="h-3 bg-line rounded w-1/2" />
       </div>
     </div>
   )
@@ -142,10 +142,10 @@ function CardTile({
     >
     <Link
       href={`/cards/${card.id}`}
-      className="group bg-[#1a1410] border border-[#2e2318] rounded-xl overflow-hidden hover:border-[#d4a853]/40 hover:shadow-[0_0_20px_rgba(212,168,83,0.08)] transition-all duration-200 flex flex-col"
+      className="group bg-surface border border-line rounded-xl overflow-hidden hover:border-accent/40 hover:shadow-[0_0_20px_rgba(139,92,246,0.08)] transition-all duration-200 flex flex-col"
     >
       {/* 이미지 */}
-      <div className="relative aspect-[3/4] bg-[#0f0b08] overflow-hidden">
+      <div className="relative aspect-[3/4] bg-bg overflow-hidden">
         {card.imageUrl ? (
           <Image
             src={resolveImageSrc(card.imageUrl)!}
@@ -155,7 +155,7 @@ function CardTile({
             className="object-contain group-hover:scale-105 transition-transform duration-300"
           />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center text-4xl text-[#2e2318]">
+          <div className="absolute inset-0 flex items-center justify-center text-4xl text-line">
             {TCG_ICONS[card.tcgType] ?? '🃏'}
           </div>
         )}
@@ -166,7 +166,7 @@ function CardTile({
           className={`absolute top-2 left-2 z-10 w-6 h-6 rounded-full flex items-center justify-center transition-all duration-150 ${
             isCollected
               ? 'bg-emerald-500 border border-emerald-400 text-white shadow-lg'
-              : 'bg-[#0f0b08]/70 border border-[#2e2318] text-[#4a3820] opacity-0 group-hover:opacity-100'
+              : 'bg-bg/70 border border-line text-subtle opacity-0 group-hover:opacity-100'
           }`}
         >
           <CheckCircle2 size={14} />
@@ -174,14 +174,14 @@ function CardTile({
         {/* 최저가 배지 */}
         {card.minPrice != null && (
           <div className="absolute bottom-2 left-0 right-0 flex justify-center">
-            <div className="bg-[#0f0b08]/85 backdrop-blur-sm border border-[#d4a853]/40 text-[#d4a853] text-[10px] font-bold px-2 py-0.5 rounded-full">
+            <div className="bg-bg/85 backdrop-blur-sm border border-accent/40 text-accent-fg text-[10px] font-bold px-2 py-0.5 rounded-full">
               최저 {card.minPrice.toLocaleString()}P
             </div>
           </div>
         )}
         {/* 리스팅 수 배지 */}
         {card._count.listings > 0 && card.minPrice == null && (
-          <div className="absolute top-2 right-2 bg-[#0f0b08]/80 backdrop-blur-sm border border-[#d4a853]/30 text-[#d4a853] text-[10px] font-bold px-1.5 py-0.5 rounded-md">
+          <div className="absolute top-2 right-2 bg-bg/80 backdrop-blur-sm border border-accent/30 text-accent-fg text-[10px] font-bold px-1.5 py-0.5 rounded-md">
             {card._count.listings}건
           </div>
         )}
@@ -189,12 +189,12 @@ function CardTile({
 
       {/* 정보 */}
       <div className="p-3 flex flex-col gap-1.5 flex-1">
-        <p className="text-sm font-semibold text-[#f5ead8] line-clamp-2 leading-tight group-hover:text-white transition-colors">
+        <p className="text-sm font-semibold text-fg line-clamp-2 leading-tight group-hover:text-white transition-colors">
           {displayName}
         </p>
         {displayLang === 'ja'
-          ? card.name !== displayName && <p className="text-[11px] text-[#5a4830] truncate">{card.name}</p>
-          : card.nameKo && card.name !== card.nameKo && <p className="text-[11px] text-[#5a4830] truncate">{card.name}</p>
+          ? card.name !== displayName && <p className="text-[11px] text-subtle truncate">{card.name}</p>
+          : card.nameKo && card.name !== card.nameKo && <p className="text-[11px] text-subtle truncate">{card.name}</p>
         }
 
         {/* 레어도 + 언어 배지 */}
@@ -231,9 +231,9 @@ function CardTile({
               )}
             </div>
           )}
-          <p className="text-[11px] text-[#5a4830] truncate">{card.setName}</p>
+          <p className="text-[11px] text-subtle truncate">{card.setName}</p>
           {card.cardNumber && (
-            <p className="text-[10px] text-[#d4a853]/70 font-mono tracking-wide">[{card.cardNumber}]</p>
+            <p className="text-[10px] text-accent-fg/70 font-mono tracking-wide">[{card.cardNumber}]</p>
           )}
         </div>
       </div>
@@ -260,18 +260,18 @@ function SearchDropdown({
   if (!q || (!isLoading && !data?.cards.length)) return null
 
   return (
-    <div className="absolute top-full left-0 right-0 mt-1 bg-[#150f0c] border border-[#2e2318] rounded-xl shadow-xl z-50 overflow-hidden">
+    <div className="absolute top-full left-0 right-0 mt-1 bg-sunken border border-line rounded-xl shadow-xl z-50 overflow-hidden">
       {isLoading ? (
-        <div className="p-4 text-center text-[#5a4830] text-sm">검색 중...</div>
+        <div className="p-4 text-center text-subtle text-sm">검색 중...</div>
       ) : (
         <>
           {data?.cards.map(card => (
             <button
               key={card.id}
               onClick={() => onSelect(card.id)}
-              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#1a1410] transition-colors text-left border-b border-[#1a1208] last:border-b-0"
+              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-surface transition-colors text-left border-b border-surface-2 last:border-b-0"
             >
-              <div className="relative w-8 h-11 shrink-0 rounded overflow-hidden bg-[#0f0b08]">
+              <div className="relative w-8 h-11 shrink-0 rounded overflow-hidden bg-bg">
                 {card.imageUrl ? (
                   <Image src={resolveImageSrc(card.imageUrl)!} alt={card.nameKo ?? card.name} fill className="object-contain" />
                 ) : (
@@ -279,19 +279,19 @@ function SearchDropdown({
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-[#f5ead8] truncate">{card.nameKo ?? card.name}</p>
-                <p className="text-[11px] text-[#5a4830] truncate">
-                  {card.cardNumber && <span className="text-[#d4a853]/70 font-mono mr-1">[{card.cardNumber}]</span>}
+                <p className="text-sm font-medium text-fg truncate">{card.nameKo ?? card.name}</p>
+                <p className="text-[11px] text-subtle truncate">
+                  {card.cardNumber && <span className="text-accent-fg/70 font-mono mr-1">[{card.cardNumber}]</span>}
                   {card.setName} · {card.rarity}
                 </p>
               </div>
-              <span className="text-[10px] text-[#7a6040] shrink-0 bg-[#1a1208] border border-[#2e2318] px-1.5 py-0.5 rounded">
+              <span className="text-[10px] text-muted-2 shrink-0 bg-surface-2 border border-line px-1.5 py-0.5 rounded">
                 {TCG_LABELS[card.tcgType] ?? card.tcgType}
               </span>
             </button>
           ))}
           {data && data.total > 6 && (
-            <div className="px-4 py-2.5 text-[11px] text-[#5a4830] text-center border-t border-[#1a1208]">
+            <div className="px-4 py-2.5 text-[11px] text-subtle text-center border-t border-surface-2">
               +{(data.total - 6).toLocaleString()}개 더 있음 — 검색 버튼으로 전체 보기
             </div>
           )}
@@ -339,16 +339,16 @@ function FilterSidebar({
       {/* 레어도 — 다중 선택 체크박스 */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <p className="text-xs font-semibold text-[#7a6040] uppercase tracking-wider">레어도</p>
+          <p className="text-xs font-semibold text-muted-2 uppercase tracking-wider">레어도</p>
           {selectedRarities.length > 0 && (
-            <button onClick={onClearRarities} className="text-[10px] text-[#5a4830] hover:text-[#e0b878] transition-colors">
+            <button onClick={onClearRarities} className="text-[10px] text-subtle hover:text-accent-soft transition-colors">
               초기화
             </button>
           )}
         </div>
         {metaLoading ? (
           <div className="space-y-1.5">
-            {[1,2,3,4].map(i => <div key={i} className="h-7 bg-[#1a1208] rounded-lg animate-pulse" />)}
+            {[1,2,3,4].map(i => <div key={i} className="h-7 bg-surface-2 rounded-lg animate-pulse" />)}
           </div>
         ) : (
           <div className="space-y-0.5 max-h-56 overflow-y-auto pr-0.5">
@@ -358,18 +358,18 @@ function FilterSidebar({
                 <label
                   key={r.name}
                   className={`flex items-center gap-2 cursor-pointer px-3 py-1.5 rounded-lg text-xs transition-colors select-none ${
-                    checked ? 'bg-[#2a1c08] text-[#e0b878]' : 'text-[#7a6040] hover:bg-[#1a1208] hover:text-[#9e8a6a]'
+                    checked ? 'bg-accent-tint text-accent-soft' : 'text-muted-2 hover:bg-surface-2 hover:text-fg-3'
                   }`}
                 >
                   <input
                     type="checkbox"
                     checked={checked}
                     onChange={() => onRarityToggle(r.name)}
-                    className="w-3 h-3 shrink-0 accent-[#d4a853]"
+                    className="w-3 h-3 shrink-0 accent-accent"
                   />
                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${rarityColorClass(r.name).split(' ')[0].replace('text-', 'bg-')}`} />
                   <span className="flex-1 truncate">{rarityLabel(r.name)}</span>
-                  <span className="text-[10px] text-[#4a3820] shrink-0">{r.count.toLocaleString()}</span>
+                  <span className="text-[10px] text-subtle shrink-0">{r.count.toLocaleString()}</span>
                 </label>
               )
             })}
@@ -380,7 +380,7 @@ function FilterSidebar({
       {/* HP 범위 (포켓몬) */}
       {showHpRange && (
         <div>
-          <p className="text-xs font-semibold text-[#7a6040] uppercase tracking-wider mb-3">HP 범위</p>
+          <p className="text-xs font-semibold text-muted-2 uppercase tracking-wider mb-3">HP 범위</p>
           <div className="flex gap-2 items-center">
             <input
               type="number"
@@ -390,9 +390,9 @@ function FilterSidebar({
               onBlur={() => onHpChange(localMin, localMax)}
               onKeyDown={e => e.key === 'Enter' && onHpChange(localMin, localMax)}
               placeholder="최소"
-              className="w-full bg-[#1a1208] border border-[#2e2318] rounded-lg px-2.5 py-1.5 text-xs text-[#f5ead8] placeholder:text-[#4a3820] focus:outline-none focus:border-[#d4a853]/30 transition-colors"
+              className="w-full bg-surface-2 border border-line rounded-lg px-2.5 py-1.5 text-xs text-fg placeholder:text-subtle focus:outline-none focus:border-accent/30 transition-colors"
             />
-            <span className="text-[#5a4830] text-xs shrink-0">~</span>
+            <span className="text-subtle text-xs shrink-0">~</span>
             <input
               type="number"
               min="0"
@@ -401,13 +401,13 @@ function FilterSidebar({
               onBlur={() => onHpChange(localMin, localMax)}
               onKeyDown={e => e.key === 'Enter' && onHpChange(localMin, localMax)}
               placeholder="최대"
-              className="w-full bg-[#1a1208] border border-[#2e2318] rounded-lg px-2.5 py-1.5 text-xs text-[#f5ead8] placeholder:text-[#4a3820] focus:outline-none focus:border-[#d4a853]/30 transition-colors"
+              className="w-full bg-surface-2 border border-line rounded-lg px-2.5 py-1.5 text-xs text-fg placeholder:text-subtle focus:outline-none focus:border-accent/30 transition-colors"
             />
           </div>
           {(hpMin || hpMax) && (
             <button
               onClick={() => { setLocalMin(''); setLocalMax(''); onHpChange('', '') }}
-              className="mt-1.5 flex items-center gap-1 text-[11px] text-[#7a6040] hover:text-[#9e8a6a] transition-colors"
+              className="mt-1.5 flex items-center gap-1 text-[11px] text-muted-2 hover:text-fg-3 transition-colors"
             >
               <X size={10} /> HP 필터 해제
             </button>
@@ -417,14 +417,14 @@ function FilterSidebar({
 
       {/* 세트 */}
       <div>
-        <p className="text-xs font-semibold text-[#7a6040] uppercase tracking-wider mb-3">세트 / 팩</p>
+        <p className="text-xs font-semibold text-muted-2 uppercase tracking-wider mb-3">세트 / 팩</p>
         <div className="relative">
           <button
             onClick={() => setSetOpen(o => !o)}
             className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-xs transition-colors ${
               setName
-                ? 'bg-[#2a1c08] border-[#3d2a0c] text-[#e0b878]'
-                : 'bg-[#1a1208] border-[#2e2318] text-[#7a6040] hover:border-[#4a3520]'
+                ? 'bg-accent-tint border-accent-line text-accent-soft'
+                : 'bg-surface-2 border-line text-muted-2 hover:border-line-strong'
             }`}
           >
             <span className="truncate">{setName || '전체 세트'}</span>
@@ -432,19 +432,19 @@ function FilterSidebar({
           </button>
 
           {setOpen && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-[#150f0c] border border-[#2e2318] rounded-xl shadow-xl z-40 overflow-hidden">
+            <div className="absolute top-full left-0 right-0 mt-1 bg-sunken border border-line rounded-xl shadow-xl z-40 overflow-hidden">
               <div className="p-2">
                 <input
                   value={setSearch}
                   onChange={e => setSetSearch(e.target.value)}
                   placeholder="세트 검색..."
-                  className="w-full bg-[#1a1208] border border-[#2e2318] rounded-lg px-3 py-1.5 text-xs text-[#f5ead8] placeholder:text-[#4a3820] focus:outline-none focus:border-[#d4a853]/30"
+                  className="w-full bg-surface-2 border border-line rounded-lg px-3 py-1.5 text-xs text-fg placeholder:text-subtle focus:outline-none focus:border-accent/30"
                 />
               </div>
               <div className="max-h-52 overflow-y-auto">
                 <button
                   onClick={() => { onSet(''); setSetOpen(false) }}
-                  className={`w-full text-left px-3 py-2 text-xs transition-colors ${!setName ? 'text-[#e0b878] bg-[#2a1c08]' : 'text-[#7a6040] hover:bg-[#1a1208]'}`}
+                  className={`w-full text-left px-3 py-2 text-xs transition-colors ${!setName ? 'text-accent-soft bg-accent-tint' : 'text-muted-2 hover:bg-surface-2'}`}
                 >
                   전체 세트
                 </button>
@@ -453,11 +453,11 @@ function FilterSidebar({
                     key={s.name}
                     onClick={() => { onSet(s.name === setName ? '' : s.name); setSetOpen(false) }}
                     className={`w-full flex items-center justify-between px-3 py-2 text-xs transition-colors ${
-                      setName === s.name ? 'text-[#e0b878] bg-[#2a1c08]' : 'text-[#7a6040] hover:bg-[#1a1208] hover:text-[#9e8a6a]'
+                      setName === s.name ? 'text-accent-soft bg-accent-tint' : 'text-muted-2 hover:bg-surface-2 hover:text-fg-3'
                     }`}
                   >
                     <span className="truncate">{s.name}</span>
-                    <span className="text-[10px] text-[#4a3820] ml-1 shrink-0">{s.count}</span>
+                    <span className="text-[10px] text-subtle ml-1 shrink-0">{s.count}</span>
                   </button>
                 ))}
               </div>
@@ -468,7 +468,7 @@ function FilterSidebar({
         {setName && (
           <button
             onClick={() => onSet('')}
-            className="mt-1.5 flex items-center gap-1 text-[11px] text-[#7a6040] hover:text-[#9e8a6a] transition-colors"
+            className="mt-1.5 flex items-center gap-1 text-[11px] text-muted-2 hover:text-fg-3 transition-colors"
           >
             <X size={10} /> 필터 해제
           </button>
@@ -486,10 +486,10 @@ function RecentlyViewedBar({ onNavigate }: { onNavigate: (id: string) => void })
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <p className="flex items-center gap-1.5 text-[11px] text-[#5a4830] font-semibold uppercase tracking-wider">
-          <Clock size={10} className="text-[#d4a853]" /> 최근 본 카드
+        <p className="flex items-center gap-1.5 text-[11px] text-subtle font-semibold uppercase tracking-wider">
+          <Clock size={10} className="text-accent-fg" /> 최근 본 카드
         </p>
-        <button onClick={clearAll} className="text-[10px] text-[#4a3820] hover:text-[#7a6040] transition-colors">지우기</button>
+        <button onClick={clearAll} className="text-[10px] text-subtle hover:text-muted-2 transition-colors">지우기</button>
       </div>
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
         {cards.map(card => (
@@ -498,14 +498,14 @@ function RecentlyViewedBar({ onNavigate }: { onNavigate: (id: string) => void })
             onClick={() => onNavigate(card.id)}
             className="shrink-0 group flex flex-col items-center gap-1.5 w-16"
           >
-            <div className="relative w-16 h-[85px] rounded-xl overflow-hidden border border-[#2e2318] group-hover:border-[#d4a853]/40 transition-colors bg-[#1a1410]">
+            <div className="relative w-16 h-[85px] rounded-xl overflow-hidden border border-line group-hover:border-accent/40 transition-colors bg-surface">
               {card.imageUrl ? (
                 <Image src={resolveImageSrc(card.imageUrl)!} alt={card.nameKo ?? card.name} fill sizes="64px" className="object-contain" />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center text-2xl">🃏</div>
               )}
             </div>
-            <p className="text-[9px] text-[#7a6040] group-hover:text-[#c9a860] line-clamp-2 text-center leading-tight w-full transition-colors">
+            <p className="text-[9px] text-muted-2 group-hover:text-accent-fg line-clamp-2 text-center leading-tight w-full transition-colors">
               {card.nameKo ?? card.name}
             </p>
           </button>
@@ -654,11 +654,11 @@ function CardsContent() {
 
       {/* ── 헤더 ── */}
       <div className="space-y-1">
-        <h1 className="text-2xl font-bold text-[#f5ead8] tracking-tight flex items-center gap-2">
-          <Layers size={22} className="text-[#d4a853]" />
+        <h1 className="text-[26px] sm:text-3xl font-bold tracking-tight text-fg flex items-center gap-2">
+          <Layers size={22} className="text-accent-fg" />
           카드 도감
         </h1>
-        <p className="text-xs text-[#5a4830]">
+        <p className="text-xs text-subtle">
           {total > 0
             ? `${total.toLocaleString()}개 카드 — 포켓몬·유희왕·MTG·디지몬·원피스 통합 한글 검색`
             : '한국어·일어·영어 카드명으로 검색 가능 · 포켓몬·유희왕·MTG·디지몬·원피스'}
@@ -667,19 +667,19 @@ function CardsContent() {
 
       {/* ── 검색바 ── */}
       <div ref={searchRef} className="relative">
-        <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5a4830] pointer-events-none" />
+        <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-subtle pointer-events-none" />
         <input
           value={searchInput}
           onChange={e => { setSearchInput(e.target.value); setShowInstant(true) }}
           onFocus={() => setShowInstant(true)}
           onKeyDown={e => { if (e.key === 'Escape') setShowInstant(false) }}
           placeholder="한국어·영어·일어로 카드명, 세트명, 번호 검색..."
-          className="w-full pl-11 pr-10 py-3.5 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] focus:border-[#d4a853]/40 rounded-xl text-sm text-[#f5ead8] placeholder:text-[#4a3820] focus:outline-none transition-colors shadow-sm"
+          className="w-full pl-11 pr-10 py-3.5 bg-surface border border-line hover:border-line-strong focus:border-accent/40 rounded-xl text-sm text-fg placeholder:text-subtle focus:outline-none transition-colors shadow-sm"
         />
         {searchInput && (
           <button
             onClick={() => { setSearchInput(''); setParam('q', ''); setShowInstant(false) }}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-[#5a4830] hover:text-[#9e8a6a] transition-colors"
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-subtle hover:text-fg-3 transition-colors"
           >
             <X size={14} />
           </button>
@@ -702,8 +702,8 @@ function CardsContent() {
           onClick={() => setParam('tcgType', '')}
           className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all border ${
             !tcgType
-              ? 'bg-[#2a1c08] text-[#e0b878] border-[#3d2a0c] shadow-[0_0_12px_rgba(212,168,83,0.1)]'
-              : 'bg-transparent text-[#7a6040] border-[#2e2318] hover:border-[#4a3520] hover:text-[#9e8a6a]'
+              ? 'bg-accent-tint text-accent-soft border-accent-line shadow-[0_0_12px_rgba(139,92,246,0.1)]'
+              : 'bg-transparent text-muted-2 border-line hover:border-line-strong hover:text-fg-3'
           }`}
         >
           전체
@@ -714,8 +714,8 @@ function CardsContent() {
             onClick={() => setParam('tcgType', t === tcgType ? '' : t)}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all border ${
               tcgType === t
-                ? 'bg-[#2a1c08] text-[#e0b878] border-[#3d2a0c] shadow-[0_0_12px_rgba(212,168,83,0.1)]'
-                : 'bg-transparent text-[#7a6040] border-[#2e2318] hover:border-[#4a3520] hover:text-[#9e8a6a]'
+                ? 'bg-accent-tint text-accent-soft border-accent-line shadow-[0_0_12px_rgba(139,92,246,0.1)]'
+                : 'bg-transparent text-muted-2 border-line hover:border-line-strong hover:text-fg-3'
             }`}
           >
             <span>{TCG_ICONS[t]}</span>
@@ -726,7 +726,7 @@ function CardsContent() {
 
       {/* ── 언어 필터 탭 ── */}
       <div className="flex gap-1.5 items-center flex-wrap">
-        <span className="text-[11px] text-[#5a4830] font-medium mr-1">언어</span>
+        <span className="text-[11px] text-subtle font-medium mr-1">언어</span>
         {[
           { value: '', label: '전체' },
           { value: 'ko', label: '🇰🇷 한국판' },
@@ -737,8 +737,8 @@ function CardsContent() {
             onClick={() => setParam('lang', opt.value)}
             className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
               lang === opt.value
-                ? 'bg-[#2a1c08] text-[#e0b878] border-[#3d2a0c]'
-                : 'bg-transparent text-[#7a6040] border-[#2e2318] hover:border-[#4a3520] hover:text-[#9e8a6a]'
+                ? 'bg-accent-tint text-accent-soft border-accent-line'
+                : 'bg-transparent text-muted-2 border-line hover:border-line-strong hover:text-fg-3'
             }`}
           >
             {opt.label}
@@ -749,13 +749,13 @@ function CardsContent() {
       {/* ── 원피스 패러렐 카드 필터 ── */}
       {(tcgType === 'ONEPIECE' || !tcgType) && (
         <div className="flex gap-1.5 items-center flex-wrap">
-          <span className="text-[11px] text-[#5a4830] font-medium mr-1">특수</span>
+          <span className="text-[11px] text-subtle font-medium mr-1">특수</span>
           <button
             onClick={() => setParam('parallel', parallel ? '' : 'true')}
             className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
               parallel
-                ? 'bg-[#2a1c08] text-[#e0b878] border-[#3d2a0c]'
-                : 'bg-transparent text-[#7a6040] border-[#2e2318] hover:border-[#4a3520] hover:text-[#9e8a6a]'
+                ? 'bg-accent-tint text-accent-soft border-accent-line'
+                : 'bg-transparent text-muted-2 border-line hover:border-line-strong hover:text-fg-3'
             }`}
           >
             ✨ 원피스 패러렐
@@ -766,13 +766,13 @@ function CardsContent() {
       {/* ── 포켓몬 카드 분류 필터 ── */}
       {(tcgType === 'POKEMON' || (!tcgType && (metaData?.supertypes?.length ?? 0) > 0)) && (
         <div className="flex gap-1.5 items-center flex-wrap">
-          <span className="text-[11px] text-[#5a4830] font-medium mr-1">분류</span>
+          <span className="text-[11px] text-subtle font-medium mr-1">분류</span>
           <button
             onClick={() => setParam('supertype', '')}
             className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
               !supertype
-                ? 'bg-[#2a1c08] text-[#e0b878] border-[#3d2a0c]'
-                : 'bg-transparent text-[#7a6040] border-[#2e2318] hover:border-[#4a3520] hover:text-[#9e8a6a]'
+                ? 'bg-accent-tint text-accent-soft border-accent-line'
+                : 'bg-transparent text-muted-2 border-line hover:border-line-strong hover:text-fg-3'
             }`}
           >
             전체
@@ -783,8 +783,8 @@ function CardsContent() {
               onClick={() => setParam('supertype', supertype === st.value ? '' : st.value)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
                 supertype === st.value
-                  ? 'bg-[#2a1c08] text-[#e0b878] border-[#3d2a0c]'
-                  : 'bg-transparent text-[#7a6040] border-[#2e2318] hover:border-[#4a3520] hover:text-[#9e8a6a]'
+                  ? 'bg-accent-tint text-accent-soft border-accent-line'
+                  : 'bg-transparent text-muted-2 border-line hover:border-line-strong hover:text-fg-3'
               }`}
             >
               <span>{st.icon}</span>{st.label}
@@ -796,7 +796,7 @@ function CardsContent() {
       {/* ── 포켓몬 에너지 타입 필터 ── */}
       {(tcgType === 'POKEMON' || supertype === 'Pokémon') && (
         <div className="flex gap-1.5 items-center flex-wrap">
-          <span className="text-[11px] text-[#5a4830] font-medium mr-1">타입</span>
+          <span className="text-[11px] text-subtle font-medium mr-1">타입</span>
           {POKEMON_ENERGY_TYPES.map(et => (
             <button
               key={et.value}
@@ -805,7 +805,7 @@ function CardsContent() {
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all border ${
                 cardType === et.value
                   ? `border-opacity-60 text-white`
-                  : 'bg-transparent text-[#7a6040] border-[#2e2318] hover:border-[#4a3520]'
+                  : 'bg-transparent text-muted-2 border-line hover:border-line-strong'
               }`}
               style={cardType === et.value ? {
                 backgroundColor: et.bg,
@@ -820,7 +820,7 @@ function CardsContent() {
           {cardType && (
             <button
               onClick={() => setParam('cardType', '')}
-              className="text-[11px] text-[#7a6040] hover:text-[#e0b878] transition-colors ml-1"
+              className="text-[11px] text-muted-2 hover:text-accent-soft transition-colors ml-1"
             >
               초기화 ×
             </button>
@@ -831,7 +831,7 @@ function CardsContent() {
       <div className="flex gap-6">
         {/* ── 데스크탑 사이드바 ── */}
         <aside className="hidden lg:block w-52 shrink-0 space-y-6">
-          <div className="bg-[#1a1410] border border-[#2e2318] rounded-xl p-4">
+          <div className="bg-surface border border-line rounded-xl p-4">
             {FilterPanel}
           </div>
         </aside>
@@ -845,22 +845,22 @@ function CardsContent() {
               {/* 모바일 필터 버튼 */}
               <button
                 onClick={() => setShowMobileFilter(o => !o)}
-                className="lg:hidden flex items-center gap-1.5 px-3 py-2 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] rounded-xl text-xs text-[#7a6040] hover:text-[#9e8a6a] transition-colors"
+                className="lg:hidden flex items-center gap-1.5 px-3 py-2 bg-surface border border-line hover:border-line-strong rounded-xl text-xs text-muted-2 hover:text-fg-3 transition-colors"
               >
                 <SlidersHorizontal size={12} />
                 필터
-                {hasFilter && <span className="w-1.5 h-1.5 rounded-full bg-[#d4a853]" />}
+                {hasFilter && <span className="w-1.5 h-1.5 rounded-full bg-accent" />}
               </button>
 
               {/* 활성 필터 칩 */}
               {lang && (
-                <span className="flex items-center gap-1 text-[11px] bg-[#2a1c08] border border-[#3d2a0c] text-[#e0b878] px-2.5 py-1 rounded-lg">
+                <span className="flex items-center gap-1 text-[11px] bg-accent-tint border border-accent-line text-accent-soft px-2.5 py-1 rounded-lg">
                   {lang === 'ja' ? '🇯🇵 일본판' : '🇰🇷 한국판'}
                   <button onClick={() => setParam('lang', '')}><X size={9} /></button>
                 </span>
               )}
               {supertype && (
-                <span className="flex items-center gap-1 text-[11px] bg-[#2a1c08] border border-[#3d2a0c] text-[#e0b878] px-2.5 py-1 rounded-lg">
+                <span className="flex items-center gap-1 text-[11px] bg-accent-tint border border-accent-line text-accent-soft px-2.5 py-1 rounded-lg">
                   {POKEMON_SUPERTYPES.find(s => s.value === supertype)?.icon} {supertype}
                   <button onClick={() => setParam('supertype', '')}><X size={9} /></button>
                 </span>
@@ -877,31 +877,31 @@ function CardsContent() {
               })()}
               {selectedRarities.length > 0 && (
                 selectedRarities.length === 1 ? (
-                  <span className="flex items-center gap-1 text-[11px] bg-[#2a1c08] border border-[#3d2a0c] text-[#e0b878] px-2.5 py-1 rounded-lg">
+                  <span className="flex items-center gap-1 text-[11px] bg-accent-tint border border-accent-line text-accent-soft px-2.5 py-1 rounded-lg">
                     {rarityLabel(selectedRarities[0])}
                     <button onClick={() => setParam('rarities', '')}><X size={9} /></button>
                   </span>
                 ) : (
-                  <span className="flex items-center gap-1 text-[11px] bg-[#2a1c08] border border-[#3d2a0c] text-[#e0b878] px-2.5 py-1 rounded-lg">
+                  <span className="flex items-center gap-1 text-[11px] bg-accent-tint border border-accent-line text-accent-soft px-2.5 py-1 rounded-lg">
                     레어도 {selectedRarities.length}개 선택
                     <button onClick={() => setParam('rarities', '')}><X size={9} /></button>
                   </span>
                 )
               )}
               {(hpMin || hpMax) && (
-                <span className="flex items-center gap-1 text-[11px] bg-[#2a1c08] border border-[#3d2a0c] text-[#e0b878] px-2.5 py-1 rounded-lg">
+                <span className="flex items-center gap-1 text-[11px] bg-accent-tint border border-accent-line text-accent-soft px-2.5 py-1 rounded-lg">
                   HP {hpMin || '0'}~{hpMax || '∞'}
                   <button onClick={() => handleHpChange('', '')}><X size={9} /></button>
                 </span>
               )}
               {setName && (
-                <span className="flex items-center gap-1 text-[11px] bg-[#2a1c08] border border-[#3d2a0c] text-[#e0b878] px-2.5 py-1 rounded-lg max-w-[180px]">
+                <span className="flex items-center gap-1 text-[11px] bg-accent-tint border border-accent-line text-accent-soft px-2.5 py-1 rounded-lg max-w-[180px]">
                   <span className="truncate">{setName}</span>
                   <button onClick={() => setParam('setName', '')}><X size={9} /></button>
                 </span>
               )}
               {parallel && (
-                <span className="flex items-center gap-1 text-[11px] bg-[#2a1c08] border border-[#3d2a0c] text-[#e0b878] px-2.5 py-1 rounded-lg">
+                <span className="flex items-center gap-1 text-[11px] bg-accent-tint border border-accent-line text-accent-soft px-2.5 py-1 rounded-lg">
                   ✨ 패러렐 카드
                   <button onClick={() => setParam('parallel', '')}><X size={9} /></button>
                 </span>
@@ -909,7 +909,7 @@ function CardsContent() {
               {hasFilter && (
                 <button
                   onClick={clearAll}
-                  className="text-[11px] text-[#5a4830] hover:text-[#9e8a6a] transition-colors"
+                  className="text-[11px] text-subtle hover:text-fg-3 transition-colors"
                 >
                   전체 초기화
                 </button>
@@ -918,11 +918,11 @@ function CardsContent() {
 
             {/* 정렬 */}
             <div className="flex items-center gap-2">
-              <TrendingUp size={12} className="text-[#5a4830]" />
+              <TrendingUp size={12} className="text-subtle" />
               <select
                 value={sort}
                 onChange={e => setParam('sort', e.target.value)}
-                className="bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] rounded-lg px-3 py-1.5 text-xs text-[#f5ead8] focus:outline-none focus:border-[#d4a853]/40 cursor-pointer transition-colors"
+                className="bg-surface border border-line hover:border-line-strong rounded-lg px-3 py-1.5 text-xs text-fg focus:outline-none focus:border-accent/40 cursor-pointer transition-colors"
               >
                 {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
@@ -931,7 +931,7 @@ function CardsContent() {
 
           {/* 모바일 필터 패널 */}
           {showMobileFilter && (
-            <div className="lg:hidden bg-[#1a1410] border border-[#2e2318] rounded-xl p-4">
+            <div className="lg:hidden bg-surface border border-line rounded-xl p-4">
               {FilterPanel}
             </div>
           )}
@@ -943,13 +943,13 @@ function CardsContent() {
             </div>
           ) : cards.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 gap-4">
-              <Sparkles size={40} className="text-[#2e2318]" />
+              <Sparkles size={40} className="text-line" />
               <div className="text-center">
-                <p className="text-[#5a4830] font-medium">검색 결과가 없습니다.</p>
-                <p className="text-xs text-[#4a3820] mt-1">다른 키워드나 필터를 사용해보세요.</p>
+                <p className="text-subtle font-medium">검색 결과가 없습니다.</p>
+                <p className="text-xs text-subtle mt-1">다른 키워드나 필터를 사용해보세요.</p>
               </div>
               {hasFilter && (
-                <button onClick={clearAll} className="text-sm text-[#d4a853] hover:text-[#f0c060] transition-colors">
+                <button onClick={clearAll} className="text-sm text-accent-fg hover:text-[#8a5ef2] transition-colors">
                   필터 초기화
                 </button>
               )}
@@ -980,7 +980,7 @@ function CardsContent() {
                 className="fixed z-[9999] pointer-events-none hidden xl:block"
                 style={{ left: Math.max(8, left), top: Math.max(8, top) }}
               >
-                <div className="relative w-48 rounded-xl overflow-hidden shadow-2xl border border-[#d4a853]/30 bg-[#0f0b08]" style={{ aspectRatio: '3/4' }}>
+                <div className="relative w-48 rounded-xl overflow-hidden shadow-2xl border border-accent/30 bg-bg" style={{ aspectRatio: '3/4' }}>
                   <Image
                     src={resolveImageSrc(hoverInfo.card.imageUrl)!}
                     alt=""
@@ -990,10 +990,10 @@ function CardsContent() {
                   />
                 </div>
                 <div className="mt-1.5 px-1">
-                  <p className="text-xs font-semibold text-[#f5ead8] line-clamp-1">
+                  <p className="text-xs font-semibold text-fg line-clamp-1">
                     {hoverInfo.card.nameKo ?? hoverInfo.card.name}
                   </p>
-                  <p className="text-[10px] text-[#7a6040] mt-0.5">
+                  <p className="text-[10px] text-muted-2 mt-0.5">
                     {hoverInfo.card.setName}
                     {hoverInfo.card.cardNumber && ` · ${hoverInfo.card.cardNumber}`}
                   </p>
@@ -1008,7 +1008,7 @@ function CardsContent() {
               <button
                 onClick={() => setPageParam(page - 1)}
                 disabled={page === 1}
-                className="h-9 w-9 flex items-center justify-center rounded-lg bg-[#1a1410] border border-[#2e2318] text-[#7a6040] hover:border-[#4a3520] hover:text-[#e8d5b0] disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+                className="h-9 w-9 flex items-center justify-center rounded-lg bg-surface border border-line text-muted-2 hover:border-line-strong hover:text-fg-2 disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronLeft size={15} />
               </button>
@@ -1022,15 +1022,15 @@ function CardsContent() {
                 }, [])
                 .map((p, i) =>
                   p === '...' ? (
-                    <span key={`e-${i}`} className="h-9 w-9 flex items-center justify-center text-[#4a3520] text-sm">…</span>
+                    <span key={`e-${i}`} className="h-9 w-9 flex items-center justify-center text-subtle text-sm">…</span>
                   ) : (
                     <button
                       key={p}
                       onClick={() => setPageParam(p as number)}
                       className={`h-9 w-9 flex items-center justify-center rounded-lg text-sm font-medium transition-all ${
                         p === page
-                          ? 'bg-[#2a1c08] text-[#e0b878] border border-[#3d2a0c]'
-                          : 'bg-[#1a1410] border border-[#2e2318] text-[#7a6040] hover:border-[#4a3520] hover:text-[#e8d5b0]'
+                          ? 'bg-accent-tint text-accent-soft border border-accent-line'
+                          : 'bg-surface border border-line text-muted-2 hover:border-line-strong hover:text-fg-2'
                       }`}
                     >
                       {p}
@@ -1041,7 +1041,7 @@ function CardsContent() {
               <button
                 onClick={() => setPageParam(page + 1)}
                 disabled={page === totalPages}
-                className="h-9 w-9 flex items-center justify-center rounded-lg bg-[#1a1410] border border-[#2e2318] text-[#7a6040] hover:border-[#4a3520] hover:text-[#e8d5b0] disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+                className="h-9 w-9 flex items-center justify-center rounded-lg bg-surface border border-line text-muted-2 hover:border-line-strong hover:text-fg-2 disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronRight size={15} />
               </button>
@@ -1060,7 +1060,7 @@ export default function CardsPage() {
     <Suspense
       fallback={
         <div className="flex items-center justify-center py-32">
-          <div className="w-5 h-5 rounded-full border-2 border-[#2e2318] border-t-[#d4a853] animate-spin" />
+          <div className="w-5 h-5 rounded-full border-2 border-line border-t-accent animate-spin" />
         </div>
       }
     >

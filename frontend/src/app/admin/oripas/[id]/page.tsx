@@ -85,7 +85,7 @@ export default function AdminOripaItemsPage() {
         <Link href="/admin/oripas" className="text-gray-400 hover:text-white transition-colors">
           <ChevronLeft size={20} />
         </Link>
-        <h1 className="text-2xl font-bold">{oripa?.title ?? '...'} — 수록 카드</h1>
+        <h1 className="text-[26px] sm:text-3xl font-bold tracking-tight">{oripa?.title ?? '...'} — 수록 카드</h1>
       </div>
 
       {msg && (

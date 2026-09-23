@@ -45,7 +45,7 @@ const CONDITIONS = [
 ]
 const GRADING_COMPANIES = ['PSA', 'BGS', 'CGC', 'SGC', 'HGA', 'ACE']
 
-const inputCls = 'w-32 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] focus:border-[#d4a853]/40 rounded-lg px-3 py-2 text-sm text-[#f5ead8] focus:outline-none transition-colors'
+const inputCls = 'w-32 bg-surface border border-line hover:border-line-strong focus:border-accent/40 rounded-full px-3 py-2 text-sm text-fg focus:outline-none transition-colors'
 
 // ─── 컴포넌트 ─────────────────────────────────────────────────────────────────
 
@@ -54,10 +54,10 @@ function FilterPill({
 }: { active: boolean; onClick: () => void; children: React.ReactNode; className?: string }) {
   return (
     <button onClick={onClick}
-      className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all duration-150 ${
+      className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all duration-150 ${
         active
-          ? 'bg-[#2a1c08] text-[#e0b878] border-[#3d2a0c]'
-          : `bg-transparent text-[#7a6040] border-[#2e2318] hover:border-[#4a3520] hover:text-[#9e8a6a] ${className ?? ''}`
+          ? 'bg-accent-tint text-accent-soft border-accent-line'
+          : `bg-transparent text-muted-2 border-line hover:border-line-strong hover:text-fg-3 ${className ?? ''}`
       }`}>
       {children}
     </button>
@@ -84,12 +84,12 @@ function MarketStatBar() {
 
   const stats = [
     {
-      icon: <BarChart2 size={14} className="text-[#d4a853]" />,
+      icon: <BarChart2 size={14} className="text-accent-fg" />,
       label: '활성 리스팅',
       value: data ? data.activeCount.toLocaleString() : '—',
     },
     {
-      icon: <Gavel size={14} className="text-[#f0a832]" />,
+      icon: <Gavel size={14} className="text-accent-2" />,
       label: '진행 중 경매',
       value: data ? data.activeAuctions.toLocaleString() : '—',
     },
@@ -111,15 +111,15 @@ function MarketStatBar() {
   ]
 
   return (
-    <div className="bg-[#150f0c] border border-[#2e2318] rounded-2xl px-5 py-4 space-y-4">
+    <div className="bg-sunken border border-line rounded-2xl px-5 py-4 space-y-4">
       {/* 숫자 지표 */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {stats.map(s => (
           <div key={s.label} className="flex items-center gap-2">
             {s.icon}
             <div>
-              <p className="text-xs font-bold text-[#f5ead8] tabular-nums leading-none">{s.value}</p>
-              <p className="text-[10px] text-[#5a4830] mt-0.5">{s.label}</p>
+              <p className="text-xs font-bold text-fg tabular-nums leading-none">{s.value}</p>
+              <p className="text-[10px] text-subtle mt-0.5">{s.label}</p>
             </div>
           </div>
         ))}
@@ -127,27 +127,27 @@ function MarketStatBar() {
 
       {/* 최근 체결 & 인기 카드 */}
       {data && (data.recentDeals.length > 0 || data.topCards.length > 0) && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-[#2e2318]">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-line">
           {/* 최근 체결 */}
           {data.recentDeals.length > 0 && (
             <div>
-              <p className="text-[10px] text-[#5a4830] uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5">
+              <p className="text-[10px] text-subtle uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5">
                 <Clock size={10} /> 최근 체결
               </p>
               <div className="space-y-1.5">
                 {data.recentDeals.slice(0, 3).map(deal => (
                   <div key={deal.id} className="flex items-center gap-2">
                     {deal.cardImage
-                      ? <div className="relative w-6 h-9 shrink-0 rounded overflow-hidden bg-[#0f0b08]">
+                      ? <div className="relative w-6 h-9 shrink-0 rounded overflow-hidden bg-bg">
                           <Image src={deal.cardImage} alt={deal.cardName} fill className="object-contain" sizes="24px" />
                         </div>
-                      : <div className="w-6 h-9 shrink-0 rounded bg-[#1a1208] flex items-center justify-center text-[8px]">🃏</div>
+                      : <div className="w-6 h-9 shrink-0 rounded bg-surface-2 flex items-center justify-center text-[8px]">🃏</div>
                     }
                     <div className="flex-1 min-w-0">
-                      <p className="text-[11px] text-[#e8d5b0] truncate">{deal.cardName}</p>
-                      <p className="text-[10px] text-[#5a4830]">{deal.listingType === 'AUCTION' ? '경매' : deal.listingType === 'BUY_NOW' ? '즉구' : '제안'}</p>
+                      <p className="text-[11px] text-fg-2 truncate">{deal.cardName}</p>
+                      <p className="text-[10px] text-subtle">{deal.listingType === 'AUCTION' ? '경매' : deal.listingType === 'BUY_NOW' ? '즉구' : '제안'}</p>
                     </div>
-                    <p className="text-[11px] font-bold text-[#f0a832] tabular-nums shrink-0">{deal.finalPrice.toLocaleString()}P</p>
+                    <p className="text-[11px] font-bold text-accent-2 tabular-nums shrink-0">{deal.finalPrice.toLocaleString()}P</p>
                   </div>
                 ))}
               </div>
@@ -157,22 +157,22 @@ function MarketStatBar() {
           {/* 인기 카드 */}
           {data.topCards.length > 0 && (
             <div>
-              <p className="text-[10px] text-[#5a4830] uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5">
+              <p className="text-[10px] text-subtle uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5">
                 <TrendingUp size={10} /> 7일 인기 카드
               </p>
               <div className="space-y-1.5">
                 {data.topCards.slice(0, 3).map((card, idx) => (
                   <Link key={card.cardId} href={`/cards/${card.cardId}`} className="flex items-center gap-2 group">
-                    <span className="text-[10px] font-bold text-[#4a3820] w-4 text-right shrink-0">#{idx + 1}</span>
+                    <span className="text-[10px] font-bold text-subtle w-4 text-right shrink-0">#{idx + 1}</span>
                     {card.imageUrl
-                      ? <div className="relative w-6 h-9 shrink-0 rounded overflow-hidden bg-[#0f0b08]">
+                      ? <div className="relative w-6 h-9 shrink-0 rounded overflow-hidden bg-bg">
                           <Image src={resolveImageSrc(card.imageUrl)!} alt={card.name ?? ''} fill className="object-contain" sizes="24px" />
                         </div>
-                      : <div className="w-6 h-9 shrink-0 rounded bg-[#1a1208] flex items-center justify-center text-[8px]">🃏</div>
+                      : <div className="w-6 h-9 shrink-0 rounded bg-surface-2 flex items-center justify-center text-[8px]">🃏</div>
                     }
                     <div className="flex-1 min-w-0">
-                      <p className="text-[11px] text-[#e8d5b0] truncate group-hover:text-white transition-colors">{card.name}</p>
-                      <p className="text-[10px] text-[#5a4830]">{card.txCount}건 {card.avgPrice ? `· 평균 ${card.avgPrice.toLocaleString()}P` : ''}</p>
+                      <p className="text-[11px] text-fg-2 truncate group-hover:text-white transition-colors">{card.name}</p>
+                      <p className="text-[10px] text-subtle">{card.txCount}건 {card.avgPrice ? `· 평균 ${card.avgPrice.toLocaleString()}P` : ''}</p>
                     </div>
                   </Link>
                 ))}
@@ -268,35 +268,35 @@ function ListingsContent() {
       {/* Header */}
       <div className="flex items-start sm:items-center gap-4 flex-col sm:flex-row">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">마켓플레이스</h1>
+          <h1 className="text-[26px] sm:text-3xl font-bold tracking-tight text-fg">마켓플레이스</h1>
           {tab === 'browse' && data && (
-            <p className="text-xs text-[#5a4830] mt-0.5">총 {data.total.toLocaleString()}개 리스팅</p>
+            <p className="text-xs text-subtle mt-0.5">총 {data.total.toLocaleString()}개 리스팅</p>
           )}
         </div>
 
         <div className="flex items-center gap-2 ml-auto">
           {/* Market 링크 */}
           <Link href="/market"
-            className="flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-medium bg-[#1a1410] border border-[#2e2318] text-[#7a6040] hover:border-[#d4a853]/30 hover:text-[#d4a853] transition-all">
+            className="flex items-center gap-1.5 h-9 px-3 rounded-full text-xs font-medium bg-surface border border-line text-muted-2 hover:border-accent/30 hover:text-accent-fg transition-all">
             <BarChart2 size={12} /> 시장 분석
           </Link>
 
           {/* Tab switcher */}
-          <div className="flex items-center gap-1 bg-[#1a1410] border border-[#2e2318] rounded-xl p-1">
+          <div className="flex items-center gap-1 bg-surface border border-line rounded-full p-1">
             <button onClick={() => setTab('browse')}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-150 ${
                 tab === 'browse'
-                  ? 'bg-[#2a1c08] text-[#e0b878] shadow-[0_0_12px_rgba(212,168,83,0.15)]'
-                  : 'text-[#7a6040] hover:text-[#9e8a6a]'
+                  ? 'bg-accent-tint text-accent-soft shadow-[0_0_12px_rgba(139,92,246,0.15)]'
+                  : 'text-muted-2 hover:text-fg-3'
               }`}>
               <LayoutGrid size={13} /> 둘러보기
             </button>
             {user && (
               <button onClick={() => setTab('sell')}
-                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-150 ${
                   tab === 'sell'
-                    ? 'bg-[#2a1c08] text-[#e0b878] shadow-[0_0_12px_rgba(212,168,83,0.15)]'
-                    : 'text-[#7a6040] hover:text-[#9e8a6a]'
+                    ? 'bg-accent-tint text-accent-soft shadow-[0_0_12px_rgba(139,92,246,0.15)]'
+                    : 'text-muted-2 hover:text-fg-3'
                 }`}>
                 <PlusCircle size={13} /> 판매 등록
               </button>
@@ -307,7 +307,7 @@ function ListingsContent() {
 
       {/* Sell form tab */}
       {tab === 'sell' && user && (
-        <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl p-6">
+        <div className="bg-surface border border-line rounded-2xl p-6">
           <SellForm onSuccess={id => router.push(`/listings/${id}`)} />
         </div>
       )}
@@ -330,24 +330,24 @@ function ListingsContent() {
           {/* Filter toolbar */}
           <div className="flex items-center gap-2 flex-wrap">
             <select value={sort} onChange={e => setParam('sort', e.target.value)}
-              className="h-9 px-3 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] rounded-lg text-sm text-[#9e8a6a] focus:outline-none transition-colors cursor-pointer">
+              className="h-9 px-3 bg-surface border border-line hover:border-line-strong rounded-full text-sm text-fg-3 focus:outline-none transition-colors cursor-pointer">
               {SORT_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
 
             <button onClick={() => setShowFilter(v => !v)}
-              className={`h-9 flex items-center gap-1.5 px-3 rounded-lg text-sm border transition-all duration-150 ${
+              className={`h-9 flex items-center gap-1.5 px-3 rounded-full text-sm border transition-all duration-150 ${
                 showFilter || hasFilters
-                  ? 'bg-[#2a1c08] border-[#3d2a0c] text-[#e0b878]'
-                  : 'bg-[#1a1410] border-[#2e2318] text-[#7a6040] hover:border-[#4a3520] hover:text-[#9e8a6a]'
+                  ? 'bg-accent-tint border-accent-line text-accent-soft'
+                  : 'bg-surface border-line text-muted-2 hover:border-line-strong hover:text-fg-3'
               }`}>
               <SlidersHorizontal size={13} />
               필터
-              {hasFilters && <span className="w-1.5 h-1.5 rounded-full bg-[#d4a853]" />}
+              {hasFilters && <span className="w-1.5 h-1.5 rounded-full bg-accent" />}
             </button>
 
             {hasFilters && (
               <button onClick={clearAllFilters}
-                className="h-9 w-9 flex items-center justify-center text-[#5a4830] hover:text-[#e8d5b0] bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] rounded-lg transition-colors"
+                className="h-9 w-9 flex items-center justify-center text-subtle hover:text-fg-2 bg-surface border border-line hover:border-line-strong rounded-full transition-colors"
                 title="필터 초기화">
                 <X size={14} />
               </button>
@@ -355,33 +355,33 @@ function ListingsContent() {
 
             {/* 활성 필터 칩 */}
             {cardName && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1a1410] border border-[#2e2318] rounded-lg text-xs text-[#7a6040]">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-line rounded-full text-xs text-muted-2">
                 <span>&ldquo;{cardName}&rdquo;</span>
-                <button onClick={() => setParam('cardName', '')} className="text-[#5a4830] hover:text-[#9e8a6a]">
+                <button onClick={() => setParam('cardName', '')} className="text-subtle hover:text-fg-3">
                   <X size={12} />
                 </button>
               </div>
             )}
             {condition && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1a1410] border border-[#2e2318] rounded-lg text-xs text-[#e0b878]">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-line rounded-full text-xs text-accent-soft">
                 {CONDITION_LABELS[condition as keyof typeof CONDITION_LABELS] ?? condition}
-                <button onClick={() => setParam('condition', '')} className="text-[#5a4830] hover:text-[#9e8a6a]">
+                <button onClick={() => setParam('condition', '')} className="text-subtle hover:text-fg-3">
                   <X size={12} />
                 </button>
               </div>
             )}
             {grading && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1a1410] border border-[#2e2318] rounded-lg text-xs text-[#e0b878]">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-line rounded-full text-xs text-accent-soft">
                 {grading} 그레이딩
-                <button onClick={() => setParam('grading', '')} className="text-[#5a4830] hover:text-[#9e8a6a]">
+                <button onClick={() => setParam('grading', '')} className="text-subtle hover:text-fg-3">
                   <X size={12} />
                 </button>
               </div>
             )}
             {hasGrading === 'true' && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1a1410] border border-[#2e2318] rounded-lg text-xs text-[#e0b878]">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-line rounded-full text-xs text-accent-soft">
                 <ShieldCheck size={11} /> 그레이딩 카드만
-                <button onClick={() => setParam('hasGrading', '')} className="text-[#5a4830] hover:text-[#9e8a6a]">
+                <button onClick={() => setParam('hasGrading', '')} className="text-subtle hover:text-fg-3">
                   <X size={12} />
                 </button>
               </div>
@@ -390,10 +390,10 @@ function ListingsContent() {
 
           {/* Expanded filter panel */}
           {showFilter && (
-            <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl p-5 space-y-5">
+            <div className="bg-surface border border-line rounded-2xl p-5 space-y-5">
               {/* TCG 종류 */}
               <div>
-                <p className="text-[10px] text-[#5a4830] mb-3 uppercase tracking-[0.15em] font-semibold">TCG 종류</p>
+                <p className="text-[10px] text-subtle mb-3 uppercase tracking-[0.15em] font-semibold">TCG 종류</p>
                 <div className="flex gap-1.5 flex-wrap">
                   <FilterPill active={!tcgType} onClick={() => setParam('tcgType', '')}>전체</FilterPill>
                   {TCG_TYPES.map(t => (
@@ -406,14 +406,14 @@ function ListingsContent() {
 
               {/* 카드 컨디션 */}
               <div>
-                <p className="text-[10px] text-[#5a4830] mb-3 uppercase tracking-[0.15em] font-semibold">카드 상태</p>
+                <p className="text-[10px] text-subtle mb-3 uppercase tracking-[0.15em] font-semibold">카드 상태</p>
                 <div className="flex gap-1.5 flex-wrap">
                   {CONDITIONS.map(c => (
                     <button
                       key={c.value}
                       onClick={() => toggleParam('condition', c.value, condition)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                        condition === c.value ? c.bg + ' ' + c.color : 'border-[#2e2318] text-[#7a6040] hover:border-[#4a3520]'
+                      className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                        condition === c.value ? c.bg + ' ' + c.color : 'border-line text-muted-2 hover:border-line-strong'
                       }`}
                     >
                       {c.label}
@@ -424,14 +424,14 @@ function ListingsContent() {
 
               {/* 그레이딩 */}
               <div>
-                <p className="text-[10px] text-[#5a4830] mb-3 uppercase tracking-[0.15em] font-semibold">그레이딩</p>
+                <p className="text-[10px] text-subtle mb-3 uppercase tracking-[0.15em] font-semibold">그레이딩</p>
                 <div className="flex gap-1.5 flex-wrap">
                   <button
                     onClick={() => toggleParam('hasGrading', 'true', hasGrading)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
                       hasGrading === 'true'
-                        ? 'bg-[#2a1c08] text-[#e0b878] border-[#3d2a0c]'
-                        : 'border-[#2e2318] text-[#7a6040] hover:border-[#4a3520]'
+                        ? 'bg-accent-tint text-accent-soft border-accent-line'
+                        : 'border-line text-muted-2 hover:border-line-strong'
                     }`}
                   >
                     <ShieldCheck size={11} /> 그레이딩 카드만
@@ -446,15 +446,15 @@ function ListingsContent() {
 
               {/* 가격 범위 */}
               <div>
-                <p className="text-[10px] text-[#5a4830] mb-3 uppercase tracking-[0.15em] font-semibold">가격 범위</p>
+                <p className="text-[10px] text-subtle mb-3 uppercase tracking-[0.15em] font-semibold">가격 범위</p>
                 <div className="flex items-center gap-2">
                   <input type="number" value={minPriceInput} onChange={e => setMinPriceInput(e.target.value)}
                     placeholder="최소 (P)" className={inputCls} />
-                  <span className="text-[#4a3520]">–</span>
+                  <span className="text-subtle">–</span>
                   <input type="number" value={maxPriceInput} onChange={e => setMaxPriceInput(e.target.value)}
                     placeholder="최대 (P)" className={inputCls} />
                   <button onClick={applyPriceFilter}
-                    className="h-9 px-4 bg-[#d4a853] hover:bg-[#c49440] text-white rounded-lg text-xs font-semibold transition-colors">
+                    className="h-9 px-4 bg-accent hover:bg-accent-strong text-white rounded-full text-xs font-semibold transition-colors">
                     적용
                   </button>
                 </div>
@@ -472,9 +472,9 @@ function ListingsContent() {
           ) : data?.listings?.length === 0 ? (
             <div className="text-center py-28">
               <p className="text-5xl mb-4 opacity-20">🃏</p>
-              <p className="text-[#5a4830] text-sm">조건에 맞는 카드가 없습니다.</p>
+              <p className="text-subtle text-sm">조건에 맞는 카드가 없습니다.</p>
               {hasFilters && (
-                <button onClick={clearAllFilters} className="mt-3 text-[#d4a853] hover:underline text-sm">
+                <button onClick={clearAllFilters} className="mt-3 text-accent-fg hover:underline text-sm">
                   필터 초기화
                 </button>
               )}
@@ -493,7 +493,7 @@ function ListingsContent() {
                   <button
                     onClick={() => { const p = new URLSearchParams(searchParams.toString()); p.set('page', String(page - 1)); router.push(`/listings?${p}`) }}
                     disabled={page === 1}
-                    className="h-9 w-9 flex items-center justify-center rounded-lg bg-[#1a1410] border border-[#2e2318] text-[#7a6040] hover:border-[#4a3520] hover:text-[#e8d5b0] disabled:opacity-25 disabled:cursor-not-allowed transition-colors">
+                    className="h-9 w-9 flex items-center justify-center rounded-full bg-surface border border-line text-muted-2 hover:border-line-strong hover:text-fg-2 disabled:opacity-25 disabled:cursor-not-allowed transition-colors">
                     <ChevronLeft size={15} />
                   </button>
 
@@ -506,14 +506,14 @@ function ListingsContent() {
                     }, [])
                     .map((p, i) =>
                       p === '...' ? (
-                        <span key={`e-${i}`} className="h-9 w-9 flex items-center justify-center text-[#4a3520] text-sm">…</span>
+                        <span key={`e-${i}`} className="h-9 w-9 flex items-center justify-center text-subtle text-sm">…</span>
                       ) : (
                         <button key={p}
                           onClick={() => { const ps = new URLSearchParams(searchParams.toString()); ps.set('page', String(p)); router.push(`/listings?${ps}`) }}
-                          className={`h-9 w-9 flex items-center justify-center rounded-lg text-sm font-medium transition-all ${
+                          className={`h-9 w-9 flex items-center justify-center rounded-full text-sm font-medium transition-all ${
                             p === page
-                              ? 'bg-[#2a1c08] text-[#e0b878] border border-[#3d2a0c] shadow-[0_0_10px_rgba(212,168,83,0.12)]'
-                              : 'bg-[#1a1410] border border-[#2e2318] text-[#7a6040] hover:border-[#4a3520] hover:text-[#e8d5b0]'
+                              ? 'bg-accent-tint text-accent-soft border border-accent-line shadow-[0_0_10px_rgba(139,92,246,0.12)]'
+                              : 'bg-surface border border-line text-muted-2 hover:border-line-strong hover:text-fg-2'
                           }`}>
                           {p}
                         </button>
@@ -523,7 +523,7 @@ function ListingsContent() {
                   <button
                     onClick={() => { const p = new URLSearchParams(searchParams.toString()); p.set('page', String(page + 1)); router.push(`/listings?${p}`) }}
                     disabled={page === totalPages}
-                    className="h-9 w-9 flex items-center justify-center rounded-lg bg-[#1a1410] border border-[#2e2318] text-[#7a6040] hover:border-[#4a3520] hover:text-[#e8d5b0] disabled:opacity-25 disabled:cursor-not-allowed transition-colors">
+                    className="h-9 w-9 flex items-center justify-center rounded-full bg-surface border border-line text-muted-2 hover:border-line-strong hover:text-fg-2 disabled:opacity-25 disabled:cursor-not-allowed transition-colors">
                     <ChevronRight size={15} />
                   </button>
                 </div>
@@ -540,7 +540,7 @@ export default function ListingsPage() {
   return (
     <Suspense fallback={
       <div className="flex items-center justify-center py-32">
-        <div className="w-8 h-8 rounded-full border-2 border-[#2e2318] border-t-[#d4a853] animate-spin" />
+        <div className="w-8 h-8 rounded-full border-2 border-line border-t-accent animate-spin" />
       </div>
     }>
       <ListingsContent />

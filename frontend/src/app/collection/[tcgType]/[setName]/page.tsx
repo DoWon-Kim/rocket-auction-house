@@ -3,7 +3,7 @@
 import { use, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import { useAuthStore } from '@/lib/store'
+import { useAuthStore, useAuthHydrated } from '@/lib/store'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -46,9 +46,11 @@ export default function CollectionSetPage({ params }: { params: Promise<{ tcgTyp
     enabled: !!user,
   })
 
+  const hydrated = useAuthHydrated()
+
   useEffect(() => {
-    if (!user) router.replace('/login')
-  }, [user, router])
+    if (hydrated && !user) router.replace('/login')
+  }, [hydrated, user, router])
 
   if (!user) return null
 
@@ -64,20 +66,20 @@ export default function CollectionSetPage({ params }: { params: Promise<{ tcgTyp
   return (
     <div className="max-w-4xl mx-auto space-y-4">
       {/* 뒤로 가기 */}
-      <Link href="/collection" className="flex items-center gap-1.5 text-sm text-[#5a4830] hover:text-[#d4a853] transition-colors w-fit">
+      <Link href="/collection" className="flex items-center gap-1.5 text-sm text-subtle hover:text-accent-fg transition-colors w-fit">
         <ChevronLeft size={15} /> 컬렉션 목록
       </Link>
 
       {/* 헤더 */}
-      <div className={`rounded-2xl border px-5 py-4 ${isComplete ? 'bg-[#d4a853]/5 border-[#d4a853]/30' : 'bg-[#1a1410] border-[#2e2318]'}`}>
+      <div className={`rounded-2xl border px-5 py-4 ${isComplete ? 'bg-accent/5 border-accent/30' : 'bg-surface border-line'}`}>
         <div className="flex items-start gap-3 mb-3">
-          <Layers size={18} className={isComplete ? 'text-[#d4a853] mt-0.5' : 'text-[#5a4830] mt-0.5'} />
+          <Layers size={18} className={isComplete ? 'text-accent-fg mt-0.5' : 'text-subtle mt-0.5'} />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="font-bold text-base text-[#f5ead8]">{decodedSetName}</h1>
-              <span className="text-xs text-[#5a4830]">{TCG_LABELS[tcgType] ?? tcgType}</span>
+              <h1 className="font-bold text-base text-fg">{decodedSetName}</h1>
+              <span className="text-xs text-subtle">{TCG_LABELS[tcgType] ?? tcgType}</span>
               {isComplete && (
-                <span className="flex items-center gap-1 px-2 py-0.5 bg-[#d4a853]/20 border border-[#d4a853]/40 rounded-full text-[10px] text-[#d4a853] font-semibold">
+                <span className="flex items-center gap-1 px-2 py-0.5 bg-accent/20 border border-accent/40 rounded-full text-[10px] text-accent-fg font-semibold">
                   <CheckCircle2 size={9} /> 완성
                 </span>
               )}
@@ -88,14 +90,14 @@ export default function CollectionSetPage({ params }: { params: Promise<{ tcgTyp
         {/* 진행률 바 */}
         <div className="space-y-1.5">
           <div className="flex justify-between text-[11px]">
-            <span className="text-[#5a4830]">진행률</span>
-            <span className={isComplete ? 'text-[#d4a853] font-semibold' : 'text-[#7a6040]'}>
+            <span className="text-subtle">진행률</span>
+            <span className={isComplete ? 'text-accent-fg font-semibold' : 'text-muted-2'}>
               {data?.ownedCount ?? 0} / {data?.totalCount ?? 0} ({pct.toFixed(1)}%)
             </span>
           </div>
-          <div className="h-2 bg-[#2e2318] rounded-full overflow-hidden">
+          <div className="h-2 bg-line rounded-full overflow-hidden">
             <div
-              className={`h-full rounded-full transition-all duration-500 ${isComplete ? 'bg-[#d4a853]' : 'bg-gradient-to-r from-[#5a3820] to-[#8a5830]'}`}
+              className={`h-full rounded-full transition-all duration-500 ${isComplete ? 'bg-accent' : 'bg-gradient-to-r from-[#2e2b48] to-[#652bee]'}`}
               style={{ width: `${Math.min(pct, 100)}%` }}
             />
           </div>
@@ -113,13 +115,13 @@ export default function CollectionSetPage({ params }: { params: Promise<{ tcgTyp
               onClick={() => setFilter(f)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
                 filter === f
-                  ? 'bg-[#d4a853] text-white'
-                  : 'bg-[#1a1410] border border-[#2e2318] text-[#7a6040] hover:text-[#d4a853]'
+                  ? 'bg-accent text-white'
+                  : 'bg-surface border border-line text-muted-2 hover:text-accent-fg'
               }`}
             >
               {label}
               <span className={`text-[10px] rounded-full px-1.5 py-0.5 ${
-                filter === f ? 'bg-white/20 text-white' : 'bg-[#2e2318] text-[#5a4830]'
+                filter === f ? 'bg-white/20 text-white' : 'bg-line text-subtle'
               }`}>{count}</span>
             </button>
           )
@@ -130,11 +132,11 @@ export default function CollectionSetPage({ params }: { params: Promise<{ tcgTyp
       {isLoading ? (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
           {Array.from({ length: 30 }).map((_, i) => (
-            <div key={i} className="aspect-[3/4] bg-[#1a1410] rounded-xl border border-[#2e2318] animate-pulse" />
+            <div key={i} className="aspect-[3/4] bg-surface rounded-xl border border-line animate-pulse" />
           ))}
         </div>
       ) : filteredCards.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 gap-2 text-[#4a3820]">
+        <div className="flex flex-col items-center justify-center py-16 gap-2 text-subtle">
           <Package size={32} className="opacity-20" />
           <p className="text-sm">{filter === 'MISSING' ? '모든 카드를 보유하고 있습니다!' : '카드가 없습니다.'}</p>
         </div>
@@ -145,11 +147,11 @@ export default function CollectionSetPage({ params }: { params: Promise<{ tcgTyp
             return (
               <div key={card.id} className={`group relative rounded-xl overflow-hidden border transition-all ${
                 card.owned
-                  ? 'border-[#5a4020] hover:border-[#d4a853]/50'
-                  : 'border-[#1e1810] opacity-40 hover:opacity-60'
+                  ? 'border-[#2e2b48] hover:border-accent/50'
+                  : 'border-surface-2 opacity-40 hover:opacity-60'
               }`}>
                 {/* 카드 이미지 */}
-                <Link href={`/cards/${card.id}`} className="block aspect-[3/4] bg-[#120d08]">
+                <Link href={`/cards/${card.id}`} className="block aspect-[3/4] bg-sunken">
                   {card.imageUrl ? (
                     <Image
                       src={resolveImageSrc(card.imageUrl)!} alt={name}
@@ -163,7 +165,7 @@ export default function CollectionSetPage({ params }: { params: Promise<{ tcgTyp
 
                 {/* 보유 수량 뱃지 */}
                 {card.owned && card.quantity > 1 && (
-                  <div className="absolute top-1.5 left-1.5 bg-black/70 text-[#d4a853] text-[10px] font-bold px-1.5 py-0.5 rounded-md">
+                  <div className="absolute top-1.5 left-1.5 bg-black/70 text-accent-fg text-[10px] font-bold px-1.5 py-0.5 rounded-md">
                     ×{card.quantity}
                   </div>
                 )}
@@ -171,15 +173,15 @@ export default function CollectionSetPage({ params }: { params: Promise<{ tcgTyp
                 {/* 체크 뱃지 */}
                 {card.owned && (
                   <div className="absolute top-1.5 right-1.5">
-                    <CheckCircle2 size={14} className="text-[#d4a853] drop-shadow-md" />
+                    <CheckCircle2 size={14} className="text-accent-fg drop-shadow-md" />
                   </div>
                 )}
 
                 {/* 카드명 + 위시리스트 */}
-                <div className="px-1.5 py-1.5 bg-[#0e0a07]">
-                  <p className="text-[10px] text-[#7a6040] truncate">{name}</p>
+                <div className="px-1.5 py-1.5 bg-[#08070c]">
+                  <p className="text-[10px] text-muted-2 truncate">{name}</p>
                   {card.cardNumber && (
-                    <p className="text-[9px] text-[#4a3820]"><span className="text-[#d4a853]/60 font-mono">[{card.cardNumber}]</span> · {card.rarity}</p>
+                    <p className="text-[9px] text-subtle"><span className="text-accent-fg/60 font-mono">[{card.cardNumber}]</span> · {card.rarity}</p>
                   )}
                   {!card.owned && (
                     <div className="mt-1 flex justify-center">

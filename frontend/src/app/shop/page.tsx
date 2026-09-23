@@ -24,12 +24,12 @@ const CATEGORY_LABELS: Record<string, string> = {
 }
 
 const CATEGORY_COLOR: Record<string, string> = {
-  BOOSTER_BOX: 'bg-[#d4a853]/20 text-[#8ba8ff]',
+  BOOSTER_BOX: 'bg-accent/20 text-[#8ba8ff]',
   STARTER_DECK: 'bg-emerald-500/20 text-emerald-300',
   SINGLE_PACK:  'bg-yellow-500/20 text-yellow-300',
   GIFT_SET:     'bg-pink-500/20 text-pink-300',
   SPECIAL:      'bg-purple-500/20 text-purple-300',
-  OTHER:        'bg-[#2e2318] text-[#8a7055]',
+  OTHER:        'bg-line text-muted',
 }
 
 interface ShopItem {
@@ -45,12 +45,12 @@ function Pagination({ page, total, onChange }: { page: number; total: number; on
   return (
     <div className="flex items-center justify-center gap-2 mt-6">
       <button onClick={() => onChange(page - 1)} disabled={page <= 1}
-        className="p-2 rounded-xl bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] hover:text-[#e8d5b0] disabled:opacity-30 transition-colors">
+        className="p-2 rounded-xl bg-surface border border-line hover:border-line-strong text-fg-3 hover:text-fg-2 disabled:opacity-30 transition-colors">
         <ChevronLeft size={16} />
       </button>
-      <span className="text-sm text-[#8a7055]">{page} / {total}</span>
+      <span className="text-sm text-muted">{page} / {total}</span>
       <button onClick={() => onChange(page + 1)} disabled={page >= total}
-        className="p-2 rounded-xl bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] hover:text-[#e8d5b0] disabled:opacity-30 transition-colors">
+        className="p-2 rounded-xl bg-surface border border-line hover:border-line-strong text-fg-3 hover:text-fg-2 disabled:opacity-30 transition-colors">
         <ChevronRight size={16} />
       </button>
     </div>
@@ -85,25 +85,25 @@ function BuyModal({ item, onClose }: { item: ShopItem; onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/70" onClick={onClose}>
-      <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl p-6 w-full max-w-sm space-y-4" onClick={e => e.stopPropagation()}>
+      <div className="bg-surface border border-line rounded-2xl p-6 w-full max-w-sm space-y-4" onClick={e => e.stopPropagation()}>
         {/* 헤더 */}
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0 pr-3">
-            <h3 className="font-bold text-base leading-tight mb-1 text-[#f5ead8]">{item.name}</h3>
+            <h3 className="font-bold text-base leading-tight mb-1 text-fg">{item.name}</h3>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-[#8a7055]">{TCG_LABELS[item.tcgType]}</span>
+              <span className="text-xs text-muted">{TCG_LABELS[item.tcgType]}</span>
               <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${CATEGORY_COLOR[item.category]}`}>{CATEGORY_LABELS[item.category]}</span>
             </div>
           </div>
-          <button onClick={onClose} className="text-[#5a4830] hover:text-[#f5ead8] shrink-0 transition-colors"><X size={18} /></button>
+          <button onClick={onClose} className="text-subtle hover:text-fg shrink-0 transition-colors"><X size={18} /></button>
         </div>
 
         {/* 스텝 인디케이터 */}
         {step !== 'done' && (
-          <div className="flex items-center gap-2 text-xs text-[#5a4830]">
-            <span className={step === 'qty' ? 'text-[#d4a853] font-semibold' : 'text-[#5a4830]'}>① 수량 선택</span>
+          <div className="flex items-center gap-2 text-xs text-subtle">
+            <span className={step === 'qty' ? 'text-accent-fg font-semibold' : 'text-subtle'}>① 수량 선택</span>
             <span>›</span>
-            <span className={step === 'addr' ? 'text-[#d4a853] font-semibold' : 'text-[#5a4830]'}>② 배송지 입력</span>
+            <span className={step === 'addr' ? 'text-accent-fg font-semibold' : 'text-subtle'}>② 배송지 입력</span>
             <span>›</span>
             <span>③ 구매 완료</span>
           </div>
@@ -119,38 +119,38 @@ function BuyModal({ item, onClose }: { item: ShopItem; onClose: () => void }) {
                 <p className="text-xs mt-0.5 text-emerald-500/80">{total.toLocaleString()}P 결제 · 마이페이지에서 배송 현황을 확인하세요.</p>
               </div>
             </div>
-            <button onClick={onClose} className="w-full bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] hover:text-[#e8d5b0] py-2.5 rounded-xl text-sm transition-colors">닫기</button>
+            <button onClick={onClose} className="w-full bg-surface border border-line hover:border-line-strong text-fg-3 hover:text-fg-2 py-2.5 rounded-xl text-sm transition-colors">닫기</button>
           </div>
         )}
 
         {/* 1단계 - 수량 */}
         {step === 'qty' && (
           <>
-            <div className="bg-[#1a1208] border border-[#2e2318] rounded-xl p-4 space-y-3">
+            <div className="bg-surface-2 border border-line rounded-xl p-4 space-y-3">
               <div className="flex justify-between text-sm">
-                <span className="text-[#8a7055]">단가</span>
-                <span className="font-semibold text-[#f5ead8]">{item.price.toLocaleString()}P</span>
+                <span className="text-muted">단가</span>
+                <span className="font-semibold text-fg">{item.price.toLocaleString()}P</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-[#8a7055]">수량</span>
+                <span className="text-sm text-muted">수량</span>
                 <div className="flex items-center gap-2">
                   <button onClick={() => setQty(q => Math.max(1, q - 1))}
-                    className="w-7 h-7 rounded-lg bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] hover:text-[#e8d5b0] flex items-center justify-center transition-colors">
+                    className="w-7 h-7 rounded-lg bg-surface border border-line hover:border-line-strong text-fg-3 hover:text-fg-2 flex items-center justify-center transition-colors">
                     <Minus size={12} />
                   </button>
-                  <span className="w-8 text-center font-semibold text-[#f5ead8]">{qty}</span>
+                  <span className="w-8 text-center font-semibold text-fg">{qty}</span>
                   <button onClick={() => setQty(q => Math.min(10, item.stock, q + 1))}
-                    className="w-7 h-7 rounded-lg bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] hover:text-[#e8d5b0] flex items-center justify-center transition-colors">
+                    className="w-7 h-7 rounded-lg bg-surface border border-line hover:border-line-strong text-fg-3 hover:text-fg-2 flex items-center justify-center transition-colors">
                     <Plus size={12} />
                   </button>
                 </div>
               </div>
-              <div className="border-t border-[#2e2318] pt-3 flex justify-between">
-                <span className="font-medium text-[#f5ead8]">합계</span>
-                <span className="text-lg text-[#f0a832] font-bold tabular-nums">{total.toLocaleString()}P</span>
+              <div className="border-t border-line pt-3 flex justify-between">
+                <span className="font-medium text-fg">합계</span>
+                <span className="text-lg text-accent-2 font-bold tabular-nums">{total.toLocaleString()}P</span>
               </div>
               {user && (
-                <p className={`text-xs text-right ${user.balance < total ? 'text-red-400' : 'text-[#5a4830]'}`}>
+                <p className={`text-xs text-right ${user.balance < total ? 'text-red-400' : 'text-subtle'}`}>
                   보유: {user.balance.toLocaleString()}P{user.balance < total && ' · 포인트 부족'}
                 </p>
               )}
@@ -158,7 +158,7 @@ function BuyModal({ item, onClose }: { item: ShopItem; onClose: () => void }) {
             <button
               onClick={() => { if (!user) { router.push('/login'); return } if (user.balance >= total) setStep('addr') }}
               disabled={!!user && user.balance < total}
-              className="w-full bg-[#d4a853] hover:bg-[#c49440] disabled:opacity-50 text-white py-3 rounded-xl font-semibold transition-colors shadow-[0_0_20px_rgba(212,168,83,0.25)]">
+              className="w-full bg-accent hover:bg-accent-strong disabled:opacity-50 text-white py-3 rounded-xl font-semibold transition-colors shadow-[0_0_20px_rgba(139,92,246,0.25)]">
               {user ? '다음 — 배송지 입력' : '로그인 후 구매'}
             </button>
           </>
@@ -177,13 +177,13 @@ function BuyModal({ item, onClose }: { item: ShopItem; onClose: () => void }) {
                 { key: 'shippingMemo',   label: '배송 메모', placeholder: '예: 문 앞에 놔주세요 (선택)', type: 'text' },
               ].map(({ key, label, placeholder, type }) => (
                 <div key={key}>
-                  <label className="block text-xs text-[#7a6040] mb-1">{label}</label>
+                  <label className="block text-xs text-muted-2 mb-1">{label}</label>
                   <input
                     type={type}
                     value={addr[key as keyof typeof addr]}
                     onChange={e => setAddr(p => ({ ...p, [key]: e.target.value }))}
                     placeholder={placeholder}
-                    className="w-full bg-[#1a1208] border border-[#2e2318] focus:border-[#d4a853]/60 rounded-lg px-3 py-2 text-sm text-[#f5ead8] placeholder:text-[#4a3820] outline-none transition-colors"
+                    className="w-full bg-surface-2 border border-line focus:border-accent/60 rounded-lg px-3 py-2 text-sm text-fg placeholder:text-subtle outline-none transition-colors"
                   />
                 </div>
               ))}
@@ -195,13 +195,13 @@ function BuyModal({ item, onClose }: { item: ShopItem; onClose: () => void }) {
             )}
             <div className="flex gap-2">
               <button onClick={() => { setErrMsg(''); setStep('qty') }}
-                className="flex-1 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] hover:text-[#e8d5b0] py-2.5 rounded-xl text-sm transition-colors">
+                className="flex-1 bg-surface border border-line hover:border-line-strong text-fg-3 hover:text-fg-2 py-2.5 rounded-xl text-sm transition-colors">
                 이전
               </button>
               <button
                 onClick={() => { setErrMsg(''); mut.mutate() }}
                 disabled={mut.isPending || !addrValid}
-                className="flex-[2] bg-[#d4a853] hover:bg-[#c49440] disabled:opacity-50 text-white py-2.5 rounded-xl font-semibold text-sm transition-colors shadow-[0_0_20px_rgba(212,168,83,0.25)]">
+                className="flex-[2] bg-accent hover:bg-accent-strong disabled:opacity-50 text-white py-2.5 rounded-xl font-semibold text-sm transition-colors shadow-[0_0_20px_rgba(139,92,246,0.25)]">
                 {mut.isPending ? '처리 중...' : `${total.toLocaleString()}P 결제 · 구매 완료`}
               </button>
             </div>
@@ -230,16 +230,16 @@ function BoxesTab() {
   return (
     <div className="space-y-5">
       {/* 필터 */}
-      <div className="bg-[#1a1410] border border-[#2e2318] rounded-xl p-4 space-y-3">
+      <div className="bg-surface border border-line rounded-xl p-4 space-y-3">
         <div className="space-y-1.5">
-          <p className="text-xs text-[#7a6040] uppercase tracking-wider font-semibold">TCG 종류</p>
+          <p className="text-xs text-muted-2 uppercase tracking-wider font-semibold">TCG 종류</p>
           <div className="flex flex-wrap gap-1.5">
             {['', ...Object.keys(TCG_LABELS)].map(key => (
               <button key={key} onClick={() => { setTcgType(key); setPage(1) }}
                 className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                   tcgType === key
-                    ? 'bg-[#d4a853] text-white shadow-[0_0_12px_rgba(212,168,83,0.3)]'
-                    : 'bg-[#1a1208] border border-[#2e2318] text-[#8a7055] hover:text-[#e8d5b0] hover:border-[#4a3520]'
+                    ? 'bg-accent text-white shadow-[0_0_12px_rgba(139,92,246,0.3)]'
+                    : 'bg-surface-2 border border-line text-muted hover:text-fg-2 hover:border-line-strong'
                 }`}>
                 {key ? TCG_LABELS[key] : '전체'}
               </button>
@@ -247,14 +247,14 @@ function BoxesTab() {
           </div>
         </div>
         <div className="space-y-1.5">
-          <p className="text-xs text-[#7a6040] uppercase tracking-wider font-semibold">카테고리</p>
+          <p className="text-xs text-muted-2 uppercase tracking-wider font-semibold">카테고리</p>
           <div className="flex flex-wrap gap-1.5">
             {['', ...Object.keys(CATEGORY_LABELS)].map(key => (
               <button key={key} onClick={() => { setCategory(key); setPage(1) }}
                 className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                   category === key
-                    ? 'bg-[#d4a853] text-white shadow-[0_0_12px_rgba(212,168,83,0.3)]'
-                    : 'bg-[#1a1208] border border-[#2e2318] text-[#8a7055] hover:text-[#e8d5b0] hover:border-[#4a3520]'
+                    ? 'bg-accent text-white shadow-[0_0_12px_rgba(139,92,246,0.3)]'
+                    : 'bg-surface-2 border border-line text-muted hover:text-fg-2 hover:border-line-strong'
                 }`}>
                 {key ? CATEGORY_LABELS[key] : '전체'}
               </button>
@@ -262,12 +262,12 @@ function BoxesTab() {
           </div>
         </div>
 
-        <div className="flex items-center justify-end pt-1 border-t border-[#2e2318]">
+        <div className="flex items-center justify-end pt-1 border-t border-line">
           <button onClick={() => { setHideSoldOut(v => !v); setPage(1) }}
             className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
               hideSoldOut
-                ? 'bg-[#d4a853]/15 border border-[#d4a853]/40 text-[#e0b878]'
-                : 'bg-[#1a1208] border border-[#2e2318] text-[#7a6040] hover:text-[#8a7055] hover:border-[#4a3520]'
+                ? 'bg-accent/15 border border-accent/40 text-accent-soft'
+                : 'bg-surface-2 border border-line text-muted-2 hover:text-muted hover:border-line-strong'
             }`}>
             {hideSoldOut ? <EyeOff size={11} /> : <Eye size={11} />}
             품절 {hideSoldOut ? '숨김' : '표시'}
@@ -278,35 +278,35 @@ function BoxesTab() {
       {isLoading ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="bg-[#1a1410] border border-[#2e2318] rounded-2xl overflow-hidden animate-pulse">
-              <div className="aspect-square bg-[#1a1208]" />
+            <div key={i} className="bg-surface border border-line rounded-2xl overflow-hidden animate-pulse">
+              <div className="aspect-square bg-surface-2" />
               <div className="p-3 space-y-2">
-                <div className="h-3 bg-[#1a1208] rounded w-3/4" />
-                <div className="h-3 bg-[#1a1208] rounded w-1/2" />
+                <div className="h-3 bg-surface-2 rounded w-3/4" />
+                <div className="h-3 bg-surface-2 rounded w-1/2" />
               </div>
             </div>
           ))}
         </div>
       ) : items.length === 0 ? (
-        <div className="text-center py-20 text-[#5a4830]">
+        <div className="text-center py-20 text-subtle">
           <Package size={40} className="mx-auto mb-3 opacity-30" />
           <p>등록된 상품이 없습니다.</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {items.map(item => (
-            <div key={item.id} className="bg-[#1a1410] border border-[#2e2318] rounded-2xl overflow-hidden hover:border-[#d4a853]/40 transition-colors group card-hover">
+            <div key={item.id} className="bg-surface border border-line rounded-2xl overflow-hidden hover:border-accent/40 transition-colors group card-hover">
               {(() => {
                 const soldOut = item.isSoldOut || item.stock === 0
                 const lowStock = !soldOut && item.stock <= 5
                 return (
-                  <div className="aspect-square bg-[#0e0c09] relative overflow-hidden">
+                  <div className="aspect-square bg-sunken relative overflow-hidden">
                     {item.imageUrl
                       ? <Image src={item.imageUrl} alt={item.name} fill sizes="(max-width:640px) 50vw,(max-width:1024px) 33vw,25vw" className={`object-contain transition-transform duration-300 ${soldOut ? 'grayscale opacity-60' : 'group-hover:scale-105'}`} />
-                      : <div className="flex items-center justify-center h-full text-[#5a4830]"><Package size={40} /></div>}
+                      : <div className="flex items-center justify-center h-full text-subtle"><Package size={40} /></div>}
                     {soldOut && (
                       <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                        <span className="text-sm font-bold text-white bg-[#1a1410]/80 px-3 py-1 rounded-full border border-[#4a3520] backdrop-blur-sm">품절</span>
+                        <span className="text-sm font-bold text-white bg-surface/80 px-3 py-1 rounded-full border border-line-strong backdrop-blur-sm">품절</span>
                       </div>
                     )}
                     {lowStock && (
@@ -324,14 +324,14 @@ function BoxesTab() {
                     {CATEGORY_LABELS[item.category]}
                   </span>
                 </div>
-                <p className="text-sm font-semibold leading-tight line-clamp-2 text-[#f5ead8]">{item.name}</p>
+                <p className="text-sm font-semibold leading-tight line-clamp-2 text-fg">{item.name}</p>
                 <div className="flex items-center justify-between pt-1">
-                  <span className="text-[#f0a832] font-bold tabular-nums">{item.price.toLocaleString()}P</span>
+                  <span className="text-accent-2 font-bold tabular-nums">{item.price.toLocaleString()}P</span>
                   {(() => {
                     const soldOut = item.isSoldOut || item.stock === 0
                     return (
                       <button onClick={() => setBuying(item)} disabled={soldOut}
-                        className="flex items-center gap-1 bg-[#d4a853] hover:bg-[#c49440] disabled:bg-[#1a1208] disabled:border disabled:border-[#2e2318] disabled:text-[#5a4830] text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors shadow-[0_0_12px_rgba(212,168,83,0.2)]">
+                        className="flex items-center gap-1 bg-accent hover:bg-accent-strong disabled:bg-surface-2 disabled:border disabled:border-line disabled:text-subtle text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors shadow-[0_0_12px_rgba(139,92,246,0.2)]">
                         <ShoppingCart size={11} />{soldOut ? '품절' : '구매'}
                       </button>
                     )
@@ -387,14 +387,14 @@ function OripasTab() {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-[#8a7055]">랜덤 뽑기로 레어 TCG 카드를 획득하세요</p>
+      <p className="text-sm text-muted">랜덤 뽑기로 레어 TCG 카드를 획득하세요</p>
 
       {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => <div key={i} className="bg-[#1a1410] border border-[#2e2318] rounded-2xl h-56 animate-pulse" />)}
+          {Array.from({ length: 6 }).map((_, i) => <div key={i} className="bg-surface border border-line rounded-2xl h-56 animate-pulse" />)}
         </div>
       ) : !oripas?.length ? (
-        <div className="text-center py-24 text-[#5a4830]">
+        <div className="text-center py-24 text-subtle">
           <p className="text-4xl mb-4">📦</p>
           <p>진행 중인 오리파가 없습니다.</p>
         </div>
@@ -405,12 +405,12 @@ function OripasTab() {
             const almostGone = oripa.remainSlots > 0 && oripa.remainSlots <= 5
             return (
               <Link key={oripa.id} href={`/oripas/${oripa.id}`} className="group">
-                <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl overflow-hidden hover:border-pink-500/50 transition-all duration-200 hover:shadow-lg hover:shadow-pink-500/10 card-hover">
-                  <div className="relative h-44 bg-[#1a1208] overflow-hidden">
+                <div className="bg-surface border border-line rounded-2xl overflow-hidden hover:border-pink-500/50 transition-all duration-200 hover:shadow-lg hover:shadow-pink-500/10 card-hover">
+                  <div className="relative h-44 bg-surface-2 overflow-hidden">
                     {oripa.imageUrl
                       ? <Image src={oripa.imageUrl} alt={oripa.title} fill className="object-cover group-hover:scale-105 transition-transform duration-300" />
                       : <div className="absolute inset-0 group-hover:scale-105 transition-transform duration-300"><CardCollage items={oripa.items} /></div>}
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#1a1410]/80 via-transparent to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-surface/80 via-transparent to-transparent" />
                     <div className="absolute top-2 right-2">
                       {almostGone
                         ? <Badge variant="red">라스트 {oripa.remainSlots}장!</Badge>
@@ -419,18 +419,18 @@ function OripasTab() {
                           : <Badge variant="red">{oripa.remainSlots}/{oripa.totalSlots} 남음</Badge>}
                     </div>
                     <div className="absolute bottom-2 left-3">
-                      <span className="text-[#f0a832] font-bold tabular-nums text-lg drop-shadow">{oripa.pricePerDraw.toLocaleString()}P</span>
-                      <span className="text-[#8a7055] text-xs ml-1">/ 1회</span>
+                      <span className="text-accent-2 font-bold tabular-nums text-lg drop-shadow">{oripa.pricePerDraw.toLocaleString()}P</span>
+                      <span className="text-muted text-xs ml-1">/ 1회</span>
                     </div>
                   </div>
                   <div className="p-4 space-y-2">
-                    <h3 className="font-semibold line-clamp-1 text-[#f5ead8]">{oripa.title}</h3>
-                    {oripa.description && <p className="text-xs text-[#8a7055] line-clamp-2">{oripa.description}</p>}
-                    <div className="flex items-center justify-between text-xs text-[#5a4830]">
+                    <h3 className="font-semibold line-clamp-1 text-fg">{oripa.title}</h3>
+                    {oripa.description && <p className="text-xs text-muted line-clamp-2">{oripa.description}</p>}
+                    <div className="flex items-center justify-between text-xs text-subtle">
                       <span>{oripa._count.purchases}명 참여</span>
                       <span>{Math.round(soldPct)}% 소진</span>
                     </div>
-                    <div className="w-full bg-[#2e2318] rounded-full h-1.5">
+                    <div className="w-full bg-line rounded-full h-1.5">
                       <div className={`h-1.5 rounded-full transition-all ${almostGone ? 'bg-red-500' : 'bg-gradient-to-r from-pink-500 to-purple-500'}`} style={{ width: `${soldPct}%` }} />
                     </div>
                   </div>
@@ -463,20 +463,20 @@ function ShopContent() {
     <div className="space-y-5">
       {/* 헤더 */}
       <div className="flex items-center gap-3">
-        <Store size={22} className="text-[#d4a853]" />
+        <Store size={22} className="text-accent-fg" />
         <div>
-          <h1 className="text-2xl font-bold text-[#f5ead8]">샵</h1>
-          <p className="text-sm text-[#8a7055]">포인트로 TCG 상품을 구매하세요</p>
+          <h1 className="text-[26px] sm:text-3xl font-bold tracking-tight text-fg">샵</h1>
+          <p className="text-sm text-muted">포인트로 TCG 상품을 구매하세요</p>
         </div>
       </div>
 
       {/* 탭 */}
-      <div className="flex bg-[#1a1410] border border-[#2e2318] rounded-xl p-1 w-fit">
+      <div className="flex bg-surface border border-line rounded-xl p-1 w-fit">
         <button onClick={() => switchTab('boxes')}
           className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             tab === 'boxes'
-              ? 'bg-[#d4a853] text-white shadow-[0_0_16px_rgba(212,168,83,0.3)]'
-              : 'text-[#8a7055] hover:text-[#e8d5b0]'
+              ? 'bg-accent text-white shadow-[0_0_16px_rgba(139,92,246,0.3)]'
+              : 'text-muted hover:text-fg-2'
           }`}>
           <Package size={14} /> TCG 박스
         </button>
@@ -484,7 +484,7 @@ function ShopContent() {
           className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             tab === 'oripa'
               ? 'bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-[0_0_16px_rgba(219,39,119,0.25)]'
-              : 'text-[#8a7055] hover:text-[#e8d5b0]'
+              : 'text-muted hover:text-fg-2'
           }`}>
           🎲 오리파 뽑기
         </button>
@@ -500,7 +500,7 @@ export default function ShopPage() {
   return (
     <Suspense fallback={
       <div className="flex items-center justify-center py-10">
-        <div className="w-6 h-6 rounded-full border-2 border-[#2e2318] border-t-[#d4a853] animate-spin" />
+        <div className="w-6 h-6 rounded-full border-2 border-line border-t-accent animate-spin" />
       </div>
     }>
       <ShopContent />

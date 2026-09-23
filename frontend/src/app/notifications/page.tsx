@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import { useAuthStore } from '@/lib/store'
+import { useAuthStore, useAuthHydrated } from '@/lib/store'
 import { useRouter } from 'next/navigation'
 import { Bell, CheckCheck, Trash2, Check } from 'lucide-react'
 import Link from 'next/link'
@@ -26,6 +26,7 @@ const TYPE_ICON: Record<string, string> = {
   BID_OUTBID: '🔔', BID_WON: '🏆', OFFER_RECEIVED: '💌', OFFER_ACCEPTED: '✅',
   OFFER_REJECTED: '❌', TRANSACTION_SHIPPED: '📦', TRANSACTION_COMPLETED: '🎉',
   REVIEW_RECEIVED: '⭐', FRIEND_REQUEST: '👤', FRIEND_ACCEPTED: '🤝', SYSTEM: '📢',
+  WISHLIST_PRICE_ALERT: '💰', COMMUNITY_COMMENT: '💬',
 }
 
 export default function NotificationsPage() {
@@ -34,9 +35,11 @@ export default function NotificationsPage() {
   const qc = useQueryClient()
   const [page, setPage] = useState(1)
 
+  const hydrated = useAuthHydrated()
+
   useEffect(() => {
-    if (!user) router.replace('/login')
-  }, [user, router])
+    if (hydrated && !user) router.replace('/login')
+  }, [hydrated, user, router])
 
   const { data, isLoading } = useQuery({
     queryKey: ['notifications-page', page],
@@ -80,8 +83,8 @@ export default function NotificationsPage() {
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Bell size={20} className="text-[#d4a853]" />
-          <h1 className="text-xl font-bold text-[#f5ead8]">알림</h1>
+          <Bell size={20} className="text-accent-fg" />
+          <h1 className="text-xl font-bold text-fg">알림</h1>
           {(data?.unreadCount ?? 0) > 0 && (
             <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{data?.unreadCount}</span>
           )}
@@ -90,7 +93,7 @@ export default function NotificationsPage() {
           <button
             onClick={() => markAll.mutate()}
             disabled={markAll.isPending}
-            className="flex items-center gap-1.5 text-sm text-[#7a6040] hover:text-[#d4a853] transition-colors px-3 py-1.5 hover:bg-[#1a1410] rounded-xl"
+            className="flex items-center gap-1.5 text-sm text-muted-2 hover:text-accent-fg transition-colors px-3 py-1.5 hover:bg-surface rounded-xl"
           >
             <CheckCheck size={15} /> 모두 읽음
           </button>
@@ -101,11 +104,11 @@ export default function NotificationsPage() {
       {isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="h-20 bg-[#1a1410] rounded-2xl animate-pulse" />
+            <div key={i} className="h-20 bg-surface rounded-2xl animate-pulse" />
           ))}
         </div>
       ) : notifications.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-24 text-[#4a3820]">
+        <div className="flex flex-col items-center justify-center py-24 text-subtle">
           <Bell size={40} className="mb-3 opacity-30" />
           <p className="text-sm">알림이 없습니다</p>
         </div>
@@ -116,12 +119,12 @@ export default function NotificationsPage() {
               key={notif.id}
               className={`group flex gap-4 items-start px-5 py-4 rounded-2xl border transition-colors ${
                 notif.isRead
-                  ? 'bg-[#1a1410] border-[#2e2318] hover:border-[#3a2818]'
-                  : 'bg-[#d4a853]/5 border-[#d4a853]/20 hover:border-[#d4a853]/30'
+                  ? 'bg-surface border-line hover:border-line-strong'
+                  : 'bg-accent/5 border-accent/20 hover:border-accent/30'
               }`}
             >
               {/* 아이콘 */}
-              <div className="w-10 h-10 flex items-center justify-center bg-[#120d08] border border-[#2e2318] rounded-full shrink-0 text-xl">
+              <div className="w-10 h-10 flex items-center justify-center bg-sunken border border-line rounded-full shrink-0 text-xl">
                 {TYPE_ICON[notif.type] ?? '🔔'}
               </div>
 
@@ -130,18 +133,18 @@ export default function NotificationsPage() {
                 {notif.link ? (
                   <Link href={notif.link} onClick={() => !notif.isRead && markRead.mutate(notif.id)}
                     className="block group/link">
-                    <p className={`text-sm font-semibold group-hover/link:text-[#d4a853] transition-colors ${notif.isRead ? 'text-[#9e8a6a]' : 'text-[#f5ead8]'}`}>
+                    <p className={`text-sm font-semibold group-hover/link:text-accent-fg transition-colors ${notif.isRead ? 'text-fg-3' : 'text-fg'}`}>
                       {notif.title}
                     </p>
-                    {notif.body && <p className="text-xs text-[#5a4830] mt-0.5 leading-relaxed">{notif.body}</p>}
+                    {notif.body && <p className="text-xs text-subtle mt-0.5 leading-relaxed">{notif.body}</p>}
                   </Link>
                 ) : (
                   <>
-                    <p className={`text-sm font-semibold ${notif.isRead ? 'text-[#9e8a6a]' : 'text-[#f5ead8]'}`}>{notif.title}</p>
-                    {notif.body && <p className="text-xs text-[#5a4830] mt-0.5 leading-relaxed">{notif.body}</p>}
+                    <p className={`text-sm font-semibold ${notif.isRead ? 'text-fg-3' : 'text-fg'}`}>{notif.title}</p>
+                    {notif.body && <p className="text-xs text-subtle mt-0.5 leading-relaxed">{notif.body}</p>}
                   </>
                 )}
-                <p className="text-[11px] text-[#3a2810] mt-1.5">
+                <p className="text-[11px] text-subtle mt-1.5">
                   {formatDistanceToNow(new Date(notif.createdAt), { addSuffix: true, locale: ko })}
                 </p>
               </div>
@@ -151,7 +154,7 @@ export default function NotificationsPage() {
                 {!notif.isRead && (
                   <button
                     onClick={() => markRead.mutate(notif.id)}
-                    className="p-1.5 text-[#5a4830] hover:text-[#d4a853] hover:bg-[#2a1c0c] rounded-lg transition-colors"
+                    className="p-1.5 text-subtle hover:text-accent-fg hover:bg-accent-tint rounded-lg transition-colors"
                     title="읽음 처리"
                   >
                     <Check size={14} />
@@ -159,7 +162,7 @@ export default function NotificationsPage() {
                 )}
                 <button
                   onClick={() => del.mutate(notif.id)}
-                  className="p-1.5 text-[#5a4830] hover:text-red-400 hover:bg-[#2a1c0c] rounded-lg transition-colors"
+                  className="p-1.5 text-subtle hover:text-red-400 hover:bg-accent-tint rounded-lg transition-colors"
                   title="삭제"
                 >
                   <Trash2 size={14} />
@@ -168,7 +171,7 @@ export default function NotificationsPage() {
 
               {/* 미읽음 인디케이터 */}
               {!notif.isRead && (
-                <div className="w-2 h-2 rounded-full bg-[#d4a853] shrink-0 mt-1" />
+                <div className="w-2 h-2 rounded-full bg-accent shrink-0 mt-1" />
               )}
             </div>
           ))}
@@ -181,15 +184,15 @@ export default function NotificationsPage() {
           <button
             onClick={() => setPage(p => Math.max(1, p - 1))}
             disabled={page === 1}
-            className="px-4 py-2 text-sm bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] hover:text-[#f5ead8] rounded-xl disabled:opacity-30 transition-colors"
+            className="px-4 py-2 text-sm bg-surface border border-line hover:border-line-strong text-fg-3 hover:text-fg rounded-xl disabled:opacity-30 transition-colors"
           >
             이전
           </button>
-          <span className="text-sm text-[#5a4830] tabular-nums">{page} / {totalPages}</span>
+          <span className="text-sm text-subtle tabular-nums">{page} / {totalPages}</span>
           <button
             onClick={() => setPage(p => Math.min(totalPages, p + 1))}
             disabled={page === totalPages}
-            className="px-4 py-2 text-sm bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] hover:text-[#f5ead8] rounded-xl disabled:opacity-30 transition-colors"
+            className="px-4 py-2 text-sm bg-surface border border-line hover:border-line-strong text-fg-3 hover:text-fg rounded-xl disabled:opacity-30 transition-colors"
           >
             다음
           </button>

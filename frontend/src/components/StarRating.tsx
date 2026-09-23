@@ -33,19 +33,19 @@ export function StarRating({ value, onChange, size = 20, readonly = false, showL
             size={size}
             className={`transition-colors ${
               star <= display
-                ? 'text-[#f0a832] fill-[#f0a832]'
-                : 'text-[#3a2810] fill-[#1a1208]'
+                ? 'text-accent-2 fill-accent-2'
+                : 'text-subtle fill-surface-2'
             }`}
           />
         </button>
       ))}
       {showLabel && !readonly && (
-        <span className="ml-1 text-xs text-[#8a7055] min-w-[60px]">
+        <span className="ml-1 text-xs text-muted min-w-[60px]">
           {LABELS[hover || value] ?? ''}
         </span>
       )}
       {readonly && value > 0 && (
-        <span className="ml-1 text-xs text-[#8a7055] tabular-nums">{value.toFixed(1)}</span>
+        <span className="ml-1 text-xs text-muted tabular-nums">{value.toFixed(1)}</span>
       )}
     </div>
   )
@@ -54,13 +54,13 @@ export function StarRating({ value, onChange, size = 20, readonly = false, showL
 // 간결한 표시용 (평균 평점 + 건수)
 export function RatingBadge({ avgRating, reviewCount, size = 13 }: { avgRating: number | null; reviewCount: number; size?: number }) {
   if (!avgRating || reviewCount === 0) return (
-    <span className="text-[11px] text-[#4a3820]">평점 없음</span>
+    <span className="text-[11px] text-subtle">평점 없음</span>
   )
   return (
     <span className="inline-flex items-center gap-1">
-      <Star size={size} className="text-[#f0a832] fill-[#f0a832]" />
-      <span className="text-xs font-semibold text-[#f0a832] tabular-nums">{avgRating.toFixed(1)}</span>
-      <span className="text-[11px] text-[#5a4830]">({reviewCount.toLocaleString()})</span>
+      <Star size={size} className="text-accent-2 fill-accent-2" />
+      <span className="text-xs font-semibold text-accent-2 tabular-nums">{avgRating.toFixed(1)}</span>
+      <span className="text-[11px] text-subtle">({reviewCount.toLocaleString()})</span>
     </span>
   )
 }

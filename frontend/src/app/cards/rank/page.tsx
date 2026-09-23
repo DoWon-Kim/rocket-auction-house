@@ -73,7 +73,7 @@ function rarityColorClass(rarity: string): string {
     return 'text-purple-400'
   if (r === 'rare' || r === 'r' || r.includes('holo'))
     return 'text-blue-400'
-  return 'text-[#7a6040]'
+  return 'text-muted-2'
 }
 
 function RankMedal({ rank }: { rank: number }) {
@@ -81,7 +81,7 @@ function RankMedal({ rank }: { rank: number }) {
   if (rank === 2) return <span className="text-2xl">🥈</span>
   if (rank === 3) return <span className="text-2xl">🥉</span>
   return (
-    <span className="w-8 h-8 flex items-center justify-center text-sm font-bold text-[#5a4830] bg-[#1a1208] rounded-full border border-[#2e2318]">
+    <span className="w-8 h-8 flex items-center justify-center text-sm font-bold text-subtle bg-surface-2 rounded-full border border-line">
       {rank}
     </span>
   )
@@ -96,7 +96,7 @@ function RankRow({ item, mode }: { item: RankItem; mode: string }) {
   return (
     <Link
       href={`/cards/${item.card.id}`}
-      className="flex items-center gap-3 px-4 py-3 hover:bg-[#1a1208] transition-colors border-b border-[#1a1208] last:border-b-0 group"
+      className="flex items-center gap-3 px-4 py-3 hover:bg-surface-2 transition-colors border-b border-surface-2 last:border-b-0 group"
     >
       {/* 순위 */}
       <div className="w-10 flex items-center justify-center shrink-0">
@@ -104,7 +104,7 @@ function RankRow({ item, mode }: { item: RankItem; mode: string }) {
       </div>
 
       {/* 카드 이미지 */}
-      <div className="relative w-10 h-14 shrink-0 rounded overflow-hidden bg-[#0f0b08]">
+      <div className="relative w-10 h-14 shrink-0 rounded overflow-hidden bg-bg">
         {item.card.imageUrl ? (
           <Image
             src={resolveImageSrc(item.card.imageUrl)!}
@@ -122,14 +122,14 @@ function RankRow({ item, mode }: { item: RankItem; mode: string }) {
 
       {/* 카드 정보 */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-[#f5ead8] truncate group-hover:text-white transition-colors">
+        <p className="text-sm font-semibold text-fg truncate group-hover:text-white transition-colors">
           {displayName}
         </p>
         {item.card.nameKo && item.card.name !== item.card.nameKo && (
-          <p className="text-[11px] text-[#5a4830] truncate">{item.card.name}</p>
+          <p className="text-[11px] text-subtle truncate">{item.card.name}</p>
         )}
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-          <span className="text-[10px] bg-[#1a1208] border border-[#2e2318] px-1.5 py-0.5 rounded text-[#7a6040]">
+          <span className="text-[10px] bg-surface-2 border border-line px-1.5 py-0.5 rounded text-muted-2">
             {TCG_LABELS[item.card.tcgType] ?? item.card.tcgType}
           </span>
           <span className={`text-[10px] font-semibold ${rColor}`}>
@@ -148,23 +148,23 @@ function RankRow({ item, mode }: { item: RankItem; mode: string }) {
             <span className="text-[10px] font-bold text-red-400">HP {item.card.hp}</span>
           )}
         </div>
-        <p className="text-[10px] text-[#4a3820] truncate mt-0.5">{item.card.setName}</p>
+        <p className="text-[10px] text-subtle truncate mt-0.5">{item.card.setName}</p>
       </div>
 
       {/* 가격 / 거래량 */}
       <div className="text-right shrink-0">
         {mode === 'price' && item.price != null && (
-          <p className="text-base font-bold text-[#f0a832]">{item.price.toLocaleString()}<span className="text-xs ml-0.5">P</span></p>
+          <p className="text-base font-bold text-accent-2">{item.price.toLocaleString()}<span className="text-xs ml-0.5">P</span></p>
         )}
         {mode === 'listings' && item.listingCount != null && (
           <>
-            <p className="text-base font-bold text-[#e0b878]">{item.listingCount}</p>
-            <p className="text-[10px] text-[#5a4830]">리스팅</p>
+            <p className="text-base font-bold text-accent-soft">{item.listingCount}</p>
+            <p className="text-[10px] text-subtle">리스팅</p>
           </>
         )}
       </div>
 
-      <ChevronRight size={14} className="text-[#4a3820] group-hover:text-[#7a6040] transition-colors shrink-0" />
+      <ChevronRight size={14} className="text-subtle group-hover:text-muted-2 transition-colors shrink-0" />
     </Link>
   )
 }
@@ -192,11 +192,11 @@ export default function CardRankPage() {
 
       {/* 헤더 */}
       <div className="space-y-1">
-        <h1 className="text-2xl font-bold text-[#f5ead8] tracking-tight flex items-center gap-2">
-          <Crown size={22} className="text-[#d4a853]" />
+        <h1 className="text-[26px] sm:text-3xl font-bold tracking-tight text-fg flex items-center gap-2">
+          <Crown size={22} className="text-accent-fg" />
           카드 랭킹
         </h1>
-        <p className="text-xs text-[#5a4830]">실시간 거래량 및 시세 기준 인기 카드</p>
+        <p className="text-xs text-subtle">실시간 거래량 및 시세 기준 인기 카드</p>
       </div>
 
       {/* 모드 선택 */}
@@ -205,8 +205,8 @@ export default function CardRankPage() {
           onClick={() => setMode('listings')}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all border ${
             mode === 'listings'
-              ? 'bg-[#2a1c08] text-[#e0b878] border-[#3d2a0c]'
-              : 'text-[#7a6040] border-[#2e2318] hover:border-[#4a3520] hover:text-[#9e8a6a]'
+              ? 'bg-accent-tint text-accent-soft border-accent-line'
+              : 'text-muted-2 border-line hover:border-line-strong hover:text-fg-3'
           }`}
         >
           <Tag size={14} /> 거래량 랭킹
@@ -215,8 +215,8 @@ export default function CardRankPage() {
           onClick={() => setMode('price')}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all border ${
             mode === 'price'
-              ? 'bg-[#2a1c08] text-[#e0b878] border-[#3d2a0c]'
-              : 'text-[#7a6040] border-[#2e2318] hover:border-[#4a3520] hover:text-[#9e8a6a]'
+              ? 'bg-accent-tint text-accent-soft border-accent-line'
+              : 'text-muted-2 border-line hover:border-line-strong hover:text-fg-3'
           }`}
         >
           <TrendingUp size={14} /> 시세 랭킹
@@ -229,8 +229,8 @@ export default function CardRankPage() {
           onClick={() => setTcgType('')}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all border ${
             !tcgType
-              ? 'bg-[#2a1c08] text-[#e0b878] border-[#3d2a0c]'
-              : 'bg-transparent text-[#7a6040] border-[#2e2318] hover:border-[#4a3520]'
+              ? 'bg-accent-tint text-accent-soft border-accent-line'
+              : 'bg-transparent text-muted-2 border-line hover:border-line-strong'
           }`}
         >
           전체
@@ -241,8 +241,8 @@ export default function CardRankPage() {
             onClick={() => setTcgType(t === tcgType ? '' : t)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all border ${
               tcgType === t
-                ? 'bg-[#2a1c08] text-[#e0b878] border-[#3d2a0c]'
-                : 'bg-transparent text-[#7a6040] border-[#2e2318] hover:border-[#4a3520]'
+                ? 'bg-accent-tint text-accent-soft border-accent-line'
+                : 'bg-transparent text-muted-2 border-line hover:border-line-strong'
             }`}
           >
             {TCG_ICONS[t]} {TCG_LABELS[t]}
@@ -251,37 +251,37 @@ export default function CardRankPage() {
       </div>
 
       {/* 랭킹 목록 */}
-      <div className="bg-[#1a1410] border border-[#2e2318] rounded-xl overflow-hidden">
+      <div className="bg-surface border border-line rounded-xl overflow-hidden">
         {/* 상단 설명 바 */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#2e2318] bg-[#150f0c]">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-line bg-sunken">
           <div className="flex items-center gap-2">
             {mode === 'listings'
-              ? <><Tag size={12} className="text-[#d4a853]" /><span className="text-xs text-[#7a6040]">활성 리스팅 수 기준</span></>
-              : <><Zap size={12} className="text-[#d4a853]" /><span className="text-xs text-[#7a6040]">즉시구매 최고가 기준</span></>
+              ? <><Tag size={12} className="text-accent-fg" /><span className="text-xs text-muted-2">활성 리스팅 수 기준</span></>
+              : <><Zap size={12} className="text-accent-fg" /><span className="text-xs text-muted-2">즉시구매 최고가 기준</span></>
             }
           </div>
-          <span className="text-[11px] text-[#4a3820]">TOP {data?.rank.length ?? '—'}</span>
+          <span className="text-[11px] text-subtle">TOP {data?.rank.length ?? '—'}</span>
         </div>
 
         {isLoading ? (
-          <div className="divide-y divide-[#1a1208]">
+          <div className="divide-y divide-surface-2">
             {Array.from({ length: 10 }).map((_, i) => (
               <div key={i} className="flex items-center gap-3 px-4 py-3 animate-pulse">
-                <div className="w-10 h-8 bg-[#1a1208] rounded" />
-                <div className="w-10 h-14 bg-[#1a1208] rounded" />
+                <div className="w-10 h-8 bg-surface-2 rounded" />
+                <div className="w-10 h-14 bg-surface-2 rounded" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-[#1a1208] rounded w-2/3" />
-                  <div className="h-3 bg-[#1a1208] rounded w-1/3" />
+                  <div className="h-4 bg-surface-2 rounded w-2/3" />
+                  <div className="h-3 bg-surface-2 rounded w-1/3" />
                 </div>
-                <div className="w-16 h-6 bg-[#1a1208] rounded" />
+                <div className="w-16 h-6 bg-surface-2 rounded" />
               </div>
             ))}
           </div>
         ) : !data?.rank.length ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2">
-            <Crown size={36} className="text-[#2e2318]" />
-            <p className="text-[#5a4830] text-sm">아직 거래 데이터가 없습니다.</p>
-            <Link href="/listings" className="text-sm text-[#d4a853] hover:text-[#f0c060]">
+            <Crown size={36} className="text-line" />
+            <p className="text-subtle text-sm">아직 거래 데이터가 없습니다.</p>
+            <Link href="/listings" className="text-sm text-accent-fg hover:text-[#8a5ef2]">
               리스팅 보러 가기 →
             </Link>
           </div>
@@ -298,7 +298,7 @@ export default function CardRankPage() {
       <div className="text-center">
         <Link
           href="/cards"
-          className="inline-flex items-center gap-2 text-sm text-[#7a6040] hover:text-[#e0b878] transition-colors"
+          className="inline-flex items-center gap-2 text-sm text-muted-2 hover:text-accent-soft transition-colors"
         >
           ← 카드 도감으로 돌아가기
         </Link>

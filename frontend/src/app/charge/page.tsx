@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuthStore } from '@/lib/store'
+import { useAuthStore, useAuthHydrated } from '@/lib/store'
 import { Wallet, Zap, AlertCircle, CreditCard, ChevronRight } from 'lucide-react'
 
 const CLIENT_KEY = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY!
@@ -15,9 +15,11 @@ export default function ChargePage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  const hydrated = useAuthHydrated()
+
   useEffect(() => {
-    if (!user) router.replace('/login')
-  }, [user, router])
+    if (hydrated && !user) router.replace('/login')
+  }, [hydrated, user, router])
 
   if (!user) return null
 
@@ -55,30 +57,30 @@ export default function ChargePage() {
     <div className="max-w-md mx-auto space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-white tracking-tight">포인트 충전</h1>
-        <p className="text-sm text-[#7a6040] mt-1">충전 포인트로 카드 구매, 경매 입찰이 가능합니다</p>
+        <h1 className="text-[26px] sm:text-3xl font-bold tracking-tight text-fg">포인트 충전</h1>
+        <p className="text-sm text-muted-2 mt-1">충전 포인트로 카드 구매, 경매 입찰이 가능합니다</p>
       </div>
 
       {/* Current balance */}
-      <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl p-5">
-        <p className="text-xs text-[#5a4830] uppercase tracking-wider font-semibold mb-3">현재 잔액</p>
+      <div className="bg-surface border border-line rounded-2xl p-5">
+        <p className="text-xs text-subtle uppercase tracking-wider font-semibold mb-3">현재 잔액</p>
         <div className="flex items-end gap-2">
-          <Wallet size={20} className="text-[#f0a832] mb-0.5" />
-          <span className="text-3xl font-bold text-[#f0a832] tabular-nums">{user.balance.toLocaleString()}</span>
-          <span className="text-lg text-[#6b4c1a] mb-0.5">P</span>
+          <Wallet size={20} className="text-accent-2 mb-0.5" />
+          <span className="text-3xl font-bold text-accent-2 tabular-nums">{user.balance.toLocaleString()}</span>
+          <span className="text-lg text-[#322f4f] mb-0.5">P</span>
         </div>
       </div>
 
       {/* Presets */}
       <div>
-        <p className="text-xs text-[#5a4830] uppercase tracking-wider font-semibold mb-3">빠른 선택</p>
+        <p className="text-xs text-subtle uppercase tracking-wider font-semibold mb-3">빠른 선택</p>
         <div className="grid grid-cols-3 gap-2">
           {PRESETS.map(p => (
             <button key={p} onClick={() => { setAmount(String(p)); setError('') }}
               className={`py-3 rounded-xl text-sm font-semibold border transition-all duration-150 ${
                 amount === String(p)
-                  ? 'bg-[#2a1c08] border-[#3d2a0c] text-[#e0b878] shadow-[0_0_12px_rgba(212,168,83,0.12)]'
-                  : 'bg-[#1a1410] border-[#2e2318] text-[#8a7055] hover:border-[#4a3520] hover:text-[#e8d5b0]'
+                  ? 'bg-accent-tint border-accent-line text-accent-soft shadow-[0_0_12px_rgba(139,92,246,0.12)]'
+                  : 'bg-surface border-line text-muted hover:border-line-strong hover:text-fg-2'
               }`}>
               {p.toLocaleString()}P
             </button>
@@ -88,13 +90,13 @@ export default function ChargePage() {
 
       {/* Custom amount */}
       <div>
-        <label className="text-xs text-[#5a4830] uppercase tracking-wider font-semibold block mb-3">직접 입력</label>
+        <label className="text-xs text-subtle uppercase tracking-wider font-semibold block mb-3">직접 입력</label>
         <div className="relative">
           <input type="number" min="1000" max="5000000" step="1000" value={amount}
             onChange={e => { setAmount(e.target.value); setError('') }}
             placeholder="금액 입력 (최소 1,000P)"
-            className="w-full bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] focus:border-[#d4a853]/50 rounded-xl px-4 py-3 pr-10 text-sm text-[#f5ead8] placeholder:text-[#5a4830] focus:outline-none transition-colors tabular-nums" />
-          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[#5a4830] text-sm">P</span>
+            className="w-full bg-surface border border-line hover:border-line-strong focus:border-accent/50 rounded-xl px-4 py-3 pr-10 text-sm text-fg placeholder:text-subtle focus:outline-none transition-colors tabular-nums" />
+          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-subtle text-sm">P</span>
         </div>
         {error && (
           <div className="flex items-center gap-2 text-red-400 text-sm mt-2">
@@ -105,16 +107,16 @@ export default function ChargePage() {
 
       {/* Summary */}
       {numAmount > 0 && (
-        <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl p-4 space-y-2.5">
-          <p className="text-xs text-[#5a4830] uppercase tracking-wider font-semibold">충전 내역</p>
+        <div className="bg-surface border border-line rounded-2xl p-4 space-y-2.5">
+          <p className="text-xs text-subtle uppercase tracking-wider font-semibold">충전 내역</p>
           <div className="flex justify-between items-center text-sm">
-            <span className="text-[#8a7055]">충전 금액</span>
-            <span className="text-[#e8d5b0] font-medium tabular-nums">{numAmount.toLocaleString()}원</span>
+            <span className="text-muted">충전 금액</span>
+            <span className="text-fg-2 font-medium tabular-nums">{numAmount.toLocaleString()}원</span>
           </div>
-          <div className="h-px bg-[#2e2318]" />
+          <div className="h-px bg-line" />
           <div className="flex justify-between items-center">
-            <span className="text-sm text-[#8a7055]">충전 후 잔액</span>
-            <span className="text-[#f0a832] font-bold tabular-nums text-base">{(user.balance + numAmount).toLocaleString()}P</span>
+            <span className="text-sm text-muted">충전 후 잔액</span>
+            <span className="text-accent-2 font-bold tabular-nums text-base">{(user.balance + numAmount).toLocaleString()}P</span>
           </div>
         </div>
       )}
@@ -122,7 +124,7 @@ export default function ChargePage() {
       {/* CTA */}
       <button onClick={handleCharge}
         disabled={loading || numAmount < 1000}
-        className="w-full h-14 flex items-center justify-center gap-2.5 bg-[#d4a853] hover:bg-[#c49440] disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all duration-200 shadow-[0_0_24px_rgba(212,168,83,0.3)] hover:shadow-[0_0_32px_rgba(212,168,83,0.5)] text-base">
+        className="w-full h-14 flex items-center justify-center gap-2.5 bg-accent hover:bg-accent-strong disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all duration-200 shadow-[0_0_24px_rgba(139,92,246,0.3)] hover:shadow-[0_0_32px_rgba(139,92,246,0.5)] text-base">
         {loading ? (
           <span className="w-5 h-5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
         ) : (
@@ -134,7 +136,7 @@ export default function ChargePage() {
         )}
       </button>
 
-      <div className="flex items-center gap-2 justify-center text-[11px] text-[#4a3820]">
+      <div className="flex items-center gap-2 justify-center text-[11px] text-subtle">
         <Zap size={11} />
         토스페이먼츠를 통해 안전하게 처리됩니다 · 충전 포인트는 환불 불가
       </div>

@@ -27,7 +27,7 @@ interface FriendRequest {
 }
 
 function Avatar({ user, size = 9 }: { user: FriendUser; size?: number }) {
-  const cls = `w-${size} h-${size} rounded-full bg-[#1a1208] border border-[#2e2318] flex items-center justify-center text-sm font-semibold overflow-hidden shrink-0 text-[#8a7055]`
+  const cls = `w-${size} h-${size} rounded-full bg-surface-2 border border-line flex items-center justify-center text-sm font-semibold overflow-hidden shrink-0 text-muted`
   return (
     <div className={cls}>
       {user.avatarUrl
@@ -99,20 +99,20 @@ export default function FriendsPage() {
 
   return (
     <div className="max-w-2xl mx-auto py-8 px-4">
-      <h1 className="text-xl font-bold text-[#f5ead8] mb-6">친구</h1>
+      <h1 className="text-xl font-bold text-fg mb-6">친구</h1>
 
       {/* 유저 검색 */}
       <div className="mb-6">
         <div className="relative">
-          <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5a4830] pointer-events-none" />
+          <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-subtle pointer-events-none" />
           <input
             value={searchInput}
             onChange={e => setSearchInput(e.target.value)}
             placeholder="닉네임으로 친구 검색..."
-            className="w-full pl-10 pr-4 py-2.5 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] focus:border-[#d4a853]/40 rounded-xl text-sm text-[#f5ead8] placeholder:text-[#5a4830] focus:outline-none transition-colors"
+            className="w-full pl-10 pr-4 py-2.5 bg-surface border border-line hover:border-line-strong focus:border-accent/40 rounded-xl text-sm text-fg placeholder:text-subtle focus:outline-none transition-colors"
           />
           {searchInput && (
-            <button onClick={() => setSearchInput('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#5a4830] hover:text-[#9e8a6a]">
+            <button onClick={() => setSearchInput('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle hover:text-fg-3">
               <X size={14} />
             </button>
           )}
@@ -120,18 +120,18 @@ export default function FriendsPage() {
 
         {/* 검색 결과 */}
         {searchQ.length >= 1 && (
-          <div className="mt-2 bg-[#150f0c] border border-[#2e2318] rounded-xl overflow-hidden">
+          <div className="mt-2 bg-sunken border border-line rounded-xl overflow-hidden">
             {searchQ_result.isLoading && (
-              <p className="text-center text-[#5a4830] py-6 text-sm">검색 중...</p>
+              <p className="text-center text-subtle py-6 text-sm">검색 중...</p>
             )}
             {!searchQ_result.isLoading && searchQ_result.data?.length === 0 && (
-              <p className="text-center text-[#5a4830] py-6 text-sm">"{searchQ}"에 해당하는 유저가 없습니다.</p>
+              <p className="text-center text-subtle py-6 text-sm">"{searchQ}"에 해당하는 유저가 없습니다.</p>
             )}
             {searchQ_result.data?.map(u => (
-              <div key={u.id} className="flex items-center gap-3 px-4 py-3 border-b border-[#2e2318] last:border-b-0 hover:bg-[#1a1410] transition-colors">
+              <div key={u.id} className="flex items-center gap-3 px-4 py-3 border-b border-line last:border-b-0 hover:bg-surface transition-colors">
                 <Avatar user={u} size={8} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-[#f5ead8] truncate">{u.nickname}</p>
+                  <p className="text-sm font-semibold text-fg truncate">{u.nickname}</p>
                 </div>
                 <div className="shrink-0">
                   {u.friendStatus === 'ACCEPTED' ? (
@@ -139,7 +139,7 @@ export default function FriendsPage() {
                       <UserCheck size={12} /> 친구
                     </span>
                   ) : u.friendStatus === 'PENDING_SENT' ? (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-[#7a6040] bg-[#2e2318] border border-[#4a3520] rounded-lg">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-2 bg-line border border-line-strong rounded-lg">
                       <Clock size={12} /> 요청됨
                     </span>
                   ) : u.friendStatus === 'PENDING_RECEIVED' ? (
@@ -154,7 +154,7 @@ export default function FriendsPage() {
                     <button
                       onClick={() => sendRequestMut.mutate(u.id)}
                       disabled={sendRequestMut.isPending}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-[#d4a853] bg-[#d4a853]/10 border border-[#d4a853]/30 rounded-lg hover:bg-[#d4a853]/20 transition-colors disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-accent-fg bg-accent/10 border border-accent/30 rounded-lg hover:bg-accent/20 transition-colors disabled:opacity-50"
                     >
                       <UserPlus size={12} /> 친구 신청
                     </button>
@@ -167,14 +167,14 @@ export default function FriendsPage() {
       </div>
 
       {/* 탭 */}
-      <div className="flex gap-1 mb-6 bg-[#150f0c] border border-[#2e2318] rounded-xl p-1">
+      <div className="flex gap-1 mb-6 bg-sunken border border-line rounded-xl p-1">
         {TABS.map(t => {
           const count = t.id === 'received' ? (receivedQ.data?.length ?? 0) : t.id === 'sent' ? (sentQ.data?.length ?? 0) : (friendsQ.data?.length ?? 0)
           return (
             <button key={t.id} onClick={() => setTab(t.id)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors ${tab === t.id ? 'bg-[#2a1c0c] text-white' : 'text-[#8a7055] hover:text-[#e8d5b0]'}`}>
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors ${tab === t.id ? 'bg-accent-tint text-white' : 'text-muted hover:text-fg-2'}`}>
               {t.icon}{t.label}
-              {count > 0 && <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${tab === t.id ? 'bg-[#d4a853]/20 text-[#d4a853]' : 'bg-[#2e2318] text-[#7a6040]'}`}>{count}</span>}
+              {count > 0 && <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${tab === t.id ? 'bg-accent/20 text-accent-fg' : 'bg-line text-muted-2'}`}>{count}</span>}
             </button>
           )
         })}
@@ -183,23 +183,23 @@ export default function FriendsPage() {
       {/* 친구 목록 */}
       {tab === 'friends' && (
         <div className="space-y-2">
-          {friendsQ.isLoading && <p className="text-center text-[#5a4830] py-12 text-sm">로딩 중...</p>}
+          {friendsQ.isLoading && <p className="text-center text-subtle py-12 text-sm">로딩 중...</p>}
           {!friendsQ.isLoading && !friendsQ.data?.length && (
             <div className="text-center py-16">
-              <Users size={36} className="mx-auto mb-3 text-[#4a3520]" />
-              <p className="text-sm text-[#8a7055]">아직 친구가 없습니다.</p>
-              <p className="text-xs text-[#5a4830] mt-1">커뮤니티에서 게시글 작성자에게 친구 신청을 해보세요.</p>
+              <Users size={36} className="mx-auto mb-3 text-subtle" />
+              <p className="text-sm text-muted">아직 친구가 없습니다.</p>
+              <p className="text-xs text-subtle mt-1">커뮤니티에서 게시글 작성자에게 친구 신청을 해보세요.</p>
             </div>
           )}
           {friendsQ.data?.map(friend => (
-            <div key={friend.id} className="flex items-center gap-3 bg-[#150f0c] border border-[#2e2318] rounded-xl px-4 py-3 hover:border-[#4a3520] transition-colors">
+            <div key={friend.id} className="flex items-center gap-3 bg-sunken border border-line rounded-xl px-4 py-3 hover:border-line-strong transition-colors">
               <Avatar user={friend} />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-[#f5ead8]">{friend.nickname}</p>
+                <p className="text-sm font-semibold text-fg">{friend.nickname}</p>
               </div>
               <div className="flex gap-2">
                 <button onClick={() => dmMut.mutate(friend.id)} disabled={dmMut.isPending}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#d4a853]/10 hover:bg-[#d4a853]/20 border border-[#d4a853]/30 text-[#d4a853] rounded-lg text-xs font-medium transition-colors disabled:opacity-50">
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-accent/10 hover:bg-accent/20 border border-accent/30 text-accent-fg rounded-lg text-xs font-medium transition-colors disabled:opacity-50">
                   <MessageCircle size={12} /> DM
                 </button>
                 <button onClick={() => removeMut.mutate(friend.id)} disabled={removeMut.isPending}
@@ -215,19 +215,19 @@ export default function FriendsPage() {
       {/* 받은 요청 */}
       {tab === 'received' && (
         <div className="space-y-2">
-          {receivedQ.isLoading && <p className="text-center text-[#5a4830] py-12 text-sm">로딩 중...</p>}
+          {receivedQ.isLoading && <p className="text-center text-subtle py-12 text-sm">로딩 중...</p>}
           {!receivedQ.isLoading && !receivedQ.data?.length && (
             <div className="text-center py-16">
-              <UserPlus size={36} className="mx-auto mb-3 text-[#4a3520]" />
-              <p className="text-sm text-[#8a7055]">받은 친구 요청이 없습니다.</p>
+              <UserPlus size={36} className="mx-auto mb-3 text-subtle" />
+              <p className="text-sm text-muted">받은 친구 요청이 없습니다.</p>
             </div>
           )}
           {receivedQ.data?.map(req => (
-            <div key={req.id} className="flex items-center gap-3 bg-[#150f0c] border border-[#2e2318] rounded-xl px-4 py-3">
+            <div key={req.id} className="flex items-center gap-3 bg-sunken border border-line rounded-xl px-4 py-3">
               {req.sender && <Avatar user={req.sender} />}
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-[#f5ead8]">{req.sender?.nickname}</p>
-                <p className="text-xs text-[#5a4830] flex items-center gap-1 mt-0.5">
+                <p className="text-sm font-semibold text-fg">{req.sender?.nickname}</p>
+                <p className="text-xs text-subtle flex items-center gap-1 mt-0.5">
                   <Clock size={10} />{new Date(req.createdAt).toLocaleDateString('ko-KR')}
                 </p>
               </div>
@@ -249,23 +249,23 @@ export default function FriendsPage() {
       {/* 보낸 요청 */}
       {tab === 'sent' && (
         <div className="space-y-2">
-          {sentQ.isLoading && <p className="text-center text-[#5a4830] py-12 text-sm">로딩 중...</p>}
+          {sentQ.isLoading && <p className="text-center text-subtle py-12 text-sm">로딩 중...</p>}
           {!sentQ.isLoading && !sentQ.data?.length && (
             <div className="text-center py-16">
-              <Send size={36} className="mx-auto mb-3 text-[#4a3520]" />
-              <p className="text-sm text-[#8a7055]">보낸 친구 요청이 없습니다.</p>
+              <Send size={36} className="mx-auto mb-3 text-subtle" />
+              <p className="text-sm text-muted">보낸 친구 요청이 없습니다.</p>
             </div>
           )}
           {sentQ.data?.map(req => (
-            <div key={req.id} className="flex items-center gap-3 bg-[#150f0c] border border-[#2e2318] rounded-xl px-4 py-3">
+            <div key={req.id} className="flex items-center gap-3 bg-sunken border border-line rounded-xl px-4 py-3">
               {req.receiver && <Avatar user={req.receiver} />}
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-[#f5ead8]">{req.receiver?.nickname}</p>
-                <p className="text-xs text-[#5a4830] flex items-center gap-1 mt-0.5">
+                <p className="text-sm font-semibold text-fg">{req.receiver?.nickname}</p>
+                <p className="text-xs text-subtle flex items-center gap-1 mt-0.5">
                   <Clock size={10} />{new Date(req.createdAt).toLocaleDateString('ko-KR')} 요청
                 </p>
               </div>
-              <span className="flex items-center gap-1 text-xs text-[#7a6040] bg-[#2e2318] px-2.5 py-1 rounded-full">
+              <span className="flex items-center gap-1 text-xs text-muted-2 bg-line px-2.5 py-1 rounded-full">
                 <Clock size={10} /> 대기 중
               </span>
             </div>

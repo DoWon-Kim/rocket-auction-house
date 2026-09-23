@@ -116,19 +116,19 @@ export default function NoticeDetailPage() {
     return (
       <div className="space-y-6">
         {/* Back button skeleton */}
-        <div className="w-20 h-8 bg-[#1a1410] border border-[#2e2318] rounded-xl animate-pulse" />
+        <div className="w-20 h-8 bg-surface border border-line rounded-xl animate-pulse" />
         {/* Card skeleton */}
-        <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl p-6 space-y-4 animate-pulse">
-          <div className="w-16 h-5 bg-[#2e2318] rounded-lg" />
-          <div className="w-3/4 h-7 bg-[#2e2318] rounded-lg" />
+        <div className="bg-surface border border-line rounded-2xl p-6 space-y-4 animate-pulse">
+          <div className="w-16 h-5 bg-line rounded-lg" />
+          <div className="w-3/4 h-7 bg-line rounded-lg" />
           <div className="flex gap-4">
-            <div className="w-24 h-4 bg-[#2e2318] rounded" />
-            <div className="w-16 h-4 bg-[#2e2318] rounded" />
+            <div className="w-24 h-4 bg-line rounded" />
+            <div className="w-16 h-4 bg-line rounded" />
           </div>
-          <div className="h-px bg-[#2e2318]" />
+          <div className="h-px bg-line" />
           <div className="space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-4 bg-[#2e2318] rounded" />
+              <div key={i} className="h-4 bg-line rounded" />
             ))}
           </div>
         </div>
@@ -139,10 +139,10 @@ export default function NoticeDetailPage() {
   if (!post) {
     return (
       <div className="flex flex-col items-center justify-center py-32 gap-4">
-        <p className="text-[#5a4830] text-sm">게시글을 찾을 수 없습니다.</p>
+        <p className="text-subtle text-sm">게시글을 찾을 수 없습니다.</p>
         <button
           onClick={() => router.push('/notice')}
-          className="px-4 py-2 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] rounded-xl text-sm transition-colors"
+          className="px-4 py-2 bg-surface border border-line hover:border-line-strong text-fg-3 rounded-xl text-sm transition-colors"
         >
           목록으로
         </button>
@@ -155,38 +155,38 @@ export default function NoticeDetailPage() {
       {/* Back button */}
       <button
         onClick={() => router.push('/notice')}
-        className="flex items-center gap-1.5 text-sm text-[#8a7055] hover:text-[#f5ead8] transition-colors"
+        className="flex items-center gap-1.5 text-sm text-muted hover:text-fg transition-colors"
       >
         <ArrowLeft size={15} />
         목록으로
       </button>
 
       {/* Post card */}
-      <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl overflow-hidden">
+      <div className="bg-surface border border-line rounded-2xl overflow-hidden">
         {/* Post header */}
-        <div className="px-6 pt-6 pb-5 border-b border-[#2e2318] space-y-3">
+        <div className="px-6 pt-6 pb-5 border-b border-line space-y-3">
           {/* Badges */}
           <div className="flex items-center gap-2">
             {post.pinned && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-[#2a1f08] text-[#f0a832] border border-[#3d2e0c]">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-accent-tint text-accent-2 border border-accent-line">
                 <Pin size={9} />
                 공지
               </span>
             )}
             <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold border ${
               post.type === 'NOTICE'
-                ? 'bg-[#0d1a2e] text-[#8a7055] border-[#2e2318]'
-                : 'bg-[#1a1f08] text-[#c8a832] border-[#2e2a0c]'
+                ? 'bg-[#0d1a2e] text-muted border-line'
+                : 'bg-[#1a1f08] text-accent-fg border-[#2e2a0c]'
             }`}>
               {post.type === 'NOTICE' ? '공지사항' : '이벤트'}
             </span>
           </div>
 
           {/* Title */}
-          <h1 className="text-xl font-bold text-[#f5ead8] leading-snug">{post.title}</h1>
+          <h1 className="text-xl font-bold text-fg leading-snug">{post.title}</h1>
 
           {/* Meta */}
-          <div className="flex flex-wrap items-center gap-4 text-xs text-[#5a4830]">
+          <div className="flex flex-wrap items-center gap-4 text-xs text-subtle">
             <span>{post.author.nickname}</span>
             <span>{formatDateTime(post.createdAt)}</span>
             <span className="flex items-center gap-1">
@@ -202,8 +202,8 @@ export default function NoticeDetailPage() {
           {/* Event period */}
           {post.type === 'EVENT' && post.eventStartAt && post.eventEndAt && (
             <div className="flex items-center gap-2 px-3 py-2 bg-[#12180a] border border-[#1e2a0e] rounded-xl w-fit">
-              <Calendar size={12} className="text-[#c8a832]" />
-              <span className="text-xs text-[#c8a832] font-medium">
+              <Calendar size={12} className="text-accent-fg" />
+              <span className="text-xs text-accent-fg font-medium">
                 {formatDate(post.eventStartAt)} ~ {formatDate(post.eventEndAt)}
               </span>
             </div>
@@ -219,7 +219,7 @@ export default function NoticeDetailPage() {
               className="w-full rounded-xl object-cover max-h-96 mb-6"
             />
           )}
-          <p className="text-sm text-[#e8d5b0] whitespace-pre-wrap leading-relaxed">
+          <p className="text-sm text-fg-2 whitespace-pre-wrap leading-relaxed">
             {post.content}
           </p>
         </div>
@@ -231,8 +231,8 @@ export default function NoticeDetailPage() {
             disabled={togglePostLike.isPending}
             className={`flex items-center gap-2 px-6 py-2.5 rounded-xl border font-semibold text-sm transition-colors disabled:opacity-40 ${
               post.likedByMe
-                ? 'bg-[#d4a853]/10 border-[#d4a853]/40 text-[#e0b878]'
-                : 'bg-[#1a1410] border-[#2e2318] hover:border-[#d4a853]/30 text-[#7a6040] hover:text-[#e0b878]'
+                ? 'bg-accent/10 border-accent/40 text-accent-soft'
+                : 'bg-surface border-line hover:border-accent/30 text-muted-2 hover:text-accent-soft'
             }`}
           >
             <ThumbsUp size={14} className={post.likedByMe ? 'fill-current' : ''} />
@@ -242,42 +242,42 @@ export default function NoticeDetailPage() {
       </div>
 
       {/* Comments section */}
-      <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-[#2e2318]">
-          <h2 className="text-sm font-semibold text-[#f5ead8] flex items-center gap-2">
-            <MessageSquare size={14} className="text-[#d4a853]" />
+      <div className="bg-surface border border-line rounded-2xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-line">
+          <h2 className="text-sm font-semibold text-fg flex items-center gap-2">
+            <MessageSquare size={14} className="text-accent-fg" />
             댓글
-            <span className="text-[#5a4830] font-normal">{post.comments.length}</span>
+            <span className="text-subtle font-normal">{post.comments.length}</span>
           </h2>
         </div>
 
         {/* Comment list */}
-        <div className="divide-y divide-[#2e2318]">
+        <div className="divide-y divide-line">
           {post.comments.length === 0 ? (
             <div className="flex items-center justify-center py-10">
-              <p className="text-sm text-[#5a4830]">첫 댓글을 작성해 보세요.</p>
+              <p className="text-sm text-subtle">첫 댓글을 작성해 보세요.</p>
             </div>
           ) : (
             post.comments.map((comment) => (
               <div key={comment.id} className="px-6 py-4 flex gap-3 group">
-                <div className="w-7 h-7 rounded-full bg-[#2e2318] flex items-center justify-center shrink-0 mt-0.5">
-                  <span className="text-[10px] text-[#7a6040] font-semibold">
+                <div className="w-7 h-7 rounded-full bg-line flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="text-[10px] text-muted-2 font-semibold">
                     {comment.author.nickname.slice(0, 1).toUpperCase()}
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-semibold text-[#9e8a6a]">{comment.author.nickname}</span>
+                    <span className="text-xs font-semibold text-fg-3">{comment.author.nickname}</span>
                     {user?.id === comment.author.id && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#2a1c08] text-[#d4a853] border border-[#4a3520] font-semibold">나</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent-tint text-accent-fg border border-line-strong font-semibold">나</span>
                     )}
-                    <span className="text-[10px] text-[#5a4830]">{formatDateTime(comment.createdAt)}</span>
+                    <span className="text-[10px] text-subtle">{formatDateTime(comment.createdAt)}</span>
                   </div>
-                  <p className="text-sm text-[#e8d5b0] whitespace-pre-wrap">{comment.content}</p>
+                  <p className="text-sm text-fg-2 whitespace-pre-wrap">{comment.content}</p>
                   <button
                     onClick={() => user ? toggleCommentLike.mutate(comment.id) : router.push('/login')}
                     className={`mt-1.5 flex items-center gap-1 text-[10px] transition-colors ${
-                      comment.likedByMe ? 'text-[#e0b878]' : 'text-[#5a4830] hover:text-[#e0b878]'
+                      comment.likedByMe ? 'text-accent-soft' : 'text-subtle hover:text-accent-soft'
                     }`}
                   >
                     <ThumbsUp size={10} className={comment.likedByMe ? 'fill-current' : ''} />
@@ -288,7 +288,7 @@ export default function NoticeDetailPage() {
                   <button
                     onClick={() => deleteComment.mutate(comment.id)}
                     disabled={deleteComment.isPending}
-                    className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg text-[#5a4830] hover:text-red-400 hover:bg-red-400/10"
+                    className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg text-subtle hover:text-red-400 hover:bg-red-400/10"
                     title="댓글 삭제"
                   >
                     <Trash2 size={13} />
@@ -300,7 +300,7 @@ export default function NoticeDetailPage() {
         </div>
 
         {/* Comment input */}
-        <div className="px-6 py-4 border-t border-[#2e2318]">
+        <div className="px-6 py-4 border-t border-line">
           {user ? (
             <form onSubmit={handleSubmitComment} className="flex gap-3">
               <input
@@ -308,12 +308,12 @@ export default function NoticeDetailPage() {
                 value={commentText}
                 onChange={(e) => setCommentText(e.target.value)}
                 placeholder="댓글을 입력하세요..."
-                className="flex-1 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] focus:border-[#d4a853]/40 rounded-xl px-4 py-2.5 text-sm text-[#f5ead8] placeholder:text-[#5a4830] focus:outline-none transition-colors"
+                className="flex-1 bg-surface border border-line hover:border-line-strong focus:border-accent/40 rounded-xl px-4 py-2.5 text-sm text-fg placeholder:text-subtle focus:outline-none transition-colors"
               />
               <button
                 type="submit"
                 disabled={addComment.isPending || !commentText.trim()}
-                className="px-4 py-2.5 bg-[#d4a853] hover:bg-[#c49440] text-white rounded-xl font-semibold text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-4 py-2.5 bg-accent hover:bg-accent-strong text-white rounded-xl font-semibold text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {addComment.isPending ? (
                   <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
@@ -323,10 +323,10 @@ export default function NoticeDetailPage() {
             </form>
           ) : (
             <div className="flex items-center justify-center py-4">
-              <p className="text-sm text-[#5a4830]">
+              <p className="text-sm text-subtle">
                 <button
                   onClick={() => router.push('/login')}
-                  className="text-[#d4a853] hover:underline"
+                  className="text-accent-fg hover:underline"
                 >
                   로그인
                 </button>{' '}

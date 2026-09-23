@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import { useAuthStore } from '@/lib/store'
+import { useAuthStore, useAuthHydrated } from '@/lib/store'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Layers, Trophy, CheckCircle2, ChevronRight } from 'lucide-react'
@@ -44,9 +44,11 @@ export default function CollectionPage() {
     enabled: !!user,
   })
 
+  const hydrated = useAuthHydrated()
+
   useEffect(() => {
-    if (!user) router.replace('/login')
-  }, [user, router])
+    if (hydrated && !user) router.replace('/login')
+  }, [hydrated, user, router])
 
   if (!user) return null
 
@@ -63,8 +65,8 @@ export default function CollectionPage() {
     <div className="max-w-3xl mx-auto space-y-5">
       {/* 헤더 */}
       <div className="flex items-center gap-3">
-        <Layers size={20} className="text-[#d4a853]" />
-        <h1 className="text-xl font-bold text-[#f5ead8]">컬렉션 트래커</h1>
+        <Layers size={20} className="text-accent-fg" />
+        <h1 className="text-xl font-bold text-fg">컬렉션 트래커</h1>
       </div>
 
       {/* 전체 통계 */}
@@ -76,10 +78,10 @@ export default function CollectionPage() {
             { label: '완성 세트', value: data.overall.completedSets.toString(), sub: `/ ${data.overall.totalSets} 세트` },
             { label: '세트 진행', value: `${data.overall.totalSets > 0 ? Math.round((data.overall.completedSets / data.overall.totalSets) * 100) : 0}%`, sub: '완성 기준' },
           ].map(stat => (
-            <div key={stat.label} className="bg-[#1a1410] border border-[#2e2318] rounded-2xl px-4 py-3 text-center">
-              <p className="text-[11px] text-[#5a4830] uppercase tracking-wider">{stat.label}</p>
-              <p className="text-lg font-bold text-[#d4a853] mt-0.5">{stat.value}</p>
-              <p className="text-[11px] text-[#4a3820]">{stat.sub}</p>
+            <div key={stat.label} className="bg-surface border border-line rounded-2xl px-4 py-3 text-center">
+              <p className="text-[11px] text-subtle uppercase tracking-wider">{stat.label}</p>
+              <p className="text-lg font-bold text-accent-fg mt-0.5">{stat.value}</p>
+              <p className="text-[11px] text-subtle">{stat.sub}</p>
             </div>
           ))}
         </div>
@@ -92,8 +94,8 @@ export default function CollectionPage() {
             onClick={() => setActiveTcg('ALL')}
             className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
               activeTcg === 'ALL'
-                ? 'bg-[#d4a853] text-white'
-                : 'bg-[#1a1410] border border-[#2e2318] text-[#7a6040] hover:text-[#d4a853]'
+                ? 'bg-accent text-white'
+                : 'bg-surface border border-line text-muted-2 hover:text-accent-fg'
             }`}
           >전체</button>
           {tcgTypes.map(tcg => (
@@ -102,8 +104,8 @@ export default function CollectionPage() {
               onClick={() => setActiveTcg(tcg)}
               className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
                 activeTcg === tcg
-                  ? 'bg-[#d4a853] text-white'
-                  : 'bg-[#1a1410] border border-[#2e2318] text-[#7a6040] hover:text-[#d4a853]'
+                  ? 'bg-accent text-white'
+                  : 'bg-surface border border-line text-muted-2 hover:text-accent-fg'
               }`}
             >
               {TCG_LABELS[tcg] ?? tcg}
@@ -116,14 +118,14 @@ export default function CollectionPage() {
       {isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="h-16 bg-[#1a1410] rounded-2xl border border-[#2e2318] animate-pulse" />
+            <div key={i} className="h-16 bg-surface rounded-2xl border border-line animate-pulse" />
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-3 text-[#4a3820]">
+        <div className="flex flex-col items-center justify-center py-20 gap-3 text-subtle">
           <Layers size={40} className="opacity-20" />
           <p className="text-sm">카드를 구매하거나 오리파를 열어 컬렉션을 완성하세요.</p>
-          <Link href="/listings" className="text-sm text-[#d4a853] hover:text-[#f0c060]">
+          <Link href="/listings" className="text-sm text-accent-fg hover:text-[#8a5ef2]">
             마켓플레이스 둘러보기 →
           </Link>
         </div>
@@ -137,50 +139,50 @@ export default function CollectionPage() {
               <Link
                 key={`${set.tcgType}::${set.setName}`}
                 href={`/collection/${set.tcgType}/${encodeURIComponent(set.setName)}`}
-                className={`group flex items-center gap-4 rounded-2xl border px-4 py-3 transition-all hover:border-[#d4a853]/40 ${
+                className={`group flex items-center gap-4 rounded-2xl border px-4 py-3 transition-all hover:border-accent/40 ${
                   isComplete
-                    ? 'bg-[#d4a853]/5 border-[#d4a853]/30'
-                    : 'bg-[#1a1410] border-[#2e2318]'
+                    ? 'bg-accent/5 border-accent/30'
+                    : 'bg-surface border-line'
                 }`}
               >
                 {/* 완성 뱃지 */}
-                <div className={`shrink-0 ${isComplete ? 'text-[#d4a853]' : 'text-[#2e2318]'}`}>
+                <div className={`shrink-0 ${isComplete ? 'text-accent-fg' : 'text-line'}`}>
                   {isComplete ? <Trophy size={18} /> : <CheckCircle2 size={18} />}
                 </div>
 
                 {/* 세트 정보 */}
                 <div className="flex-1 min-w-0 space-y-1.5">
                   <div className="flex items-baseline gap-2 flex-wrap">
-                    <span className="font-semibold text-sm text-[#f5ead8] truncate group-hover:text-[#d4a853] transition-colors">
+                    <span className="font-semibold text-sm text-fg truncate group-hover:text-accent-fg transition-colors">
                       {set.setName}
                     </span>
-                    <span className="text-[10px] text-[#5a4830] shrink-0">
+                    <span className="text-[10px] text-subtle shrink-0">
                       {TCG_LABELS[set.tcgType] ?? set.tcgType}
                     </span>
                   </div>
 
                   {/* 프로그레스 바 */}
                   <div className="flex items-center gap-2">
-                    <div className="flex-1 h-1.5 bg-[#2e2318] rounded-full overflow-hidden">
+                    <div className="flex-1 h-1.5 bg-line rounded-full overflow-hidden">
                       <div
                         className={`h-full rounded-full transition-all ${
-                          isComplete ? 'bg-[#d4a853]' : 'bg-[#7a5830]'
+                          isComplete ? 'bg-accent' : 'bg-[#652bee]'
                         }`}
                         style={{ width: `${Math.min(pct, 100)}%` }}
                       />
                     </div>
                     <span className={`text-[11px] font-medium shrink-0 tabular-nums ${
-                      isComplete ? 'text-[#d4a853]' : pct > 0 ? 'text-[#7a6040]' : 'text-[#3a2810]'
+                      isComplete ? 'text-accent-fg' : pct > 0 ? 'text-muted-2' : 'text-subtle'
                     }`}>
                       {set.ownedCount}/{set.totalCount}
                     </span>
-                    <span className={`text-[11px] shrink-0 tabular-nums ${isComplete ? 'text-[#d4a853]' : 'text-[#4a3820]'}`}>
+                    <span className={`text-[11px] shrink-0 tabular-nums ${isComplete ? 'text-accent-fg' : 'text-subtle'}`}>
                       {pct.toFixed(1)}%
                     </span>
                   </div>
                 </div>
 
-                <ChevronRight size={14} className="text-[#3a2810] shrink-0 group-hover:text-[#d4a853] transition-colors" />
+                <ChevronRight size={14} className="text-subtle shrink-0 group-hover:text-accent-fg transition-colors" />
               </Link>
             )
           })}

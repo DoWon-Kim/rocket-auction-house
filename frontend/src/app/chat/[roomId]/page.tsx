@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import { useAuthStore } from '@/lib/store'
+import { useAuthStore, useAuthHydrated } from '@/lib/store'
 import { connectSocket, getSocket } from '@/lib/socket'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -40,7 +40,7 @@ const CARRIERS = [
 ]
 
 function Avatar({ user, size = 8 }: { user: MsgSender; size?: number }) {
-  const cls = `w-${size} h-${size} rounded-full bg-[#1a1208] border border-[#2e2318] flex items-center justify-center text-xs font-semibold overflow-hidden shrink-0 text-[#8a7055]`
+  const cls = `w-${size} h-${size} rounded-full bg-surface-2 border border-line flex items-center justify-center text-xs font-semibold overflow-hidden shrink-0 text-muted`
   return (
     <div className={cls}>
       {user.avatarUrl
@@ -168,9 +168,11 @@ export default function ChatRoomPage() {
     },
   })
 
+  const hydrated = useAuthHydrated()
+
   useEffect(() => {
-    if (!user) router.replace('/login')
-  }, [user, router])
+    if (hydrated && !user) router.replace('/login')
+  }, [hydrated, user, router])
 
   if (!user) return null
 
@@ -183,28 +185,28 @@ export default function ChatRoomPage() {
     <div className="max-w-2xl mx-auto flex flex-col h-[calc(100vh-5rem)]">
 
       {/* ── 헤더 ── */}
-      <div className="flex items-center gap-3 px-4 py-3 bg-[#1a1410] border border-[#2e2318] rounded-xl mb-2 shrink-0">
-        <button onClick={() => router.back()} className="text-[#5a4830] hover:text-[#f5ead8] transition-colors">
+      <div className="flex items-center gap-3 px-4 py-3 bg-surface border border-line rounded-xl mb-2 shrink-0">
+        <button onClick={() => router.back()} className="text-subtle hover:text-fg transition-colors">
           <ArrowLeft size={18} />
         </button>
         {other && <Avatar user={other} size={9} />}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold truncate text-[#f5ead8]">{other?.nickname ?? '...'}</p>
-          <p className="text-xs text-[#5a4830] truncate">{cardName}</p>
+          <p className="text-sm font-semibold truncate text-fg">{other?.nickname ?? '...'}</p>
+          <p className="text-xs text-subtle truncate">{cardName}</p>
         </div>
         <div
-          className={`w-2 h-2 rounded-full transition-colors ${connected ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)]' : 'bg-[#5a4830]'}`}
+          className={`w-2 h-2 rounded-full transition-colors ${connected ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)]' : 'bg-subtle'}`}
           title={connected ? '연결됨' : '연결 중'}
         />
       </div>
 
       {/* ── 에스크로/거래 패널 (접을 수 있는 형태) ── */}
       {tx && (
-        <div className="mb-2 shrink-0 bg-[#1a1410] border border-[#2e2318] rounded-xl overflow-hidden">
+        <div className="mb-2 shrink-0 bg-surface border border-line rounded-xl overflow-hidden">
           {/* 패널 토글 헤더 */}
           <button
             onClick={() => setTxPanelOpen(v => !v)}
-            className="w-full flex items-center justify-between px-4 py-2.5 text-xs hover:bg-[#1a1208] transition-colors"
+            className="w-full flex items-center justify-between px-4 py-2.5 text-xs hover:bg-surface-2 transition-colors"
           >
             <span className="flex items-center gap-2 font-medium">
               {tx.txStatus === 'COMPLETED' || tx.txStatus === 'AUTO_COMPLETED' ? (
@@ -216,30 +218,30 @@ export default function ChatRoomPage() {
                   <Truck size={12} /> 배송 중
                 </span>
               ) : (
-                <span className="flex items-center gap-1.5 text-[#d4a853]">
+                <span className="flex items-center gap-1.5 text-accent-fg">
                   <Package size={12} /> 발송 대기 중
                 </span>
               )}
-              <span className="text-[#f0a832] font-bold tabular-nums">{tx.finalPrice.toLocaleString()}P</span>
+              <span className="text-accent-2 font-bold tabular-nums">{tx.finalPrice.toLocaleString()}P</span>
             </span>
             <ChevronDown
               size={14}
-              className={`text-[#5a4830] transition-transform duration-200 ${txPanelOpen ? 'rotate-180' : ''}`}
+              className={`text-subtle transition-transform duration-200 ${txPanelOpen ? 'rotate-180' : ''}`}
             />
           </button>
 
           {/* 패널 본문 */}
           {txPanelOpen && (
-            <div className="border-t border-[#2e2318] px-4 py-3 space-y-2">
+            <div className="border-t border-line px-4 py-3 space-y-2">
               {tx.txStatus === 'PENDING_SHIPMENT' && (
                 <div className="text-xs space-y-2">
                   {isBuyer ? (
-                    <p className="text-[#8a7055]">판매자 발송을 기다리고 있습니다.</p>
+                    <p className="text-muted">판매자 발송을 기다리고 있습니다.</p>
                   ) : (
                     <>
                       <button
                         onClick={() => setShowShipForm(v => !v)}
-                        className="flex items-center gap-1.5 bg-[#d4a853] hover:bg-[#c49440] text-white px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors shadow-[0_0_12px_rgba(212,168,83,0.25)]"
+                        className="flex items-center gap-1.5 bg-accent hover:bg-accent-strong text-white px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors shadow-[0_0_12px_rgba(139,92,246,0.25)]"
                       >
                         <Truck size={11} /> 발송 처리
                       </button>
@@ -248,7 +250,7 @@ export default function ChatRoomPage() {
                           <select
                             value={carrier}
                             onChange={e => setCarrier(e.target.value)}
-                            className="flex-1 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] focus:border-[#d4a853]/40 rounded-xl px-3 py-2 text-xs text-[#f5ead8] focus:outline-none transition-colors"
+                            className="flex-1 bg-surface border border-line hover:border-line-strong focus:border-accent/40 rounded-xl px-3 py-2 text-xs text-fg focus:outline-none transition-colors"
                           >
                             <option value="">택배사</option>
                             {CARRIERS.map(c => <option key={c} value={c}>{c}</option>)}
@@ -258,7 +260,7 @@ export default function ChatRoomPage() {
                             placeholder="운송장 번호"
                             value={trackNum}
                             onChange={e => setTrackNum(e.target.value)}
-                            className="flex-1 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] focus:border-[#d4a853]/40 rounded-xl px-3 py-2 text-xs text-[#f5ead8] placeholder:text-[#5a4830] focus:outline-none transition-colors"
+                            className="flex-1 bg-surface border border-line hover:border-line-strong focus:border-accent/40 rounded-xl px-3 py-2 text-xs text-fg placeholder:text-subtle focus:outline-none transition-colors"
                           />
                           <button
                             onClick={() => shipMut.mutate()}
@@ -277,7 +279,7 @@ export default function ChatRoomPage() {
               {tx.txStatus === 'SHIPPED' && (
                 <div className="text-xs space-y-2">
                   {tx.trackingNumber && (
-                    <p className="text-[#8a7055]">
+                    <p className="text-muted">
                       {tx.trackingCarrier}{' '}
                       <span className="font-mono text-yellow-300">{tx.trackingNumber}</span>
                     </p>
@@ -299,7 +301,7 @@ export default function ChatRoomPage() {
               )}
 
               {(tx.txStatus === 'COMPLETED' || tx.txStatus === 'AUTO_COMPLETED') && (
-                <p className="text-xs text-[#8a7055]">
+                <p className="text-xs text-muted">
                   {tx.txStatus === 'AUTO_COMPLETED' ? '자동으로 거래가 완료되었습니다.' : '구매자가 수령을 확인했습니다.'}
                 </p>
               )}
@@ -312,10 +314,10 @@ export default function ChatRoomPage() {
       <div className="flex-1 overflow-y-auto space-y-3 px-1 py-2 min-h-0">
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <div className="w-6 h-6 rounded-full border-2 border-[#2e2318] border-t-[#d4a853] animate-spin" />
+            <div className="w-6 h-6 rounded-full border-2 border-line border-t-accent animate-spin" />
           </div>
         ) : messages.length === 0 ? (
-          <div className="text-center text-[#5a4830] text-sm py-8">
+          <div className="text-center text-subtle text-sm py-8">
             <p>아직 메시지가 없습니다.</p>
             <p className="text-xs mt-1">{other?.nickname}님에게 먼저 말을 걸어보세요!</p>
           </div>
@@ -332,18 +334,18 @@ export default function ChatRoomPage() {
                 )}
                 <div className={`max-w-[72%] space-y-0.5 ${isMe ? 'items-end' : 'items-start'} flex flex-col`}>
                   {showAvatar && !isMe && (
-                    <span className="text-xs text-[#5a4830] ml-1">{msg.sender.nickname}</span>
+                    <span className="text-xs text-subtle ml-1">{msg.sender.nickname}</span>
                   )}
                   <div className={`px-3 py-2 rounded-2xl text-sm leading-relaxed ${
                     isMe
-                      ? 'bg-[#2a1c08] text-[#e8d5b0] rounded-br-sm'
-                      : 'bg-[#221a12] text-[#e8d5b0] rounded-bl-sm'
+                      ? 'bg-accent-tint text-fg-2 rounded-br-sm'
+                      : 'bg-surface-2 text-fg-2 rounded-bl-sm'
                   }`}>
                     {msg.content}
                   </div>
-                  <div className={`flex items-center gap-1 text-[10px] text-[#5a4830] ${isMe ? 'flex-row-reverse' : ''}`}>
+                  <div className={`flex items-center gap-1 text-[10px] text-subtle ${isMe ? 'flex-row-reverse' : ''}`}>
                     <span>{format(new Date(msg.createdAt), 'HH:mm', { locale: ko })}</span>
-                    {isMe && msg.readAt && <CheckCheck size={10} className="text-[#d4a853]" />}
+                    {isMe && msg.readAt && <CheckCheck size={10} className="text-accent-fg" />}
                   </div>
                 </div>
               </div>
@@ -355,7 +357,7 @@ export default function ChatRoomPage() {
 
       {/* ── 입력창 ── */}
       <div className="shrink-0 pt-2">
-        <div className="flex items-end gap-2 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] rounded-xl p-2 transition-colors">
+        <div className="flex items-end gap-2 bg-surface border border-line hover:border-line-strong rounded-xl p-2 transition-colors">
           <textarea
             ref={inputRef}
             rows={1}
@@ -365,19 +367,19 @@ export default function ChatRoomPage() {
               if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg() }
             }}
             placeholder="메시지를 입력하세요..."
-            className="flex-1 bg-transparent resize-none text-sm focus:outline-none max-h-32 py-1.5 px-2 text-[#f5ead8] placeholder:text-[#5a4830]"
+            className="flex-1 bg-transparent resize-none text-sm focus:outline-none max-h-32 py-1.5 px-2 text-fg placeholder:text-subtle"
             style={{ overflowY: 'auto' }}
           />
           <button
             onClick={sendMsg}
             disabled={!input.trim() || !connected}
-            className="w-9 h-9 rounded-xl bg-[#d4a853] hover:bg-[#c49440] disabled:opacity-40 text-white flex items-center justify-center transition-colors shrink-0 shadow-[0_0_12px_rgba(212,168,83,0.25)]"
+            className="w-9 h-9 rounded-xl bg-accent hover:bg-accent-strong disabled:opacity-40 text-white flex items-center justify-center transition-colors shrink-0 shadow-[0_0_12px_rgba(139,92,246,0.25)]"
           >
             <Send size={15} />
           </button>
         </div>
         {!connected && (
-          <p className="text-xs text-[#5a4830] text-center mt-1">연결 중...</p>
+          <p className="text-xs text-subtle text-center mt-1">연결 중...</p>
         )}
       </div>
     </div>

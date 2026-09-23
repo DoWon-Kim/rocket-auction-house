@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
-import { useAuthStore } from '@/lib/store'
+import { useAuthStore, useAuthHydrated } from '@/lib/store'
 import { LISTING_TYPE_LABELS, CONDITION_LABELS, TCG_LABELS, resolveImageSrc } from '@/lib/utils'
 import Badge from '@/components/ui/Badge'
 import { format } from 'date-fns'
@@ -23,29 +23,30 @@ import { RatingBadge } from '@/components/StarRating'
 // ─── 탭 정의 ─────────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: 'profile',     label: '내 정보',     icon: <User size={15} /> },
-  { id: 'inventory',   label: '인벤토리',    icon: <Archive size={15} /> },
-  { id: 'shipping',    label: '배송 신청',   icon: <Truck size={15} /> },
-  { id: 'listings',    label: '판매 중',     icon: <ShoppingBag size={15} /> },
-  { id: 'purchases',   label: '구매 내역',   icon: <ArrowDownCircle size={15} /> },
-  { id: 'sales',       label: '판매 내역',   icon: <ArrowUpCircle size={15} /> },
-  { id: 'offers-in',   label: '받은 제안',   icon: <Handshake size={15} /> },
-  { id: 'offers-out',  label: '보낸 제안',   icon: <Handshake size={15} /> },
-  { id: 'bids',        label: '입찰 내역',   icon: <Gavel size={15} /> },
-  { id: 'oripas',      label: '오리파 내역', icon: <Package size={15} /> },
-  { id: 'shop-orders', label: '샵 구매',     icon: <Store size={15} /> },
-  { id: 'withdrawal',  label: '포인트 환전', icon: <Banknote size={15} /> },
-  { id: 'disputes',    label: '분쟁 내역',   icon: <Shield size={15} /> },
+  { id: 'profile',     group: '계정',      label: '내 정보',     icon: <User size={16} /> },
+  { id: 'withdrawal',  group: '계정',      label: '포인트 환전', icon: <Banknote size={16} /> },
+  { id: 'listings',    group: '거래',      label: '판매 중',     icon: <ShoppingBag size={16} /> },
+  { id: 'purchases',   group: '거래',      label: '구매 내역',   icon: <ArrowDownCircle size={16} /> },
+  { id: 'sales',       group: '거래',      label: '판매 내역',   icon: <ArrowUpCircle size={16} /> },
+  { id: 'offers-in',   group: '거래',      label: '받은 제안',   icon: <Handshake size={16} /> },
+  { id: 'offers-out',  group: '거래',      label: '보낸 제안',   icon: <Handshake size={16} /> },
+  { id: 'bids',        group: '거래',      label: '입찰 내역',   icon: <Gavel size={16} /> },
+  { id: 'disputes',    group: '거래',      label: '분쟁 내역',   icon: <Shield size={16} /> },
+  { id: 'inventory',   group: '보관 · 배송', label: '인벤토리',    icon: <Archive size={16} /> },
+  { id: 'shipping',    group: '보관 · 배송', label: '배송 신청',   icon: <Truck size={16} /> },
+  { id: 'oripas',      group: '보관 · 배송', label: '오리파 내역', icon: <Package size={16} /> },
+  { id: 'shop-orders', group: '보관 · 배송', label: '샵 구매',     icon: <Store size={16} /> },
 ] as const
 type TabId = typeof TABS[number]['id']
+const TAB_GROUPS = [...new Set(TABS.map(t => t.group))]
 
 // ─── 공용 컴포넌트 ────────────────────────────────────────────────────────
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div className="text-center py-16 text-[#5a4830]">
-      <AlertCircle size={32} className="mx-auto mb-3 text-[#4a3520]" />
-      <p className="text-sm text-[#8a7055]">{text}</p>
+    <div className="text-center py-16 text-subtle">
+      <AlertCircle size={32} className="mx-auto mb-3 text-subtle" />
+      <p className="text-sm text-muted">{text}</p>
     </div>
   )
 }
@@ -69,7 +70,7 @@ function SkeletonList() {
   return (
     <div className="space-y-2">
       {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="bg-[#1a1410] border border-[#2e2318] rounded-2xl h-16 animate-pulse" />
+        <div key={i} className="bg-surface border border-line rounded-2xl h-16 animate-pulse" />
       ))}
     </div>
   )
@@ -82,7 +83,7 @@ function Pagination({ page, total, onPageChange }: { page: number; total: number
       <button
         onClick={() => onPageChange(page - 1)}
         disabled={page === 1}
-        className="w-8 h-8 rounded-lg text-sm bg-[#1a1410] border border-[#2e2318] text-[#8a7055] hover:border-[#4a3520] hover:text-[#e8d5b0] disabled:opacity-30 transition-colors"
+        className="w-9 h-9 rounded-full text-sm bg-surface border border-line text-muted hover:border-line-strong hover:text-fg-2 disabled:opacity-30 transition-colors"
       >
         ‹
       </button>
@@ -95,15 +96,15 @@ function Pagination({ page, total, onPageChange }: { page: number; total: number
         }, [])
         .map((p, i) =>
           p === '...' ? (
-            <span key={`e-${i}`} className="w-8 h-8 flex items-center justify-center text-[#5a4830] text-sm">…</span>
+            <span key={`e-${i}`} className="w-8 h-8 flex items-center justify-center text-subtle text-sm">…</span>
           ) : (
             <button
               key={p}
               onClick={() => onPageChange(p as number)}
-              className={`w-8 h-8 rounded-lg text-sm transition-colors ${
+              className={`w-9 h-9 rounded-full text-sm tabular-nums transition-colors ${
                 p === page
-                  ? 'bg-[#d4a853] text-white font-semibold shadow-[0_0_20px_rgba(212,168,83,0.25)]'
-                  : 'bg-[#1a1410] border border-[#2e2318] text-[#8a7055] hover:border-[#4a3520] hover:text-[#e8d5b0]'
+                  ? 'bg-accent text-white font-semibold shadow-[0_0_20px_rgba(139,92,246,0.25)]'
+                  : 'bg-surface border border-line text-muted hover:border-line-strong hover:text-fg-2'
               }`}
             >
               {p}
@@ -113,7 +114,7 @@ function Pagination({ page, total, onPageChange }: { page: number; total: number
       <button
         onClick={() => onPageChange(page + 1)}
         disabled={page === total}
-        className="w-8 h-8 rounded-lg text-sm bg-[#1a1410] border border-[#2e2318] text-[#8a7055] hover:border-[#4a3520] hover:text-[#e8d5b0] disabled:opacity-30 transition-colors"
+        className="w-9 h-9 rounded-full text-sm bg-surface border border-line text-muted hover:border-line-strong hover:text-fg-2 disabled:opacity-30 transition-colors"
       >
         ›
       </button>
@@ -133,10 +134,10 @@ function FilterBar({ options, value, onChange }: {
         <button
           key={o.value}
           onClick={() => onChange(o.value)}
-          className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
+          className={`h-8 px-3.5 rounded-full text-xs font-medium transition-colors ${
             value === o.value
-              ? 'bg-[#2a1c0c] text-white border border-[#d4a853]/40'
-              : 'bg-[#1a1410] border border-[#2e2318] text-[#7a6040] hover:border-[#4a3520] hover:text-[#9e8a6a]'
+              ? 'bg-white text-bg border border-white font-semibold'
+              : 'bg-surface border border-line text-muted hover:border-line-strong hover:text-fg'
           }`}
         >
           {o.label}
@@ -149,42 +150,8 @@ function FilterBar({ options, value, onChange }: {
 // ─── 각 탭 컨텐츠 ─────────────────────────────────────────────────────────
 
 function ProfileTab() {
-  const { user } = useAuthStore()
-  if (!user) return null
   return (
     <div className="space-y-4">
-      {/* 프로필 카드 */}
-      <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl p-6 flex items-center gap-5">
-        <div className="w-16 h-16 rounded-full bg-[#d4a853]/20 border-2 border-[#d4a853]/60 flex items-center justify-center text-2xl font-bold text-[#d4a853]">
-          {user.nickname[0].toUpperCase()}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-xl font-bold text-[#f5ead8]">{user.nickname}</p>
-          <p className="text-sm text-[#8a7055]">{user.email}</p>
-          {user.role === 'ADMIN' && <Badge variant="indigo" className="mt-1">관리자</Badge>}
-        </div>
-      </div>
-
-      {/* 포인트 카드 */}
-      <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl p-6 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#f0a832]/10 flex items-center justify-center">
-            <Wallet size={20} className="text-[#f0a832]" />
-          </div>
-          <div>
-            <p className="text-xs text-[#7a6040] uppercase tracking-wider font-semibold">보유 포인트</p>
-            <p className="text-2xl font-bold text-[#f0a832] tabular-nums">{user.balance.toLocaleString()} P</p>
-          </div>
-        </div>
-        <Link
-          href="/charge"
-          className="flex items-center gap-2 px-4 py-2.5 bg-[#f0a832] hover:bg-[#e09820] text-[#0f0b08] font-semibold rounded-xl text-sm shadow-[0_0_20px_rgba(240,168,50,0.2)] transition-colors"
-        >
-          <Wallet size={15} />
-          포인트 충전
-        </Link>
-      </div>
-
       {/* 빠른 링크 */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
@@ -194,10 +161,10 @@ function ProfileTab() {
           { href: '/settings/2fa', icon: '🔐', label: '2단계 인증', sub: '보안 설정'    },
         ].map(item => (
           <Link key={item.href} href={item.href}
-            className="bg-[#1a1410] hover:bg-[#201810] border border-[#2e2318] hover:border-[#d4a853]/30 rounded-2xl p-4 flex flex-col items-center gap-1.5 transition-colors text-center">
-            <span className="text-2xl">{item.icon}</span>
-            <span className="text-sm font-semibold text-[#e8d5b0]">{item.label}</span>
-            <span className="text-[11px] text-[#5a4830]">{item.sub}</span>
+            className="neon-border bg-surface/70 hover:bg-surface-2 border border-line rounded-2xl p-5 flex flex-col items-start gap-1 transition-colors">
+            <span className="text-2xl mb-2">{item.icon}</span>
+            <span className="text-sm font-semibold text-fg">{item.label}</span>
+            <span className="text-xs text-muted">{item.sub}</span>
           </Link>
         ))}
       </div>
@@ -217,44 +184,44 @@ function SellerStatsDashboard() {
   const s = data?.seller
 
   return (
-    <div className="bg-[#150f0c] border border-[#2e2318] rounded-2xl p-5 space-y-4">
+    <div className="bg-surface/70 border border-line rounded-3xl p-6 space-y-5">
       <div className="flex items-center gap-2">
-        <BarChart2 size={14} className="text-[#d4a853]" />
-        <p className="text-sm font-semibold text-[#e8d5b0]">판매 분석</p>
+        <BarChart2 size={14} className="text-accent-fg" />
+        <p className="text-base font-semibold text-fg">판매 분석</p>
       </div>
 
       {isLoading ? (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-14 rounded-xl bg-[#1a1410] animate-pulse" />
+            <div key={i} className="h-14 rounded-xl bg-surface animate-pulse" />
           ))}
         </div>
       ) : (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { label: '활성 리스팅', value: s?.activeListings?.toLocaleString() ?? '0', icon: <ShoppingBag size={13} className="text-[#d4a853]" /> },
+              { label: '활성 리스팅', value: s?.activeListings?.toLocaleString() ?? '0', icon: <ShoppingBag size={13} className="text-accent-fg" /> },
               { label: '전체 판매', value: `${s?.totalSales?.toLocaleString() ?? '0'}건`, icon: <TrendingUp size={13} className="text-emerald-400" /> },
               { label: '30일 거래액', value: s?.revenue30d ? `${(s.revenue30d / 10000).toFixed(1)}만P` : '—', icon: <Wallet size={13} className="text-blue-400" /> },
               { label: '7일 판매', value: `${s?.txCount7d?.toLocaleString() ?? '0'}건`, icon: <ArrowUpCircle size={13} className="text-purple-400" /> },
             ].map(stat => (
-              <div key={stat.label} className="bg-[#1a1410] border border-[#2e2318] rounded-xl px-3 py-3 flex flex-col gap-1.5">
-                <div className="flex items-center gap-1.5">{stat.icon}<p className="text-[10px] text-[#5a4830] uppercase tracking-wide">{stat.label}</p></div>
-                <p className="text-base font-bold text-[#f5ead8] tabular-nums">{stat.value}</p>
+              <div key={stat.label} className="bg-sunken/60 border border-line rounded-2xl px-4 py-4 flex flex-col gap-2">
+                <div className="flex items-center gap-1.5">{stat.icon}<p className="text-xs text-muted">{stat.label}</p></div>
+                <p className="font-display text-xl font-semibold text-fg tabular-nums">{stat.value}</p>
               </div>
             ))}
           </div>
 
-          <div className="grid grid-cols-2 gap-3 pt-1 border-t border-[#2e2318]">
+          <div className="grid grid-cols-2 gap-3 pt-1 border-t border-line">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-[#5a4830]">평균 판매가</span>
-              <span className="text-xs font-semibold text-[#e8d5b0] tabular-nums">
+              <span className="text-xs text-subtle">평균 판매가</span>
+              <span className="text-xs font-semibold text-fg-2 tabular-nums">
                 {s?.avgSalePrice ? `${s.avgSalePrice.toLocaleString()}P` : '—'}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-xs text-[#5a4830]">평균 평점</span>
-              <span className="flex items-center gap-1 text-xs font-semibold text-[#f0a832]">
+              <span className="text-xs text-subtle">평균 평점</span>
+              <span className="flex items-center gap-1 text-xs font-semibold text-accent-2">
                 <Star size={10} fill="currentColor" strokeWidth={0} />
                 {s?.avgRating ? `${s.avgRating} (${s.reviewCount}건)` : '없음'}
               </span>
@@ -310,31 +277,31 @@ function ListingsTab() {
             card: { name: string; tcgType: string; rarity: string; setName: string };
             _count: { bids: number; offers: number };
           }) => (
-            <div key={l.id} className="bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] rounded-2xl p-4 flex items-center gap-4 transition-colors">
+            <div key={l.id} className="bg-surface border border-line hover:border-line-strong rounded-2xl p-4 flex items-center gap-4 transition-colors">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <Link href={`/listings/${l.id}`} className="font-semibold text-[#f5ead8] hover:text-[#d4a853] transition-colors">
+                  <Link href={`/listings/${l.id}`} className="font-semibold text-fg hover:text-accent-fg transition-colors">
                     {l.card.name}
                   </Link>
                   <Badge>{TCG_LABELS[l.card.tcgType]}</Badge>
                   <Badge variant="default">{LISTING_TYPE_LABELS[l.listingType]}</Badge>
                   <StatusBadge status={l.status} />
                 </div>
-                <div className="flex items-center gap-3 text-xs text-[#7a6040] flex-wrap">
+                <div className="flex items-center gap-3 text-xs text-muted-2 flex-wrap">
                   <span>{l.card.setName} · {l.card.rarity}</span>
                   <span>{CONDITION_LABELS[l.condition]}</span>
-                  <span className="text-[#f0a832] font-bold tabular-nums">
+                  <span className="text-accent-2 font-bold tabular-nums">
                     {(l.buyNowPrice ?? l.currentPrice ?? l.minOfferPrice ?? 0).toLocaleString()} P
                   </span>
-                  {l._count.bids > 0 && <span className="text-[#8a7055]">입찰 {l._count.bids}건</span>}
-                  {l._count.offers > 0 && <span className="text-[#8a7055]">제안 {l._count.offers}건</span>}
+                  {l._count.bids > 0 && <span className="text-muted">입찰 {l._count.bids}건</span>}
+                  {l._count.offers > 0 && <span className="text-muted">제안 {l._count.offers}건</span>}
                   <span>{format(new Date(l.createdAt), 'yy/MM/dd', { locale: ko })}</span>
                 </div>
               </div>
               {l.status === 'ACTIVE' && (
                 <button
                   onClick={() => { if (confirm('리스팅을 취소할까요?')) cancelMut.mutate(l.id) }}
-                  className="p-2 text-[#5a4830] hover:text-red-400 hover:bg-red-950/40 rounded-xl transition-colors shrink-0"
+                  className="p-2 text-subtle hover:text-red-400 hover:bg-red-950/40 rounded-xl transition-colors shrink-0"
                 >
                   <X size={16} />
                 </button>
@@ -350,8 +317,8 @@ function ListingsTab() {
 
 // ─── 번개장터식 거래 상태 ──────────────────────────────────────────────────────
 const TX_STATUS: Record<string, { label: string; color: string; step: number }> = {
-  PENDING_SHIPMENT: { label: '발송 대기',  color: 'bg-[#d4a853]/15 text-[#d4a853]',      step: 1 },
-  SHIPPED:          { label: '배송 중',    color: 'bg-[#f0a832]/15 text-[#f0a832]',       step: 2 },
+  PENDING_SHIPMENT: { label: '발송 대기',  color: 'bg-accent/15 text-accent-fg',      step: 1 },
+  SHIPPED:          { label: '배송 중',    color: 'bg-accent-2/15 text-accent-2',       step: 2 },
   COMPLETED:        { label: '거래 완료',  color: 'bg-emerald-500/15 text-emerald-400',   step: 3 },
   AUTO_COMPLETED:   { label: '자동 완료',  color: 'bg-emerald-500/15 text-emerald-400',   step: 3 },
   CANCELLED:        { label: '취소',       color: 'bg-red-950/50 text-red-400',           step: 0 },
@@ -387,11 +354,11 @@ function TxSteps({ status }: { status: string }) {
     <div className="flex items-center gap-0 text-xs">
       {steps.map((s, i) => (
         <div key={s.key} className="flex items-center gap-0">
-          <div className={`px-2 py-0.5 rounded text-[10px] font-medium ${cur >= i + 1 ? 'text-[#d4a853]' : 'text-[#5a4830]'}`}>
+          <div className={`px-2 py-0.5 rounded text-[10px] font-medium ${cur >= i + 1 ? 'text-accent-fg' : 'text-subtle'}`}>
             {s.label}
           </div>
           {i < steps.length - 1 && (
-            <span className={`mx-0.5 ${cur >= i + 2 ? 'text-[#d4a853]' : 'text-[#2e2318]'}`}>›</span>
+            <span className={`mx-0.5 ${cur >= i + 2 ? 'text-accent-fg' : 'text-line'}`}>›</span>
           )}
         </div>
       ))}
@@ -426,15 +393,15 @@ function PurchasesTab() {
           return (
             <div
               key={tx.id}
-              className={`bg-[#1a1410] border rounded-2xl overflow-hidden transition-colors ${
-                isShipped ? 'border-[#f0a832]/30' : 'border-[#2e2318]'
+              className={`bg-surface border rounded-2xl overflow-hidden transition-colors ${
+                isShipped ? 'border-accent-2/30' : 'border-line'
               }`}
             >
               {/* 헤더 */}
               <div className="flex items-center gap-3 px-4 pt-3 pb-2">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Link href={`/listings/${tx.listing.id}`} className="font-semibold text-sm text-[#f5ead8] hover:text-[#d4a853] transition-colors truncate">
+                    <Link href={`/listings/${tx.listing.id}`} className="font-semibold text-sm text-fg hover:text-accent-fg transition-colors truncate">
                       {cardName}
                     </Link>
                     <Badge>{TCG_LABELS[tx.listing.card.tcgType]}</Badge>
@@ -443,13 +410,13 @@ function PurchasesTab() {
                     )}
                   </div>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                    <p className="text-xs text-[#7a6040]">
+                    <p className="text-xs text-muted-2">
                       판매자: {tx.seller.nickname} · {format(new Date(tx.completedAt), 'yy.MM.dd', { locale: ko })}
                     </p>
                     <RatingBadge avgRating={tx.seller.avgRating} reviewCount={tx.seller.reviewCount} size={11} />
                   </div>
                 </div>
-                <p className="text-[#f0a832] font-bold tabular-nums text-sm shrink-0">
+                <p className="text-accent-2 font-bold tabular-nums text-sm shrink-0">
                   {tx.finalPrice.toLocaleString()} P
                 </p>
               </div>
@@ -461,12 +428,12 @@ function PurchasesTab() {
 
               {/* 배송 정보 */}
               {tx.trackingNumber && (
-                <div className="mx-4 mb-2 bg-[#2a1c0c] border border-[#2e2318] rounded-xl px-3 py-2 text-xs flex items-center gap-2">
-                  <Truck size={12} className="text-[#f0a832] shrink-0" />
-                  <span className="text-[#9e8a6a]">{tx.trackingCarrier}</span>
-                  <span className="font-mono text-[#f0a832] tabular-nums">{tx.trackingNumber}</span>
+                <div className="mx-4 mb-2 bg-accent-tint border border-line rounded-xl px-3 py-2 text-xs flex items-center gap-2">
+                  <Truck size={12} className="text-accent-2 shrink-0" />
+                  <span className="text-fg-3">{tx.trackingCarrier}</span>
+                  <span className="font-mono text-accent-2 tabular-nums">{tx.trackingNumber}</span>
                   {tx.shippedAt && (
-                    <span className="text-[#5a4830] ml-auto">
+                    <span className="text-subtle ml-auto">
                       {format(new Date(tx.shippedAt), 'MM.dd HH:mm', { locale: ko })} 발송
                     </span>
                   )}
@@ -489,7 +456,7 @@ function PurchasesTab() {
                   </button>
                 )}
                 {tx.txStatus === 'PENDING_SHIPMENT' && (
-                  <span className="flex items-center gap-1.5 text-xs text-[#d4a853] bg-[#d4a853]/10 border border-[#d4a853]/20 px-3 py-1.5 rounded-xl">
+                  <span className="flex items-center gap-1.5 text-xs text-accent-fg bg-accent/10 border border-accent/20 px-3 py-1.5 rounded-xl">
                     <AlertCircle size={12} /> 판매자 발송을 기다리고 있습니다
                   </span>
                 )}
@@ -507,20 +474,20 @@ function PurchasesTab() {
                   tx.reviews.length === 0 ? (
                     <button
                       onClick={() => setReviewTarget(tx)}
-                      className="flex items-center gap-1.5 bg-[#d4a853]/15 border border-[#d4a853]/30 hover:bg-[#d4a853]/25 text-[#d4a853] px-3 py-1.5 rounded-xl text-xs font-medium transition-colors"
+                      className="flex items-center gap-1.5 bg-accent/15 border border-accent/30 hover:bg-accent/25 text-accent-fg px-3 py-1.5 rounded-xl text-xs font-medium transition-colors"
                     >
                       <Star size={12} /> 리뷰 작성
                     </button>
                   ) : (
-                    <span className="flex items-center gap-1.5 text-xs text-[#5a4830] px-3 py-1.5">
-                      <Star size={11} className="text-[#f0a832] fill-[#f0a832]" /> 리뷰 완료
+                    <span className="flex items-center gap-1.5 text-xs text-subtle px-3 py-1.5">
+                      <Star size={11} className="text-accent-2 fill-accent-2" /> 리뷰 완료
                     </span>
                   )
                 )}
                 {tx.chatRoom && (
                   <Link
                     href={`/chat/${tx.chatRoom.id}`}
-                    className="flex items-center gap-1.5 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] hover:text-[#e8d5b0] px-3 py-1.5 rounded-xl text-xs transition-colors ml-auto"
+                    className="flex items-center gap-1.5 bg-surface border border-line hover:border-line-strong text-fg-3 hover:text-fg-2 px-3 py-1.5 rounded-xl text-xs transition-colors ml-auto"
                   >
                     <MessageCircle size={12} /> 채팅
                   </Link>
@@ -557,13 +524,13 @@ function TrackingForm({ txId, onDone }: { txId: string; onDone: () => void }) {
   })
 
   return (
-    <div className="bg-[#2a1c0c] border border-[#2e2318] rounded-xl p-3 space-y-2 mt-2 mb-3">
-      <p className="text-xs font-semibold text-[#9e8a6a]">발송 정보 입력</p>
+    <div className="bg-accent-tint border border-line rounded-xl p-3 space-y-2 mt-2 mb-3">
+      <p className="text-xs font-semibold text-fg-3">발송 정보 입력</p>
       <div className="flex gap-2 flex-wrap">
         <select
           value={carrier}
           onChange={e => setCarrier(e.target.value)}
-          className="flex-1 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] focus:border-[#d4a853]/40 rounded-xl px-3 py-2 text-xs text-[#f5ead8] focus:outline-none transition-colors"
+          className="flex-1 bg-surface border border-line hover:border-line-strong focus:border-accent/40 rounded-xl px-3 py-2 text-xs text-fg focus:outline-none transition-colors"
         >
           <option value="">택배사 선택</option>
           {CARRIERS.map(c => <option key={c} value={c}>{c}</option>)}
@@ -573,12 +540,12 @@ function TrackingForm({ txId, onDone }: { txId: string; onDone: () => void }) {
           placeholder="운송장 번호"
           value={number}
           onChange={e => setNumber(e.target.value)}
-          className="flex-1 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] focus:border-[#d4a853]/40 rounded-xl px-3 py-2 text-xs text-[#f5ead8] placeholder:text-[#5a4830] focus:outline-none transition-colors"
+          className="flex-1 bg-surface border border-line hover:border-line-strong focus:border-accent/40 rounded-xl px-3 py-2 text-xs text-fg placeholder:text-subtle focus:outline-none transition-colors"
         />
         <button
           onClick={() => mut.mutate()}
           disabled={!carrier || !number || mut.isPending}
-          className="flex items-center gap-1.5 bg-[#d4a853] hover:bg-[#c49440] disabled:opacity-40 text-white px-3 py-2 rounded-xl text-xs font-semibold shadow-[0_0_20px_rgba(212,168,83,0.25)] transition-colors"
+          className="flex items-center gap-1.5 bg-accent hover:bg-accent-strong disabled:opacity-40 text-white px-3 py-2 rounded-xl text-xs font-semibold shadow-[0_0_20px_rgba(139,92,246,0.25)] transition-colors"
         >
           {mut.isPending ? <span className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" /> : null}
           {mut.isPending ? '처리 중' : '발송 처리'}
@@ -613,32 +580,32 @@ function SalesTab() {
           return (
             <div
               key={tx.id}
-              className={`bg-[#1a1410] border rounded-2xl overflow-hidden transition-colors ${
-                needsShip ? 'border-[#d4a853]/30' : 'border-[#2e2318]'
+              className={`bg-surface border rounded-2xl overflow-hidden transition-colors ${
+                needsShip ? 'border-accent/30' : 'border-line'
               }`}
             >
               {needsShip && (
-                <div className="bg-[#d4a853]/10 border-b border-[#d4a853]/20 px-4 py-1.5 text-xs text-[#d4a853] font-medium flex items-center gap-1.5">
+                <div className="bg-accent/10 border-b border-accent/20 px-4 py-1.5 text-xs text-accent-fg font-medium flex items-center gap-1.5">
                   <AlertCircle size={11} /> 발송 처리가 필요합니다
                 </div>
               )}
               <div className="flex items-center gap-3 px-4 pt-3 pb-2">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Link href={`/listings/${tx.listing.id}`} className="font-semibold text-sm text-[#f5ead8] hover:text-[#d4a853] transition-colors truncate">
+                    <Link href={`/listings/${tx.listing.id}`} className="font-semibold text-sm text-fg hover:text-accent-fg transition-colors truncate">
                       {cardName}
                     </Link>
                     <Badge>{TCG_LABELS[tx.listing.card.tcgType]}</Badge>
                     {st && <span className={`px-2 py-0.5 rounded-lg text-xs font-medium ${st.color}`}>{st.label}</span>}
                   </div>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                    <p className="text-xs text-[#7a6040]">
+                    <p className="text-xs text-muted-2">
                       구매자: {tx.buyer.nickname} · {format(new Date(tx.completedAt), 'yy.MM.dd', { locale: ko })}
                     </p>
                     <RatingBadge avgRating={tx.buyer.avgRating} reviewCount={tx.buyer.reviewCount} size={11} />
                   </div>
                 </div>
-                <p className={`font-bold tabular-nums text-sm shrink-0 ${isDone ? 'text-[#f0a832]' : 'text-[#5a4830]'}`}>
+                <p className={`font-bold tabular-nums text-sm shrink-0 ${isDone ? 'text-accent-2' : 'text-subtle'}`}>
                   {isDone ? `+${tx.finalPrice.toLocaleString()} P` : `${tx.finalPrice.toLocaleString()} P`}
                 </p>
               </div>
@@ -650,10 +617,10 @@ function SalesTab() {
 
               {/* 배송 정보 */}
               {tx.trackingNumber && (
-                <div className="mx-4 mb-2 bg-[#2a1c0c] border border-[#2e2318] rounded-xl px-3 py-2 text-xs flex items-center gap-2">
-                  <Truck size={12} className="text-[#f0a832] shrink-0" />
-                  <span className="text-[#9e8a6a]">{tx.trackingCarrier}</span>
-                  <span className="font-mono text-[#f0a832] tabular-nums">{tx.trackingNumber}</span>
+                <div className="mx-4 mb-2 bg-accent-tint border border-line rounded-xl px-3 py-2 text-xs flex items-center gap-2">
+                  <Truck size={12} className="text-accent-2 shrink-0" />
+                  <span className="text-fg-3">{tx.trackingCarrier}</span>
+                  <span className="font-mono text-accent-2 tabular-nums">{tx.trackingNumber}</span>
                 </div>
               )}
 
@@ -665,7 +632,7 @@ function SalesTab() {
                     : (
                       <button
                         onClick={() => setOpenShip(tx.id)}
-                        className="w-full flex items-center justify-center gap-1.5 bg-[#d4a853] hover:bg-[#c49440] text-white py-2 rounded-xl text-xs font-semibold shadow-[0_0_20px_rgba(212,168,83,0.25)] transition-colors mb-2"
+                        className="w-full flex items-center justify-center gap-1.5 bg-accent hover:bg-accent-strong text-white py-2 rounded-xl text-xs font-semibold shadow-[0_0_20px_rgba(139,92,246,0.25)] transition-colors mb-2"
                       >
                         <Truck size={12} /> 발송 처리하기
                       </button>
@@ -681,20 +648,20 @@ function SalesTab() {
                   tx.reviews.length === 0 ? (
                     <button
                       onClick={() => setReviewTarget(tx)}
-                      className="flex items-center gap-1.5 bg-[#d4a853]/15 border border-[#d4a853]/30 hover:bg-[#d4a853]/25 text-[#d4a853] px-3 py-1.5 rounded-xl text-xs font-medium transition-colors"
+                      className="flex items-center gap-1.5 bg-accent/15 border border-accent/30 hover:bg-accent/25 text-accent-fg px-3 py-1.5 rounded-xl text-xs font-medium transition-colors"
                     >
                       <Star size={12} /> 리뷰 작성
                     </button>
                   ) : (
-                    <span className="flex items-center gap-1.5 text-xs text-[#5a4830] px-3 py-1.5">
-                      <Star size={11} className="text-[#f0a832] fill-[#f0a832]" /> 리뷰 완료
+                    <span className="flex items-center gap-1.5 text-xs text-subtle px-3 py-1.5">
+                      <Star size={11} className="text-accent-2 fill-accent-2" /> 리뷰 완료
                     </span>
                   )
                 )}
                 {tx.chatRoom && (
                   <Link
                     href={`/chat/${tx.chatRoom.id}`}
-                    className="inline-flex items-center gap-1.5 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] hover:text-[#e8d5b0] px-3 py-1.5 rounded-xl text-xs transition-colors ml-auto"
+                    className="inline-flex items-center gap-1.5 bg-surface border border-line hover:border-line-strong text-fg-3 hover:text-fg-2 px-3 py-1.5 rounded-xl text-xs transition-colors ml-auto"
                   >
                     <MessageCircle size={12} /> 구매자와 채팅
                   </Link>
@@ -764,19 +731,19 @@ function OffersInTab() {
             buyer: { nickname: string };
             listing: { id: string; card: { name: string; tcgType: string }; minOfferPrice?: number };
           }) => (
-            <div key={o.id} className="bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] rounded-2xl p-4 space-y-2 transition-colors">
+            <div key={o.id} className="bg-surface border border-line hover:border-line-strong rounded-2xl p-4 space-y-2 transition-colors">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                    <Link href={`/listings/${o.listing.id}`} className="font-semibold text-[#f5ead8] hover:text-[#d4a853] transition-colors">
+                    <Link href={`/listings/${o.listing.id}`} className="font-semibold text-fg hover:text-accent-fg transition-colors">
                       {o.listing.card.name}
                     </Link>
                     <Badge>{TCG_LABELS[o.listing.card.tcgType]}</Badge>
                     <StatusBadge status={o.status} />
                   </div>
-                  <p className="text-xs text-[#7a6040]">
+                  <p className="text-xs text-muted-2">
                     {o.buyer.nickname} ·{' '}
-                    <span className="text-[#f0a832] font-bold tabular-nums">{o.amount.toLocaleString()} P</span>
+                    <span className="text-accent-2 font-bold tabular-nums">{o.amount.toLocaleString()} P</span>
                     {' '}제안
                     {o.listing.minOfferPrice && (
                       <span> (최소 <span className="tabular-nums">{o.listing.minOfferPrice.toLocaleString()}</span> P)</span>
@@ -784,7 +751,7 @@ function OffersInTab() {
                     {' '}· {format(new Date(o.createdAt), 'yy/MM/dd HH:mm', { locale: ko })}
                   </p>
                   {o.message && (
-                    <p className="text-xs text-[#9e8a6a] mt-1 bg-[#2a1c0c] border border-[#2e2318] rounded-lg px-2 py-1">
+                    <p className="text-xs text-fg-3 mt-1 bg-accent-tint border border-line rounded-lg px-2 py-1">
                       "{o.message}"
                     </p>
                   )}
@@ -801,7 +768,7 @@ function OffersInTab() {
                     <button
                       onClick={() => respondMut.mutate({ offerId: o.id, action: 'DECLINED' })}
                       disabled={respondMut.isPending}
-                      className="flex items-center gap-1 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] hover:text-[#e8d5b0] px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors"
+                      className="flex items-center gap-1 bg-surface border border-line hover:border-line-strong text-fg-3 hover:text-fg-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors"
                     >
                       <X size={13} /> 거절
                     </button>
@@ -847,22 +814,22 @@ function OffersOutTab() {
             id: string; amount: number; message?: string; status: string; createdAt: string;
             listing: { id: string; card: { name: string; tcgType: string }; seller: { nickname: string } };
           }) => (
-            <div key={o.id} className="bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] rounded-2xl p-4 flex items-center gap-4 transition-colors">
+            <div key={o.id} className="bg-surface border border-line hover:border-line-strong rounded-2xl p-4 flex items-center gap-4 transition-colors">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                  <Link href={`/listings/${o.listing.id}`} className="font-semibold text-[#f5ead8] hover:text-[#d4a853] transition-colors">
+                  <Link href={`/listings/${o.listing.id}`} className="font-semibold text-fg hover:text-accent-fg transition-colors">
                     {o.listing.card.name}
                   </Link>
                   <Badge>{TCG_LABELS[o.listing.card.tcgType]}</Badge>
                   <StatusBadge status={o.status} />
                 </div>
-                <p className="text-xs text-[#7a6040]">
+                <p className="text-xs text-muted-2">
                   판매자: {o.listing.seller.nickname} ·{' '}
-                  <span className="text-[#f0a832] font-bold tabular-nums">{o.amount.toLocaleString()} P</span>
+                  <span className="text-accent-2 font-bold tabular-nums">{o.amount.toLocaleString()} P</span>
                   {' '}· {format(new Date(o.createdAt), 'yy/MM/dd HH:mm', { locale: ko })}
                 </p>
                 {o.message && (
-                  <p className="text-xs text-[#9e8a6a] mt-1 bg-[#2a1c0c] border border-[#2e2318] rounded-lg px-2 py-1">
+                  <p className="text-xs text-fg-3 mt-1 bg-accent-tint border border-line rounded-lg px-2 py-1">
                     "{o.message}"
                   </p>
                 )}
@@ -870,7 +837,7 @@ function OffersOutTab() {
               {o.status === 'PENDING' && (
                 <button
                   onClick={() => { if (confirm('제안을 철회할까요?')) withdrawMut.mutate(o.id) }}
-                  className="p-2 text-[#5a4830] hover:text-red-400 hover:bg-red-950/40 rounded-xl transition-colors shrink-0"
+                  className="p-2 text-subtle hover:text-red-400 hover:bg-red-950/40 rounded-xl transition-colors shrink-0"
                 >
                   <X size={16} />
                 </button>
@@ -907,11 +874,11 @@ function BidsTab() {
             const ended = b.listing.auctionEndsAt ? new Date(b.listing.auctionEndsAt) < new Date() : false
             const won = b.isWinning && ended && b.listing.status === 'SOLD'
             return (
-              <div key={b.id} className="bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] rounded-2xl p-4 flex items-center gap-4 transition-colors">
-                <Gavel size={20} className={b.isWinning ? 'text-[#f0a832]' : 'text-[#5a4830]'} />
+              <div key={b.id} className="bg-surface border border-line hover:border-line-strong rounded-2xl p-4 flex items-center gap-4 transition-colors">
+                <Gavel size={20} className={b.isWinning ? 'text-accent-2' : 'text-subtle'} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                    <Link href={`/listings/${b.listing.id}`} className="font-semibold text-[#f5ead8] hover:text-[#d4a853] transition-colors">
+                    <Link href={`/listings/${b.listing.id}`} className="font-semibold text-fg hover:text-accent-fg transition-colors">
                       {b.listing.card.name}
                     </Link>
                     <Badge>{TCG_LABELS[b.listing.card.tcgType]}</Badge>
@@ -919,9 +886,9 @@ function BidsTab() {
                     {b.isWinning && !ended && <Badge variant="yellow">최고 입찰자</Badge>}
                     {!b.isWinning && <Badge variant="red">입찰 실패</Badge>}
                   </div>
-                  <p className="text-xs text-[#7a6040]">
+                  <p className="text-xs text-muted-2">
                     내 입찰가:{' '}
-                    <span className="text-[#f0a832] font-bold tabular-nums">{b.amount.toLocaleString()} P</span>
+                    <span className="text-accent-2 font-bold tabular-nums">{b.amount.toLocaleString()} P</span>
                     {' '}· 현재가:{' '}
                     <span className="tabular-nums">{b.listing.currentPrice?.toLocaleString()} P</span>
                     {' '}· 판매자: {b.listing.seller.nickname}
@@ -1047,7 +1014,7 @@ function InventoryTab() {
         {selectedIds.length > 0 && (
           <button
             onClick={() => setShowShipForm(true)}
-            className="flex items-center gap-1.5 bg-[#d4a853] hover:bg-[#c49440] text-white px-3 py-1.5 rounded-xl text-sm font-semibold shadow-[0_0_20px_rgba(212,168,83,0.25)] transition-colors"
+            className="flex items-center gap-1.5 bg-accent hover:bg-accent-strong text-white px-3 py-1.5 rounded-xl text-sm font-semibold shadow-[0_0_20px_rgba(139,92,246,0.25)] transition-colors"
           >
             <Truck size={14} /> 선택 {selectedIds.length}개 배송 신청
           </button>
@@ -1075,24 +1042,24 @@ function InventoryTab() {
               <div
                 key={item.ids ? item.cardId : item.id}
                 onClick={() => toggleSelect(item)}
-                className={`bg-[#1a1410] border rounded-2xl p-4 flex items-center gap-4 cursor-pointer transition-colors ${
+                className={`bg-surface border rounded-2xl p-4 flex items-center gap-4 cursor-pointer transition-colors ${
                   selected
-                    ? 'border-[#d4a853]/50 bg-[#d4a853]/5'
-                    : 'border-[#2e2318] hover:border-[#4a3520]'
+                    ? 'border-accent/50 bg-accent/5'
+                    : 'border-line hover:border-line-strong'
                 }`}
               >
                 {/* 체크박스 */}
                 <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center shrink-0 transition-colors ${
-                  selected ? 'bg-[#d4a853] border-[#d4a853]' : 'border-[#4a3520]'
+                  selected ? 'bg-accent border-accent' : 'border-line-strong'
                 }`}>
                   {selected && <Check size={12} className="text-white" />}
                 </div>
                 {/* 이미지 (스택 시 겹친 효과) */}
                 <div className="relative shrink-0" style={{ width: 40, height: 56 }}>
                   {isStacked && (
-                    <div className="absolute inset-0 rounded-lg bg-[#2a1c0c] border border-[#2e2318]" style={{ transform: 'translate(3px, 3px)' }} />
+                    <div className="absolute inset-0 rounded-lg bg-accent-tint border border-line" style={{ transform: 'translate(3px, 3px)' }} />
                   )}
-                  <div className="absolute inset-0 rounded-lg overflow-hidden bg-[#2a1c0c]">
+                  <div className="absolute inset-0 rounded-lg overflow-hidden bg-accent-tint">
                     {displayImg
                       ? <Image src={displayImg} alt={item.card.name} fill className="object-cover" />
                       : <div className="absolute inset-0 flex items-center justify-center text-lg">🃏</div>
@@ -1102,31 +1069,31 @@ function InventoryTab() {
                 {/* 정보 */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                    <p className="font-semibold text-sm text-[#f5ead8] truncate">{item.card.name}</p>
+                    <p className="font-semibold text-sm text-fg truncate">{item.card.name}</p>
                     <Badge>{TCG_LABELS[item.card.tcgType] ?? item.card.tcgType}</Badge>
                     <Badge variant={item.source === 'PURCHASE' ? 'indigo' : 'green'}>
                       {item.source === 'PURCHASE' ? '구매' : '오리파'}
                     </Badge>
                   </div>
-                  <p className="text-xs text-[#7a6040]">
+                  <p className="text-xs text-muted-2">
                     {item.card.setName} · {item.card.rarity}
                     {item.condition && ` · ${CONDITION_LABELS[item.condition] ?? item.condition}`}
                     {item.gradingCompany && ` · ${item.gradingCompany}${item.gradingGrade ? ` ${item.gradingGrade}` : ''}`}
                   </p>
-                  <p className="text-xs text-[#5a4830]">{format(new Date(item.createdAt), 'yy/MM/dd', { locale: ko })}</p>
+                  <p className="text-xs text-subtle">{format(new Date(item.createdAt), 'yy/MM/dd', { locale: ko })}</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   {/* 수량 배지: 2장 이상이면 강조 표시 */}
                   <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                     isStacked
-                      ? 'bg-[#1a2a4a] text-[#d4a853] border border-[#d4a853]/30'
-                      : 'text-[#8a7055]'
+                      ? 'bg-[#1a2a4a] text-accent-fg border border-accent/30'
+                      : 'text-muted'
                   }`}>
                     ×{item.quantity}
                   </span>
                   <button
                     onClick={handleDelete(item)}
-                    className="p-1.5 text-[#5a4830] hover:text-red-400 hover:bg-red-950/40 rounded-xl transition-colors"
+                    className="p-1.5 text-subtle hover:text-red-400 hover:bg-red-950/40 rounded-xl transition-colors"
                   >
                     <Trash2 size={14} />
                   </button>
@@ -1170,20 +1137,20 @@ function ShipForm({ selectedItems, onClose, onSuccess }: {
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm((prev) => ({ ...prev, [k]: e.target.value }))
 
-  const inputCls = "w-full bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] focus:border-[#d4a853]/40 rounded-xl px-4 py-3 text-sm text-[#f5ead8] placeholder:text-[#5a4830] focus:outline-none transition-colors"
+  const inputCls = "w-full bg-surface border border-line hover:border-line-strong focus:border-accent/40 rounded-xl px-4 py-3 text-sm text-fg placeholder:text-subtle focus:outline-none transition-colors"
 
   return (
-    <div className="bg-[#1a1410] border border-[#d4a853]/30 rounded-2xl p-5 space-y-4">
-      <h3 className="font-semibold text-[#f5ead8] flex items-center gap-2">
-        <Truck size={16} className="text-[#d4a853]" /> 배송 신청
+    <div className="bg-surface border border-accent/30 rounded-2xl p-5 space-y-4">
+      <h3 className="font-semibold text-fg flex items-center gap-2">
+        <Truck size={16} className="text-accent-fg" /> 배송 신청
       </h3>
 
       {/* 신청 아이템 목록 */}
-      <div className="bg-[#2a1c0c] border border-[#2e2318] rounded-xl p-3 space-y-1">
+      <div className="bg-accent-tint border border-line rounded-xl p-3 space-y-1">
         {selectedItems.map((i) => (
           <div key={i.id} className="flex items-center gap-2 text-sm">
-            <span className="text-[#9e8a6a] truncate flex-1">{i.card.name}</span>
-            <span className="text-[#7a6040] text-xs">×{i.quantity}</span>
+            <span className="text-fg-3 truncate flex-1">{i.card.name}</span>
+            <span className="text-muted-2 text-xs">×{i.quantity}</span>
           </div>
         ))}
       </div>
@@ -1197,12 +1164,12 @@ function ShipForm({ selectedItems, onClose, onSuccess }: {
           ['addressDetail', '상세 주소'],
         ] as [keyof typeof form, string][]).map(([key, label]) => (
           <div key={key} className={key === 'address' || key === 'addressDetail' ? 'col-span-2' : ''}>
-            <label className="block text-xs text-[#7a6040] uppercase tracking-wider font-semibold mb-1.5">{label}</label>
+            <label className="block text-xs text-muted-2 uppercase tracking-wider font-semibold mb-1.5">{label}</label>
             <input value={form[key]} onChange={set(key)} className={inputCls} />
           </div>
         ))}
         <div className="col-span-2">
-          <label className="block text-xs text-[#7a6040] uppercase tracking-wider font-semibold mb-1.5">배송 메모</label>
+          <label className="block text-xs text-muted-2 uppercase tracking-wider font-semibold mb-1.5">배송 메모</label>
           <textarea
             value={form.memo}
             onChange={set('memo')}
@@ -1222,7 +1189,7 @@ function ShipForm({ selectedItems, onClose, onSuccess }: {
         <button
           onClick={() => shipMut.mutate()}
           disabled={shipMut.isPending || !form.recipientName || !form.phone || !form.zipCode || !form.address}
-          className="flex items-center gap-1.5 bg-[#d4a853] hover:bg-[#c49440] disabled:opacity-50 text-white font-semibold px-4 py-2.5 rounded-xl text-sm shadow-[0_0_20px_rgba(212,168,83,0.25)] transition-colors"
+          className="flex items-center gap-1.5 bg-accent hover:bg-accent-strong disabled:opacity-50 text-white font-semibold px-4 py-2.5 rounded-xl text-sm shadow-[0_0_20px_rgba(139,92,246,0.25)] transition-colors"
         >
           {shipMut.isPending
             ? <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
@@ -1232,7 +1199,7 @@ function ShipForm({ selectedItems, onClose, onSuccess }: {
         </button>
         <button
           onClick={onClose}
-          className="flex items-center gap-1.5 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] hover:text-[#e8d5b0] px-4 py-2.5 rounded-xl text-sm transition-colors"
+          className="flex items-center gap-1.5 bg-surface border border-line hover:border-line-strong text-fg-3 hover:text-fg-2 px-4 py-2.5 rounded-xl text-sm transition-colors"
         >
           <X size={14} /> 취소
         </button>
@@ -1270,50 +1237,50 @@ function ShippingTab() {
             const st = SHIPPING_STATUS_LABEL[req.status] ?? { text: req.status, v: 'default' as const }
             const expanded = expandedId === req.id
             return (
-              <div key={req.id} className="bg-[#1a1410] border border-[#2e2318] rounded-2xl overflow-hidden">
+              <div key={req.id} className="bg-surface border border-line rounded-2xl overflow-hidden">
                 {/* 헤더 */}
                 <button
                   onClick={() => setExpandedId(expanded ? null : req.id)}
-                  className="w-full flex items-center gap-4 p-4 hover:bg-[#2a1c0c]/50 transition-colors text-left"
+                  className="w-full flex items-center gap-4 p-4 hover:bg-accent-tint/50 transition-colors text-left"
                 >
-                  <Truck size={18} className="text-[#d4a853] shrink-0" />
+                  <Truck size={18} className="text-accent-fg shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                      <span className="font-semibold text-sm text-[#f5ead8]">{req.recipientName}</span>
+                      <span className="font-semibold text-sm text-fg">{req.recipientName}</span>
                       <Badge variant={st.v}>{st.text}</Badge>
                       {req.courier && req.trackingNumber && (
-                        <span className="text-xs text-[#8a7055]">{req.courier} · {req.trackingNumber}</span>
+                        <span className="text-xs text-muted">{req.courier} · {req.trackingNumber}</span>
                       )}
                     </div>
-                    <p className="text-xs text-[#7a6040]">
+                    <p className="text-xs text-muted-2">
                       {req.items.length}종 · {format(new Date(req.createdAt), 'yy/MM/dd HH:mm', { locale: ko })}
                     </p>
                   </div>
                   {expanded
-                    ? <ChevronUp size={16} className="text-[#5a4830] shrink-0" />
-                    : <ChevronDown size={16} className="text-[#5a4830] shrink-0" />
+                    ? <ChevronUp size={16} className="text-subtle shrink-0" />
+                    : <ChevronDown size={16} className="text-subtle shrink-0" />
                   }
                 </button>
 
                 {/* 상세 */}
                 {expanded && (
-                  <div className="border-t border-[#2e2318] px-4 pb-4 space-y-3">
-                    <div className="pt-3 space-y-1 text-sm text-[#8a7055]">
-                      <p><span className="text-[#5a4830]">주소</span> [{req.zipCode}] {req.address} {req.addressDetail}</p>
-                      <p><span className="text-[#5a4830]">연락처</span> {req.phone}</p>
-                      {req.memo && <p><span className="text-[#5a4830]">메모</span> {req.memo}</p>}
+                  <div className="border-t border-line px-4 pb-4 space-y-3">
+                    <div className="pt-3 space-y-1 text-sm text-muted">
+                      <p><span className="text-subtle">주소</span> [{req.zipCode}] {req.address} {req.addressDetail}</p>
+                      <p><span className="text-subtle">연락처</span> {req.phone}</p>
+                      {req.memo && <p><span className="text-subtle">메모</span> {req.memo}</p>}
                     </div>
                     <div className="space-y-1">
                       {req.items.map((si) => (
-                        <div key={si.id} className="flex items-center gap-3 py-1.5 border-b border-[#2e2318]/50 last:border-0">
-                          <div className="relative w-8 h-10 shrink-0 rounded-lg overflow-hidden bg-[#2a1c0c]">
+                        <div key={si.id} className="flex items-center gap-3 py-1.5 border-b border-line/50 last:border-0">
+                          <div className="relative w-8 h-10 shrink-0 rounded-lg overflow-hidden bg-accent-tint">
                             {si.inventoryItem.card.imageUrl
                               ? <Image src={resolveImageSrc(si.inventoryItem.card.imageUrl)!} alt={si.inventoryItem.card.name} fill className="object-cover" />
                               : <div className="absolute inset-0 flex items-center justify-center text-xs">🃏</div>
                             }
                           </div>
-                          <span className="text-sm text-[#9e8a6a] flex-1 truncate">{si.inventoryItem.card.name}</span>
-                          <span className="text-xs text-[#7a6040]">×{si.quantity}</span>
+                          <span className="text-sm text-fg-3 flex-1 truncate">{si.inventoryItem.card.name}</span>
+                          <span className="text-xs text-muted-2">×{si.quantity}</span>
                         </div>
                       ))}
                     </div>
@@ -1354,13 +1321,13 @@ function OripasTab() {
             results: Array<{ card: { name: string; rarity: string }; grade: number }>;
             oripa: { title: string };
           }) => (
-            <div key={p.id} className="bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] rounded-2xl p-4 space-y-3 transition-colors">
+            <div key={p.id} className="bg-surface border border-line hover:border-line-strong rounded-2xl p-4 space-y-3 transition-colors">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
-                  <p className="font-semibold text-[#f5ead8]">{p.oripa.title}</p>
-                  <p className="text-xs text-[#7a6040] mt-0.5">
+                  <p className="font-semibold text-fg">{p.oripa.title}</p>
+                  <p className="text-xs text-muted-2 mt-0.5">
                     {p.draws}회 뽑기 ·{' '}
-                    <span className="text-[#f0a832] font-bold tabular-nums">{p.totalPaid.toLocaleString()} P</span>
+                    <span className="text-accent-2 font-bold tabular-nums">{p.totalPaid.toLocaleString()} P</span>
                     {' '}· {format(new Date(p.createdAt), 'yy/MM/dd HH:mm', { locale: ko })}
                   </p>
                 </div>
@@ -1371,10 +1338,10 @@ function OripasTab() {
                     key={i}
                     className={`border rounded-lg px-2 py-1 text-xs ${
                       r.grade === 3
-                        ? 'border-[#f0a832]/50 bg-[#f0a832]/10 text-[#f0a832]'
+                        ? 'border-accent-2/50 bg-accent-2/10 text-accent-2'
                         : r.grade === 2
-                          ? 'border-[#d4a853]/40 bg-[#d4a853]/10 text-[#d4a853]'
-                          : 'border-[#2e2318] text-[#8a7055]'
+                          ? 'border-accent/40 bg-accent/10 text-accent-fg'
+                          : 'border-line text-muted'
                     }`}
                   >
                     {r.card.name} <span className="opacity-60">{r.card.rarity}</span>
@@ -1400,11 +1367,11 @@ const BANK_LIST = [
 ]
 
 const WITHDRAWAL_STATUS_LABEL: Record<string, { label: string; color: string }> = {
-  PENDING:   { label: '검토 중', color: 'bg-[#f0a832]/15 text-[#f0a832]' },
-  APPROVED:  { label: '처리 중', color: 'bg-[#d4a853]/15 text-[#d4a853]' },
+  PENDING:   { label: '검토 중', color: 'bg-accent-2/15 text-accent-2' },
+  APPROVED:  { label: '처리 중', color: 'bg-accent/15 text-accent-fg' },
   COMPLETED: { label: '완료',    color: 'bg-emerald-500/15 text-emerald-400' },
   REJECTED:  { label: '거절',    color: 'bg-red-950/50 text-red-400' },
-  CANCELLED: { label: '취소됨',  color: 'bg-[#2e2318] text-[#7a6040]' },
+  CANCELLED: { label: '취소됨',  color: 'bg-line text-muted-2' },
 }
 
 interface WithdrawalRecord {
@@ -1451,33 +1418,33 @@ function ShopOrdersTab() {
         }) => {
           const st = SHIP_STATUS_MY[order.shippingStatus] ?? { label: order.shippingStatus, color: '' }
           return (
-            <div key={order.id} className="bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] rounded-2xl p-4 transition-colors">
+            <div key={order.id} className="bg-surface border border-line hover:border-line-strong rounded-2xl p-4 transition-colors">
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-[#0e0c09] rounded-xl overflow-hidden shrink-0 border border-[#2e2318]">
+                <div className="w-10 h-10 bg-sunken rounded-xl overflow-hidden shrink-0 border border-line">
                   {order.shopItem.imageUrl
                     ? <Image src={order.shopItem.imageUrl} alt={order.shopItem.name} width={40} height={40} className="object-contain w-full h-full" />
-                    : <div className="flex items-center justify-center h-full text-[#5a4830]"><Store size={14} /></div>
+                    : <div className="flex items-center justify-center h-full text-subtle"><Store size={14} /></div>
                   }
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-semibold text-[#f5ead8] truncate">{order.shopItem.name}</p>
+                    <p className="text-sm font-semibold text-fg truncate">{order.shopItem.name}</p>
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${st.color}`}>{st.label}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-[#7a6040] mt-0.5 flex-wrap">
+                  <div className="flex items-center gap-2 text-xs text-muted-2 mt-0.5 flex-wrap">
                     <span>{TCG_LABELS[order.shopItem.tcgType]}</span>
                     <span>{SHOP_CAT[order.shopItem.category]}</span>
                     <span>·</span><span>{order.quantity}개</span>
                     <span>·</span><span>{format(new Date(order.createdAt), 'yy.MM.dd', { locale: ko })}</span>
                   </div>
                 </div>
-                <p className="text-[#f0a832] font-bold tabular-nums text-sm shrink-0">{order.totalPrice.toLocaleString()}P</p>
+                <p className="text-accent-2 font-bold tabular-nums text-sm shrink-0">{order.totalPrice.toLocaleString()}P</p>
               </div>
               {(order.courier || order.trackingNumber || order.address) && (
-                <div className="mt-3 pt-3 border-t border-[#2e2318] text-xs text-[#7a6040] space-y-0.5">
+                <div className="mt-3 pt-3 border-t border-line text-xs text-muted-2 space-y-0.5">
                   {order.address && <p>배송지: {order.recipientName} · {order.address}</p>}
                   {order.courier && order.trackingNumber && (
-                    <p className="text-[#d4a853]/80">{order.courier} · 운송장: {order.trackingNumber}</p>
+                    <p className="text-accent-fg/80">{order.courier} · 운송장: {order.trackingNumber}</p>
                   )}
                 </div>
               )}
@@ -1539,20 +1506,20 @@ function WithdrawalTab() {
 
   const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / 10))
 
-  const inputCls = "w-full bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] focus:border-[#d4a853]/40 rounded-xl px-4 py-3 text-sm text-[#f5ead8] placeholder:text-[#5a4830] focus:outline-none transition-colors"
+  const inputCls = "w-full bg-surface border border-line hover:border-line-strong focus:border-accent/40 rounded-xl px-4 py-3 text-sm text-fg placeholder:text-subtle focus:outline-none transition-colors"
 
   return (
     <div className="space-y-4">
       {/* 잔액 + 신청 버튼 */}
-      <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl p-5 flex items-center justify-between gap-4">
+      <div className="bg-surface border border-line rounded-2xl p-5 flex items-center justify-between gap-4">
         <div>
-          <p className="text-xs text-[#7a6040] uppercase tracking-wider font-semibold mb-1">현재 잔액</p>
-          <p className="text-2xl font-bold text-[#f0a832] tabular-nums">{(user?.balance ?? 0).toLocaleString()} P</p>
-          <p className="text-xs text-[#5a4830] mt-1">최소 환전 금액: 10,000P · 1P = 1원</p>
+          <p className="text-xs text-muted-2 uppercase tracking-wider font-semibold mb-1">현재 잔액</p>
+          <p className="text-2xl font-bold text-accent-2 tabular-nums">{(user?.balance ?? 0).toLocaleString()} P</p>
+          <p className="text-xs text-subtle mt-1">최소 환전 금액: 10,000P · 1P = 1원</p>
         </div>
         <button
           onClick={() => setShowForm(v => !v)}
-          className="flex items-center gap-2 bg-[#f0a832] hover:bg-[#e09820] text-[#0f0b08] font-semibold px-4 py-2.5 rounded-xl text-sm shadow-[0_0_20px_rgba(240,168,50,0.2)] transition-colors"
+          className="flex items-center gap-2 bg-accent hover:bg-accent-strong text-on-accent font-semibold px-4 py-2.5 rounded-full text-sm transition-colors"
         >
           <Banknote size={15} />
           환전 신청
@@ -1561,14 +1528,14 @@ function WithdrawalTab() {
 
       {/* 신청 폼 */}
       {showForm && (
-        <form onSubmit={submit} className="bg-[#1a1410] border border-[#f0a832]/30 rounded-2xl p-5 space-y-4">
-          <h3 className="text-sm font-semibold text-[#f0a832] flex items-center gap-2">
+        <form onSubmit={submit} className="bg-surface border border-accent-2/30 rounded-2xl p-5 space-y-4">
+          <h3 className="text-sm font-semibold text-accent-2 flex items-center gap-2">
             <Banknote size={15} /> 환전 신청
           </h3>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2 space-y-1.5">
-              <label className="text-xs text-[#7a6040] uppercase tracking-wider font-semibold">환전할 포인트</label>
+              <label className="text-xs text-muted-2 uppercase tracking-wider font-semibold">환전할 포인트</label>
               <input
                 type="number"
                 min={10000}
@@ -1581,7 +1548,7 @@ function WithdrawalTab() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs text-[#7a6040] uppercase tracking-wider font-semibold">은행</label>
+              <label className="text-xs text-muted-2 uppercase tracking-wider font-semibold">은행</label>
               <select
                 value={form.bankName}
                 onChange={e => setForm(p => ({ ...p, bankName: e.target.value }))}
@@ -1593,7 +1560,7 @@ function WithdrawalTab() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs text-[#7a6040] uppercase tracking-wider font-semibold">예금주</label>
+              <label className="text-xs text-muted-2 uppercase tracking-wider font-semibold">예금주</label>
               <input
                 type="text"
                 placeholder="홍길동"
@@ -1604,7 +1571,7 @@ function WithdrawalTab() {
             </div>
 
             <div className="col-span-2 space-y-1.5">
-              <label className="text-xs text-[#7a6040] uppercase tracking-wider font-semibold">계좌번호 (- 없이 숫자만)</label>
+              <label className="text-xs text-muted-2 uppercase tracking-wider font-semibold">계좌번호 (- 없이 숫자만)</label>
               <input
                 type="text"
                 placeholder="01012345678"
@@ -1625,24 +1592,24 @@ function WithdrawalTab() {
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              className="px-4 py-2 rounded-xl text-sm bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] hover:text-[#e8d5b0] transition-colors"
+              className="px-4 py-2 rounded-xl text-sm bg-surface border border-line hover:border-line-strong text-fg-3 hover:text-fg-2 transition-colors"
             >
               취소
             </button>
             <button
               type="submit"
               disabled={createMut.isPending}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm bg-[#f0a832] hover:bg-[#e09820] text-[#0f0b08] font-semibold disabled:opacity-50 shadow-[0_0_20px_rgba(240,168,50,0.2)] transition-colors"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm bg-accent hover:bg-accent-strong text-on-accent font-semibold disabled:opacity-50 shadow-[0_0_20px_rgba(34,211,238,0.2)] transition-colors"
             >
               {createMut.isPending
-                ? <span className="w-4 h-4 rounded-full border-2 border-[#0f0b08]/30 border-t-[#0f0b08] animate-spin" />
+                ? <span className="w-4 h-4 rounded-full border-2 border-bg/30 border-t-bg animate-spin" />
                 : null
               }
               {createMut.isPending ? '신청 중...' : '신청하기'}
             </button>
           </div>
 
-          <div className="text-xs text-[#5a4830] space-y-0.5 border-t border-[#2e2318] pt-3">
+          <div className="text-xs text-subtle space-y-0.5 border-t border-line pt-3">
             <p>· 신청 금액은 즉시 잔액에서 차감됩니다.</p>
             <p>· 검토 후 1~3 영업일 내 송금 처리됩니다.</p>
             <p>· 대기 중 상태에서만 취소 가능합니다.</p>
@@ -1658,17 +1625,17 @@ function WithdrawalTab() {
       ) : (
         <div className="space-y-2">
           {data.list.map(wr => {
-            const st = WITHDRAWAL_STATUS_LABEL[wr.status] ?? { label: wr.status, color: 'bg-[#2e2318] text-[#7a6040]' }
+            const st = WITHDRAWAL_STATUS_LABEL[wr.status] ?? { label: wr.status, color: 'bg-line text-muted-2' }
             return (
-              <div key={wr.id} className="bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] rounded-2xl p-4 transition-colors">
+              <div key={wr.id} className="bg-surface border border-line hover:border-line-strong rounded-2xl p-4 transition-colors">
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-[#f0a832] tabular-nums">{wr.amount.toLocaleString()} P</span>
+                      <span className="font-bold text-accent-2 tabular-nums">{wr.amount.toLocaleString()} P</span>
                       <span className={`px-2 py-0.5 rounded-lg text-xs font-medium ${st.color}`}>{st.label}</span>
                     </div>
-                    <p className="text-sm text-[#9e8a6a]">{wr.bankName} · {wr.accountHolder} · {wr.accountNumber}</p>
-                    <p className="text-xs text-[#7a6040]">
+                    <p className="text-sm text-fg-3">{wr.bankName} · {wr.accountHolder} · {wr.accountNumber}</p>
+                    <p className="text-xs text-muted-2">
                       신청일: {format(new Date(wr.createdAt), 'yyyy.MM.dd HH:mm', { locale: ko })}
                       {wr.processedAt && ` · 처리일: ${format(new Date(wr.processedAt), 'yyyy.MM.dd', { locale: ko })}`}
                     </p>
@@ -1729,26 +1696,26 @@ function DisputesTab() {
   return (
     <div className="space-y-3">
       {disputes.map(d => {
-        const st = DISPUTE_STATUS[d.status] ?? { label: d.status, color: 'bg-[#2e2318] text-[#8a7055]' }
+        const st = DISPUTE_STATUS[d.status] ?? { label: d.status, color: 'bg-line text-muted' }
         const cardName = d.transaction.listing.card.nameKo ?? d.transaction.listing.card.name
         return (
-          <div key={d.id} className="bg-[#1a1410] border border-[#2e2318] rounded-2xl p-4 space-y-2">
+          <div key={d.id} className="bg-surface border border-line rounded-2xl p-4 space-y-2">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="font-semibold text-sm text-[#f5ead8] truncate">{cardName}</p>
-                <p className="text-xs text-[#5a4830] mt-0.5">
+                <p className="font-semibold text-sm text-fg truncate">{cardName}</p>
+                <p className="text-xs text-subtle mt-0.5">
                   {format(new Date(d.createdAt), 'yy.MM.dd', { locale: ko })} ·
                   구매자 {d.buyer.nickname} / 판매자 {d.seller.nickname}
                 </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <span className={`px-2 py-0.5 rounded-lg text-xs font-medium ${st.color}`}>{st.label}</span>
-                <span className="text-[#f0a832] font-bold text-sm tabular-nums">
+                <span className="text-accent-2 font-bold text-sm tabular-nums">
                   {d.transaction.finalPrice.toLocaleString()} P
                 </span>
               </div>
             </div>
-            <p className="text-xs text-[#7a6040] line-clamp-2 bg-[#120e0a] border border-[#2e2318] rounded-xl px-3 py-2">
+            <p className="text-xs text-muted-2 line-clamp-2 bg-sunken border border-line rounded-xl px-3 py-2">
               {d.description}
             </p>
           </div>
@@ -1765,9 +1732,11 @@ export default function MyPage() {
   const router = useRouter()
   const [tab, setTab] = useState<TabId>('profile')
 
+  const hydrated = useAuthHydrated()
+
   useEffect(() => {
-    if (!user) router.replace('/login')
-  }, [user, router])
+    if (hydrated && !user) router.replace('/login')
+  }, [hydrated, user, router])
 
   if (!user) return null
 
@@ -1788,59 +1757,102 @@ export default function MyPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0f0b08]">
-      <div className="max-w-5xl mx-auto px-4 py-8">
-        {/* 페이지 제목 */}
-        <h1 className="text-2xl font-bold text-white tracking-tight mb-6">마이페이지</h1>
-
-        <div className="flex gap-6 items-start">
-          {/* ── 사이드바 탭 (desktop) ── */}
-          <aside className="hidden md:flex flex-col w-44 shrink-0 bg-[#1a1410] border border-[#2e2318] rounded-2xl p-2 sticky top-24">
-            {TABS.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors text-left w-full ${
-                  tab === t.id
-                    ? 'bg-[#2a1c0c] text-white border border-[#d4a853]/20'
-                    : 'text-[#7a6040] hover:text-[#9e8a6a] hover:bg-[#2a1c0c]/50'
-                }`}
-              >
-                <span className={tab === t.id ? 'text-[#d4a853]' : 'text-[#5a4830]'}>
-                  {t.icon}
-                </span>
-                {t.label}
+    <div className="max-w-6xl mx-auto space-y-8">
+      {/* ── 프로필 배너 ── */}
+      <section className="relative overflow-hidden rounded-[28px] border border-line bg-gradient-to-br from-accent-tint via-surface to-surface p-6 sm:p-8">
+        <div className="absolute -top-24 -right-16 w-80 h-80 rounded-full bg-accent/25 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-28 left-1/4 w-72 h-72 rounded-full bg-accent-2/10 blur-3xl pointer-events-none" />
+        <div className="relative flex flex-col md:flex-row md:items-center gap-6">
+          <div className="flex items-center gap-4 flex-1 min-w-0">
+            <div className="shrink-0 p-[2px] rounded-full bg-gradient-to-br from-accent via-accent-strong to-accent-2">
+              <div className="w-16 h-16 rounded-full bg-surface flex items-center justify-center font-display text-2xl font-bold text-fg">
+                {user.nickname[0].toUpperCase()}
+              </div>
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-fg truncate">{user.nickname}</h1>
+                {(user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') && <Badge variant="indigo">관리자</Badge>}
+              </div>
+              <p className="text-sm text-muted truncate mt-0.5">{user.email}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 md:gap-5 flex-wrap">
+            <div className="glass border border-white/10 rounded-2xl px-5 py-3">
+              <p className="text-xs text-muted flex items-center gap-1.5"><Wallet size={12} className="text-accent-2" /> 보유 포인트</p>
+              <p className="font-display text-2xl font-semibold text-fg tabular-nums leading-tight">
+                {user.balance.toLocaleString()}<span className="text-sm text-muted ml-1 font-sans font-medium">P</span>
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Link href="/charge"
+                className="h-11 px-5 inline-flex items-center gap-2 rounded-full bg-white text-bg text-sm font-semibold hover:bg-fg-2 transition-colors">
+                충전
+              </Link>
+              <button onClick={() => setTab('withdrawal')}
+                className="h-11 px-5 inline-flex items-center rounded-full border border-line-strong text-sm font-semibold text-fg-2 hover:bg-surface-2 transition-colors">
+                환전
               </button>
-            ))}
-          </aside>
+            </div>
+          </div>
+        </div>
+      </section>
 
-          {/* ── 메인 컨텐츠 ── */}
-          <div className="flex-1 min-w-0">
-            {/* 모바일 탭 (상단 가로 스크롤) */}
-            <div className="md:hidden mb-4 -mx-4 px-4">
-              <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-hide">
-                {TABS.map((t) => (
+      <div className="flex gap-8 items-start">
+        {/* ── 사이드바 (desktop) ── */}
+        <aside className="hidden md:block w-56 shrink-0 sticky top-24 space-y-5">
+          {TAB_GROUPS.map(g => (
+            <div key={g}>
+              <p className="px-3 mb-1.5 text-[11px] font-semibold text-subtle tracking-wider">{g}</p>
+              <div className="space-y-0.5">
+                {TABS.filter(t => t.group === g).map(t => (
                   <button
                     key={t.id}
                     onClick={() => setTab(t.id)}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-colors shrink-0 ${
+                    className={`relative flex items-center gap-3 h-10 px-3 rounded-xl text-sm font-medium transition-colors text-left w-full ${
                       tab === t.id
-                        ? 'bg-[#2a1c0c] text-white border border-[#d4a853]/30'
-                        : 'bg-[#1a1410] border border-[#2e2318] text-[#7a6040] hover:text-[#9e8a6a]'
+                        ? 'bg-white/[0.06] text-fg'
+                        : 'text-muted hover:text-fg hover:bg-white/[0.03]'
                     }`}
                   >
-                    <span className={tab === t.id ? 'text-[#d4a853]' : 'text-[#5a4830]'}>
-                      {t.icon}
-                    </span>
+                    {tab === t.id && (
+                      <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-gradient-to-b from-accent to-accent-2 shadow-[0_0_10px_rgba(139,92,246,0.8)]" />
+                    )}
+                    <span className={tab === t.id ? 'text-accent-fg' : 'text-subtle'}>{t.icon}</span>
                     {t.label}
                   </button>
                 ))}
               </div>
             </div>
+          ))}
+        </aside>
 
-            {/* 탭 컨텐츠 */}
-            <div>{content[tab]}</div>
+        {/* ── 메인 컨텐츠 ── */}
+        <div className="flex-1 min-w-0">
+          {/* 모바일 탭 (가로 스크롤) */}
+          <div className="md:hidden mb-5 -mx-4 px-4">
+            <div className="flex gap-1.5 overflow-x-auto pb-2">
+              {TABS.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setTab(t.id)}
+                  className={`flex items-center gap-1.5 h-9 px-3.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors shrink-0 ${
+                    tab === t.id
+                      ? 'bg-white text-bg font-semibold'
+                      : 'bg-surface border border-line text-muted hover:text-fg'
+                  }`}
+                >
+                  {t.icon}
+                  {t.label}
+                </button>
+              ))}
+            </div>
           </div>
+
+          <h2 className="hidden md:block text-xl font-bold tracking-tight text-fg mb-5">
+            {TABS.find(t => t.id === tab)?.label}
+          </h2>
+          <div key={tab} className="animate-fade-up">{content[tab]}</div>
         </div>
       </div>
     </div>

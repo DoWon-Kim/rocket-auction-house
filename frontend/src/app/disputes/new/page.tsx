@@ -45,8 +45,8 @@ function DisputeForm() {
     return (
       <div className="text-center py-16">
         <AlertCircle className="mx-auto mb-3 text-red-400 w-8 h-8" />
-        <p className="text-sm text-[#8a7055]">거래 정보가 없습니다.</p>
-        <Link href="/my" className="text-[#d4a853] text-sm hover:underline mt-2 inline-block">마이페이지로 돌아가기</Link>
+        <p className="text-sm text-muted">거래 정보가 없습니다.</p>
+        <Link href="/my" className="text-accent-fg text-sm hover:underline mt-2 inline-block">마이페이지로 돌아가기</Link>
       </div>
     )
   }
@@ -54,7 +54,7 @@ function DisputeForm() {
   return (
     <div className="max-w-lg mx-auto py-8 px-4 space-y-6">
       <div>
-        <Link href="/my?tab=purchases" className="flex items-center gap-1.5 text-sm text-[#5a4830] hover:text-[#d4a853] transition-colors mb-4">
+        <Link href="/my?tab=purchases" className="flex items-center gap-1.5 text-sm text-subtle hover:text-accent-fg transition-colors mb-4">
           <ArrowLeft size={14} /> 구매 내역으로 돌아가기
         </Link>
         <div className="flex items-center gap-3">
@@ -62,13 +62,13 @@ function DisputeForm() {
             <Flag className="w-5 h-5 text-red-400" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-[#e8d5b0]">분쟁 신청</h1>
-            <p className="text-xs text-[#5a4830]">판매자와 문제가 해결되지 않은 경우에만 신청하세요</p>
+            <h1 className="text-lg font-bold text-fg-2">분쟁 신청</h1>
+            <p className="text-xs text-subtle">판매자와 문제가 해결되지 않은 경우에만 신청하세요</p>
           </div>
         </div>
       </div>
 
-      <div className="bg-[#1a1208] border border-[#3d2e1a] rounded-2xl p-6 space-y-5">
+      <div className="bg-surface-2 border border-[#211f34] rounded-2xl p-6 space-y-5">
         {error && (
           <div className="flex items-start gap-2 bg-red-900/30 border border-red-700/40 text-red-300 text-sm px-4 py-3 rounded-xl">
             <AlertCircle size={14} className="shrink-0 mt-0.5" />
@@ -77,7 +77,7 @@ function DisputeForm() {
         )}
 
         <div className="space-y-2">
-          <label className="text-xs text-[#7a6040] uppercase tracking-wider font-semibold">분쟁 사유</label>
+          <label className="text-xs text-muted-2 uppercase tracking-wider font-semibold">분쟁 사유</label>
           <div className="grid grid-cols-1 gap-2">
             {REASONS.map(r => (
               <button
@@ -87,7 +87,7 @@ function DisputeForm() {
                 className={`px-4 py-2.5 rounded-xl text-sm text-left transition-colors border ${
                   reason === r.value
                     ? 'bg-red-900/30 border-red-700/50 text-red-300 font-medium'
-                    : 'bg-[#120e0a] border-[#2e2318] text-[#7a6040] hover:border-[#4a3520] hover:text-[#9e8a6a]'
+                    : 'bg-sunken border-line text-muted-2 hover:border-line-strong hover:text-fg-3'
                 }`}
               >
                 {r.label}
@@ -97,17 +97,17 @@ function DisputeForm() {
         </div>
 
         <div className="space-y-2">
-          <label className="text-xs text-[#7a6040] uppercase tracking-wider font-semibold">
-            상세 내용 <span className="normal-case text-[#5a4830]">(최소 10자)</span>
+          <label className="text-xs text-muted-2 uppercase tracking-wider font-semibold">
+            상세 내용 <span className="normal-case text-subtle">(최소 10자)</span>
           </label>
           <textarea
             value={description}
             onChange={e => setDescription(e.target.value)}
             rows={5}
             placeholder="구체적인 상황을 설명해 주세요. 예) 배송된 카드가 사진과 다른 상태이며, 스크래치가 심합니다."
-            className="w-full bg-[#120e0a] border border-[#2e2318] focus:border-[#d4a853]/40 rounded-xl px-4 py-3 text-sm text-[#e8d5b0] placeholder:text-[#3a2e1e] outline-none resize-none"
+            className="w-full bg-sunken border border-line focus:border-accent/40 rounded-xl px-4 py-3 text-sm text-fg-2 placeholder:text-[#211f34] outline-none resize-none"
           />
-          <p className="text-[11px] text-[#4a3520] text-right">{description.length} / 1000</p>
+          <p className="text-[11px] text-subtle text-right">{description.length} / 1000</p>
         </div>
 
         <div className="pt-1">
@@ -119,7 +119,7 @@ function DisputeForm() {
             {mut.isPending ? <Loader2 size={16} className="animate-spin" /> : <Flag size={15} />}
             분쟁 신청하기
           </button>
-          <p className="text-[11px] text-[#4a3520] text-center mt-2">
+          <p className="text-[11px] text-subtle text-center mt-2">
             신청 후 고객센터에서 검토 후 연락드립니다
           </p>
         </div>

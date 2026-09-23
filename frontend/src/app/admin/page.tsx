@@ -25,9 +25,9 @@ function MiniBar({ value, max }: { value: number; max: number }) {
   const pct = max > 0 ? Math.round((value / max) * 100) : 0
   return (
     <div className="flex items-end gap-0.5 h-8">
-      <div className="relative w-full bg-[#2e2318] rounded-sm overflow-hidden h-full">
+      <div className="relative w-full bg-line rounded-sm overflow-hidden h-full">
         <div
-          className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#d4a853] to-[#f0a832] rounded-sm transition-all"
+          className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-accent to-accent-2 rounded-sm transition-all"
           style={{ height: `${pct}%` }}
         />
       </div>
@@ -44,10 +44,10 @@ export default function AdminDashboard() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <h1 className="text-xl font-bold text-[#f5ead8]">대시보드</h1>
+        <h1 className="text-xl font-bold text-fg">대시보드</h1>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="bg-[#1a1410] border border-[#2e2318] rounded-2xl h-24 animate-pulse" />
+            <div key={i} className="bg-surface border border-line rounded-2xl h-24 animate-pulse" />
           ))}
         </div>
       </div>
@@ -60,22 +60,22 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-bold text-[#f5ead8]">대시보드</h1>
+      <h1 className="text-xl font-bold text-fg">대시보드</h1>
 
       {/* 핵심 지표 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: '전체 유저',   value: stats.users.toLocaleString(),            sub: `+${stats.newUsersToday} 오늘`,      icon: <Users size={18} />,            iconCls: 'text-[#d4a853] bg-[#d4a853]/10' },
-          { label: '활성 리스팅', value: stats.activeListings.toLocaleString(),   sub: '현재 거래 중',                       icon: <ShoppingBag size={18} />,       iconCls: 'text-[#f0a832] bg-[#f0a832]/10' },
+          { label: '전체 유저',   value: stats.users.toLocaleString(),            sub: `+${stats.newUsersToday} 오늘`,      icon: <Users size={18} />,            iconCls: 'text-accent-fg bg-accent/10' },
+          { label: '활성 리스팅', value: stats.activeListings.toLocaleString(),   sub: '현재 거래 중',                       icon: <ShoppingBag size={18} />,       iconCls: 'text-accent-2 bg-accent-2/10' },
           { label: '총 거래',     value: stats.transactions.toLocaleString(),      sub: `이번 달 ${stats.txMonth}건`,         icon: <ArrowLeftRight size={18} />,    iconCls: 'text-emerald-400 bg-emerald-400/10' },
           { label: '활성 오리파', value: stats.activeOripas.toLocaleString(),      sub: '현재 운영 중',                       icon: <Package size={18} />,           iconCls: 'text-pink-400 bg-pink-400/10' },
         ].map(card => (
-          <div key={card.label} className="bg-[#1a1410] border border-[#2e2318] rounded-2xl p-4 flex items-center gap-3">
+          <div key={card.label} className="bg-surface border border-line rounded-2xl p-4 flex items-center gap-3">
             <div className={`p-2.5 rounded-xl shrink-0 ${card.iconCls}`}>{card.icon}</div>
             <div className="min-w-0">
-              <p className="text-xs text-[#5a4830]">{card.label}</p>
-              <p className="text-xl font-bold text-[#f5ead8] tabular-nums leading-tight">{card.value}</p>
-              <p className="text-[10px] text-[#4a3820] mt-0.5">{card.sub}</p>
+              <p className="text-xs text-subtle">{card.label}</p>
+              <p className="text-xl font-bold text-fg tabular-nums leading-tight">{card.value}</p>
+              <p className="text-[10px] text-subtle mt-0.5">{card.sub}</p>
             </div>
           </div>
         ))}
@@ -117,10 +117,10 @@ export default function AdminDashboard() {
       {/* 2열 그리드: 7일 거래 추이 + 신규 유저 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* 7일 거래 차트 */}
-        <div className="lg:col-span-2 bg-[#1a1410] border border-[#2e2318] rounded-2xl p-5">
+        <div className="lg:col-span-2 bg-surface border border-line rounded-2xl p-5">
           <div className="flex items-center gap-2 mb-4">
-            <TrendingUp size={15} className="text-[#d4a853]" />
-            <p className="text-sm font-semibold text-[#f5ead8]">최근 7일 거래 추이</p>
+            <TrendingUp size={15} className="text-accent-fg" />
+            <p className="text-sm font-semibold text-fg">최근 7일 거래 추이</p>
           </div>
           {stats.dailyStats && stats.dailyStats.length > 0 ? (
             <div className="flex items-end gap-1.5 h-28">
@@ -128,28 +128,28 @@ export default function AdminDashboard() {
                 <div key={d.date} className="flex-1 flex flex-col items-center gap-1">
                   <div className="w-full relative" style={{ height: '80px' }}>
                     <div
-                      className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#d4a853]/80 to-[#f0a832]/60 rounded-t-sm"
+                      className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-accent/80 to-accent-2/60 rounded-t-sm"
                       style={{ height: `${Math.max(4, Math.round((d.revenue / maxRevenue) * 80))}px` }}
                     />
                   </div>
-                  <p className="text-[9px] text-[#4a3820]">{d.date.slice(5)}</p>
-                  <p className="text-[9px] text-[#6a5030] font-medium tabular-nums">{d.count}건</p>
+                  <p className="text-[9px] text-subtle">{d.date.slice(5)}</p>
+                  <p className="text-[9px] text-[#652bee] font-medium tabular-nums">{d.count}건</p>
                 </div>
               ))}
               {stats.dailyStats.length === 0 && (
-                <p className="text-sm text-[#5a4830] text-center w-full">데이터 없음</p>
+                <p className="text-sm text-subtle text-center w-full">데이터 없음</p>
               )}
             </div>
           ) : (
-            <div className="flex items-center justify-center h-28 text-[#4a3820] text-sm">거래 데이터가 없습니다.</div>
+            <div className="flex items-center justify-center h-28 text-subtle text-sm">거래 데이터가 없습니다.</div>
           )}
         </div>
 
         {/* 이번 주 요약 */}
-        <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl p-5 space-y-3">
+        <div className="bg-surface border border-line rounded-2xl p-5 space-y-3">
           <div className="flex items-center gap-2 mb-1">
-            <UserCheck size={15} className="text-[#d4a853]" />
-            <p className="text-sm font-semibold text-[#f5ead8]">이번 주 요약</p>
+            <UserCheck size={15} className="text-accent-fg" />
+            <p className="text-sm font-semibold text-fg">이번 주 요약</p>
           </div>
           {[
             { label: '신규 가입', value: `+${stats.newUsersWeek}명`, sub: `오늘 +${stats.newUsersToday}명` },
@@ -158,49 +158,49 @@ export default function AdminDashboard() {
           ].map(row => (
             <div key={row.label} className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-[#5a4830]">{row.label}</p>
-                <p className="text-[10px] text-[#3a2810]">{row.sub}</p>
+                <p className="text-xs text-subtle">{row.label}</p>
+                <p className="text-[10px] text-subtle">{row.sub}</p>
               </div>
-              <p className="text-base font-bold text-[#f0a832] tabular-nums">{row.value}</p>
+              <p className="text-base font-bold text-accent-2 tabular-nums">{row.value}</p>
             </div>
           ))}
         </div>
       </div>
 
       {/* 최근 거래 */}
-      <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-[#2e2318] flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-[#f5ead8]">최근 완료 거래</h2>
-          <span className="text-[10px] text-[#5a4830]">최근 10건</span>
+      <div className="bg-surface border border-line rounded-2xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-line flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-fg">최근 완료 거래</h2>
+          <span className="text-[10px] text-subtle">최근 10건</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#2e2318]">
-                <th className="text-left px-5 py-3 text-xs text-[#5a4830] font-semibold">카드</th>
-                <th className="text-left px-5 py-3 text-xs text-[#5a4830] font-semibold">구매자</th>
-                <th className="text-left px-5 py-3 text-xs text-[#5a4830] font-semibold">판매자</th>
-                <th className="text-right px-5 py-3 text-xs text-[#5a4830] font-semibold">금액</th>
-                <th className="text-right px-5 py-3 text-xs text-[#5a4830] font-semibold">일시</th>
+              <tr className="border-b border-line">
+                <th className="text-left px-5 py-3 text-xs text-subtle font-semibold">카드</th>
+                <th className="text-left px-5 py-3 text-xs text-subtle font-semibold">구매자</th>
+                <th className="text-left px-5 py-3 text-xs text-subtle font-semibold">판매자</th>
+                <th className="text-right px-5 py-3 text-xs text-subtle font-semibold">금액</th>
+                <th className="text-right px-5 py-3 text-xs text-subtle font-semibold">일시</th>
               </tr>
             </thead>
             <tbody>
               {stats.recentTransactions.map((tx) => (
-                <tr key={tx.id} className="border-b border-[#1e1810] hover:bg-[#1a1208] transition-colors">
-                  <td className="px-5 py-3 font-medium text-[#e8d5b0] max-w-[180px] truncate">
+                <tr key={tx.id} className="border-b border-surface-2 hover:bg-surface-2 transition-colors">
+                  <td className="px-5 py-3 font-medium text-fg-2 max-w-[180px] truncate">
                     {tx.listing.card.nameKo ?? tx.listing.card.name}
                   </td>
-                  <td className="px-5 py-3 text-[#8a7055]">{tx.buyer.nickname}</td>
-                  <td className="px-5 py-3 text-[#8a7055]">{tx.seller.nickname}</td>
-                  <td className="px-5 py-3 text-right text-[#f0a832] font-bold tabular-nums">{tx.finalPrice.toLocaleString()}P</td>
-                  <td className="px-5 py-3 text-right text-[#5a4830] text-xs whitespace-nowrap">
+                  <td className="px-5 py-3 text-muted">{tx.buyer.nickname}</td>
+                  <td className="px-5 py-3 text-muted">{tx.seller.nickname}</td>
+                  <td className="px-5 py-3 text-right text-accent-2 font-bold tabular-nums">{tx.finalPrice.toLocaleString()}P</td>
+                  <td className="px-5 py-3 text-right text-subtle text-xs whitespace-nowrap">
                     {format(new Date(tx.completedAt), 'MM/dd HH:mm', { locale: ko })}
                   </td>
                 </tr>
               ))}
               {stats.recentTransactions.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-5 py-8 text-center text-[#5a4830]">거래 내역이 없습니다.</td>
+                  <td colSpan={5} className="px-5 py-8 text-center text-subtle">거래 내역이 없습니다.</td>
                 </tr>
               )}
             </tbody>

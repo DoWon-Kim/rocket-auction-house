@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
-import { useAuthStore } from '@/lib/store'
+import { useAuthStore, useAuthHydrated } from '@/lib/store'
 import { connectSocket } from '@/lib/socket'
 import Image from 'next/image'
 import { format } from 'date-fns'
@@ -26,7 +26,7 @@ interface RoomRow {
 }
 
 function Avatar({ user, size = 8 }: { user: MsgSender; size?: number }) {
-  const cls = `w-${size} h-${size} rounded-full bg-[#1a1208] border border-[#2e2318] flex items-center justify-center text-xs font-semibold overflow-hidden shrink-0 text-[#8a7055]`
+  const cls = `w-${size} h-${size} rounded-full bg-surface-2 border border-line flex items-center justify-center text-xs font-semibold overflow-hidden shrink-0 text-muted`
   return (
     <div className={cls}>
       {user.avatarUrl
@@ -49,30 +49,32 @@ export default function ChatListPage() {
     refetchInterval: 10000,
   })
 
+  const hydrated = useAuthHydrated()
+
   useEffect(() => {
-    if (!user) router.replace('/login')
-  }, [user, router])
+    if (hydrated && !user) router.replace('/login')
+  }, [hydrated, user, router])
 
   if (!user) return null
 
   return (
     <div className="max-w-xl mx-auto space-y-4">
       <div className="flex items-center gap-3">
-        <MessageCircle size={20} className="text-[#d4a853]" />
-        <h1 className="text-xl font-bold text-[#f5ead8]">채팅</h1>
+        <MessageCircle size={20} className="text-accent-fg" />
+        <h1 className="text-xl font-bold text-fg">채팅</h1>
       </div>
 
       {isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-[#1a1410] border border-[#2e2318] rounded-xl h-20 animate-pulse" />
+            <div key={i} className="bg-surface border border-line rounded-xl h-20 animate-pulse" />
           ))}
         </div>
       ) : !rooms?.length ? (
-        <div className="text-center py-16 text-[#5a4830]">
+        <div className="text-center py-16 text-subtle">
           <MessageCircle size={36} className="mx-auto mb-3 opacity-30" />
           <p className="text-sm">채팅 내역이 없습니다.</p>
-          <p className="text-xs mt-1 text-[#5a4830]">거래 상대방과 채팅을 시작해보세요.</p>
+          <p className="text-xs mt-1 text-subtle">거래 상대방과 채팅을 시작해보세요.</p>
         </div>
       ) : (
         <div className="space-y-1.5">
@@ -85,28 +87,28 @@ export default function ChatListPage() {
 
             return (
               <button key={room.id} onClick={() => router.push(`/chat/${room.id}`)}
-                className="w-full flex items-center gap-3 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] rounded-xl px-4 py-3 text-left transition-colors group">
+                className="w-full flex items-center gap-3 bg-surface border border-line hover:border-line-strong rounded-xl px-4 py-3 text-left transition-colors group">
                 <Avatar user={other} size={11} />
                 <div className="flex-1 min-w-0 space-y-0.5">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-[#f5ead8]">{other.nickname}</span>
+                    <span className="text-sm font-semibold text-fg">{other.nickname}</span>
                     {last && (
-                      <span className="text-xs text-[#5a4830] shrink-0">
+                      <span className="text-xs text-subtle shrink-0">
                         {format(new Date(last.createdAt), 'MM.dd HH:mm', { locale: ko })}
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-[#5a4830] truncate">{cardName}</p>
+                  <p className="text-xs text-subtle truncate">{cardName}</p>
                   {last ? (
-                    <p className={`text-sm truncate ${unread > 0 ? 'text-[#f5ead8] font-medium' : 'text-[#8a7055]'}`}>
+                    <p className={`text-sm truncate ${unread > 0 ? 'text-fg font-medium' : 'text-muted'}`}>
                       {last.senderId === user.id ? '나: ' : ''}{last.content}
                     </p>
                   ) : (
-                    <p className="text-sm text-[#5a4830]">메시지 없음</p>
+                    <p className="text-sm text-subtle">메시지 없음</p>
                   )}
                 </div>
                 {unread > 0 && (
-                  <span className="bg-[#d4a853] text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(212,168,83,0.4)]">
+                  <span className="bg-accent text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(139,92,246,0.4)]">
                     {unread > 9 ? '9+' : unread}
                   </span>
                 )}

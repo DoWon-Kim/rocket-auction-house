@@ -21,7 +21,7 @@ const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
   OPEN:      { label: '접수',    cls: 'bg-yellow-900/40 text-yellow-400 border-yellow-700/40' },
   REVIEWING: { label: '검토 중', cls: 'bg-blue-900/40 text-blue-400 border-blue-700/40' },
   RESOLVED:  { label: '해결됨', cls: 'bg-emerald-900/40 text-emerald-400 border-emerald-700/40' },
-  REJECTED:  { label: '기각',   cls: 'bg-[#2e2318] text-[#7a6040] border-[#4a3520]' },
+  REJECTED:  { label: '기각',   cls: 'bg-line text-muted-2 border-line-strong' },
   REFUNDED:  { label: '환불',   cls: 'bg-purple-900/40 text-purple-400 border-purple-700/40' },
 }
 
@@ -96,8 +96,8 @@ export default function AdminDisputesPage() {
           <Shield className="w-4 h-4 text-purple-400" />
         </div>
         <div>
-          <h1 className="text-lg font-bold text-[#f5ead8]">분쟁 관리</h1>
-          <p className="text-xs text-[#5a4830]">접수된 거래 분쟁을 검토하고 처리합니다</p>
+          <h1 className="text-lg font-bold text-fg">분쟁 관리</h1>
+          <p className="text-xs text-subtle">접수된 거래 분쟁을 검토하고 처리합니다</p>
         </div>
       </div>
 
@@ -109,8 +109,8 @@ export default function AdminDisputesPage() {
             onClick={() => { setStatusFilter(s); setPage(1) }}
             className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors border ${
               statusFilter === s
-                ? 'bg-[#2a1c0c] text-white border-[#d4a853]/40'
-                : 'bg-[#1a1410] border-[#2e2318] text-[#7a6040] hover:border-[#4a3520]'
+                ? 'bg-accent-tint text-white border-accent/40'
+                : 'bg-surface border-line text-muted-2 hover:border-line-strong'
             }`}
           >
             {s === 'ALL' ? '전체' : STATUS_LABELS[s]?.label ?? s}
@@ -120,40 +120,40 @@ export default function AdminDisputesPage() {
 
       {/* 목록 */}
       {isLoading ? (
-        <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 text-[#d4a853] animate-spin" /></div>
+        <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 text-accent-fg animate-spin" /></div>
       ) : disputes.length === 0 ? (
-        <div className="text-center py-16 text-[#5a4830] text-sm">분쟁 내역이 없습니다.</div>
+        <div className="text-center py-16 text-subtle text-sm">분쟁 내역이 없습니다.</div>
       ) : (
         <div className="space-y-2">
           {disputes.map(d => {
             const st = STATUS_LABELS[d.status] ?? { label: d.status, cls: '' }
             const cardName = d.transaction.listing.card.nameKo ?? d.transaction.listing.card.name
             return (
-              <div key={d.id} className="bg-[#1a1410] border border-[#2e2318] rounded-2xl p-4 hover:border-[#4a3520] transition-colors">
+              <div key={d.id} className="bg-surface border border-line rounded-2xl p-4 hover:border-line-strong transition-colors">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className={`px-2 py-0.5 rounded-lg text-xs font-medium border ${st.cls}`}>{st.label}</span>
-                      <span className="px-2 py-0.5 rounded-lg text-xs bg-[#2e2318] text-[#7a6040]">{REASON_LABELS[d.reason] ?? d.reason}</span>
+                      <span className="px-2 py-0.5 rounded-lg text-xs bg-line text-muted-2">{REASON_LABELS[d.reason] ?? d.reason}</span>
                     </div>
-                    <p className="font-semibold text-sm text-[#f5ead8]">{cardName}</p>
-                    <p className="text-xs text-[#5a4830]">
-                      구매자: <span className="text-[#9e8a6a]">{d.buyer.nickname}</span> →
-                      판매자: <span className="text-[#9e8a6a]">{d.seller.nickname}</span> ·
+                    <p className="font-semibold text-sm text-fg">{cardName}</p>
+                    <p className="text-xs text-subtle">
+                      구매자: <span className="text-fg-3">{d.buyer.nickname}</span> →
+                      판매자: <span className="text-fg-3">{d.seller.nickname}</span> ·
                       {d.transaction.finalPrice.toLocaleString()} P ·
                       {format(new Date(d.createdAt), 'yy.MM.dd', { locale: ko })}
                     </p>
-                    <p className="text-xs text-[#7a6040] line-clamp-1">{d.description}</p>
+                    <p className="text-xs text-muted-2 line-clamp-1">{d.description}</p>
                   </div>
                   {nextOptions.length > 0 || !['RESOLVED', 'REJECTED', 'REFUNDED'].includes(d.status) ? (
                     <button
                       onClick={() => openModal(d)}
-                      className="shrink-0 px-3 py-1.5 rounded-xl text-xs font-medium bg-[#d4a853]/15 border border-[#d4a853]/30 text-[#d4a853] hover:bg-[#d4a853]/25 transition-colors"
+                      className="shrink-0 px-3 py-1.5 rounded-xl text-xs font-medium bg-accent/15 border border-accent/30 text-accent-fg hover:bg-accent/25 transition-colors"
                     >
                       처리
                     </button>
                   ) : (
-                    <span className="shrink-0 text-xs text-[#5a4830] px-2">완료</span>
+                    <span className="shrink-0 text-xs text-subtle px-2">완료</span>
                   )}
                 </div>
               </div>
@@ -166,12 +166,12 @@ export default function AdminDisputesPage() {
       {totalPages > 1 && (
         <div className="flex justify-center gap-1">
           <button onClick={() => setPage(p => p - 1)} disabled={page === 1}
-            className="w-8 h-8 rounded-lg text-sm bg-[#1a1410] border border-[#2e2318] text-[#8a7055] hover:border-[#4a3520] disabled:opacity-30 transition-colors">
+            className="w-8 h-8 rounded-lg text-sm bg-surface border border-line text-muted hover:border-line-strong disabled:opacity-30 transition-colors">
             <ChevronLeft size={14} className="mx-auto" />
           </button>
-          <span className="px-3 h-8 flex items-center text-sm text-[#8a7055]">{page} / {totalPages}</span>
+          <span className="px-3 h-8 flex items-center text-sm text-muted">{page} / {totalPages}</span>
           <button onClick={() => setPage(p => p + 1)} disabled={page === totalPages}
-            className="w-8 h-8 rounded-lg text-sm bg-[#1a1410] border border-[#2e2318] text-[#8a7055] hover:border-[#4a3520] disabled:opacity-30 transition-colors">
+            className="w-8 h-8 rounded-lg text-sm bg-surface border border-line text-muted hover:border-line-strong disabled:opacity-30 transition-colors">
             <ChevronRight size={14} className="mx-auto" />
           </button>
         </div>
@@ -180,25 +180,25 @@ export default function AdminDisputesPage() {
       {/* 처리 모달 */}
       {selected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4" onClick={() => setSelected(null)}>
-          <div className="bg-[#1a1208] border border-[#3d2e1a] rounded-2xl p-6 w-full max-w-md space-y-4" onClick={e => e.stopPropagation()}>
-            <h2 className="text-base font-bold text-[#e8d5b0]">분쟁 처리</h2>
+          <div className="bg-surface-2 border border-[#211f34] rounded-2xl p-6 w-full max-w-md space-y-4" onClick={e => e.stopPropagation()}>
+            <h2 className="text-base font-bold text-fg-2">분쟁 처리</h2>
 
-            <div className="bg-[#120e0a] border border-[#2e2318] rounded-xl p-3 space-y-1">
-              <p className="text-xs text-[#5a4830]">사유: {REASON_LABELS[selected.reason] ?? selected.reason}</p>
-              <p className="text-sm text-[#c9a860]">{selected.description}</p>
+            <div className="bg-sunken border border-line rounded-xl p-3 space-y-1">
+              <p className="text-xs text-subtle">사유: {REASON_LABELS[selected.reason] ?? selected.reason}</p>
+              <p className="text-sm text-accent-fg">{selected.description}</p>
             </div>
 
             {nextOptions.length > 0 ? (
               <>
                 <div className="space-y-2">
-                  <label className="text-xs text-[#7a6040] uppercase tracking-wider font-semibold">처리 결과</label>
+                  <label className="text-xs text-muted-2 uppercase tracking-wider font-semibold">처리 결과</label>
                   <div className="grid grid-cols-1 gap-1.5">
                     {nextOptions.map(o => (
                       <button key={o.value} onClick={() => setNextStatus(o.value)}
                         className={`px-3 py-2 rounded-xl text-sm text-left border transition-colors ${
                           nextStatus === o.value
-                            ? 'bg-[#d4a853]/15 border-[#d4a853]/40 text-[#d4a853]'
-                            : 'bg-[#120e0a] border-[#2e2318] text-[#7a6040] hover:border-[#4a3520]'
+                            ? 'bg-accent/15 border-accent/40 text-accent-fg'
+                            : 'bg-sunken border-line text-muted-2 hover:border-line-strong'
                         }`}>
                         {o.label}
                       </button>
@@ -207,10 +207,10 @@ export default function AdminDisputesPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs text-[#7a6040] uppercase tracking-wider font-semibold">관리자 메모 (선택)</label>
+                  <label className="text-xs text-muted-2 uppercase tracking-wider font-semibold">관리자 메모 (선택)</label>
                   <textarea value={adminNote} onChange={e => setAdminNote(e.target.value)} rows={3}
                     placeholder="처리 사유 또는 메모를 입력하세요"
-                    className="w-full bg-[#120e0a] border border-[#2e2318] focus:border-[#d4a853]/40 rounded-xl px-3 py-2 text-sm text-[#e8d5b0] placeholder:text-[#3a2e1e] outline-none resize-none" />
+                    className="w-full bg-sunken border border-line focus:border-accent/40 rounded-xl px-3 py-2 text-sm text-fg-2 placeholder:text-[#211f34] outline-none resize-none" />
                 </div>
 
                 {nextStatus === 'REFUNDED' && (
@@ -221,22 +221,22 @@ export default function AdminDisputesPage() {
 
                 <div className="flex gap-2">
                   <button onClick={() => setSelected(null)}
-                    className="flex-1 h-10 border border-[#2e2318] text-[#5a4830] hover:border-[#4a3520] rounded-xl text-sm transition-all">
+                    className="flex-1 h-10 border border-line text-subtle hover:border-line-strong rounded-xl text-sm transition-all">
                     취소
                   </button>
                   <button onClick={() => resolveMut.mutate()}
                     disabled={resolveMut.isPending || !nextStatus}
-                    className="flex-1 h-10 bg-[#d4a853] hover:bg-[#c49440] disabled:opacity-50 text-[#0f0b08] font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-1.5">
+                    className="flex-1 h-10 bg-accent hover:bg-accent-strong disabled:opacity-50 text-on-accent font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-1.5">
                     {resolveMut.isPending ? <Loader2 size={14} className="animate-spin" /> : null}
                     처리 완료
                   </button>
                 </div>
               </>
             ) : (
-              <div className="text-center py-4 text-sm text-[#5a4830]">
+              <div className="text-center py-4 text-sm text-subtle">
                 이미 처리된 분쟁입니다.
-                {selected.adminNote && <p className="mt-1 text-[#7a6040]">메모: {selected.adminNote}</p>}
-                <button onClick={() => setSelected(null)} className="mt-3 text-[#d4a853] text-xs hover:underline">닫기</button>
+                {selected.adminNote && <p className="mt-1 text-muted-2">메모: {selected.adminNote}</p>}
+                <button onClick={() => setSelected(null)} className="mt-3 text-accent-fg text-xs hover:underline">닫기</button>
               </div>
             )}
           </div>

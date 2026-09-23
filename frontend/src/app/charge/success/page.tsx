@@ -29,8 +29,8 @@ function SuccessContent() {
 
   if (status === 'loading') return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
-      <div className="w-10 h-10 rounded-full border-2 border-[#2e2318] border-t-[#d4a853] animate-spin" />
-      <p className="text-[#7a6040] text-sm">결제를 확인하는 중입니다...</p>
+      <div className="w-10 h-10 rounded-full border-2 border-line border-t-accent animate-spin" />
+      <p className="text-muted-2 text-sm">결제를 확인하는 중입니다...</p>
     </div>
   )
 
@@ -41,10 +41,10 @@ function SuccessContent() {
       </div>
       <div>
         <p className="text-xl font-bold text-white mb-1">결제 오류</p>
-        <p className="text-sm text-[#7a6040]">{message}</p>
+        <p className="text-sm text-muted-2">{message}</p>
       </div>
       <button onClick={() => router.push('/charge')}
-        className="h-11 px-8 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] hover:text-[#e8d5b0] rounded-xl text-sm transition-all">
+        className="h-11 px-8 bg-surface border border-line hover:border-line-strong text-fg-3 hover:text-fg-2 rounded-xl text-sm transition-all">
         다시 시도
       </button>
     </div>
@@ -57,26 +57,26 @@ function SuccessContent() {
       </div>
 
       <div>
-        <h1 className="text-2xl font-bold text-white mb-1">충전 완료!</h1>
-        <p className="text-sm text-[#7a6040]">포인트가 성공적으로 충전되었습니다.</p>
+        <h1 className="text-[26px] sm:text-3xl font-bold tracking-tight text-fg mb-1">충전 완료!</h1>
+        <p className="text-sm text-muted-2">포인트가 성공적으로 충전되었습니다.</p>
       </div>
 
-      <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl p-5 text-left">
-        <p className="text-xs text-[#5a4830] uppercase tracking-wider font-semibold mb-3">현재 잔액</p>
+      <div className="bg-surface border border-line rounded-2xl p-5 text-left">
+        <p className="text-xs text-subtle uppercase tracking-wider font-semibold mb-3">현재 잔액</p>
         <div className="flex items-end gap-2">
-          <Wallet size={20} className="text-[#f0a832] mb-0.5" />
-          <span className="text-3xl font-bold text-[#f0a832] tabular-nums">{newBalance.toLocaleString()}</span>
-          <span className="text-lg text-[#6b4c1a] mb-0.5">P</span>
+          <Wallet size={20} className="text-accent-2 mb-0.5" />
+          <span className="text-3xl font-bold text-accent-2 tabular-nums">{newBalance.toLocaleString()}</span>
+          <span className="text-lg text-[#322f4f] mb-0.5">P</span>
         </div>
       </div>
 
       <div className="flex gap-3">
         <Link href="/listings"
-          className="flex-1 h-11 flex items-center justify-center gap-1.5 bg-[#d4a853] hover:bg-[#c49440] text-white rounded-xl text-sm font-semibold transition-all shadow-[0_0_16px_rgba(212,168,83,0.25)]">
+          className="flex-1 h-11 flex items-center justify-center gap-1.5 bg-accent hover:bg-accent-strong text-white rounded-xl text-sm font-semibold transition-all shadow-[0_0_16px_rgba(139,92,246,0.25)]">
           마켓플레이스 <ArrowRight size={14} />
         </Link>
         <Link href="/my"
-          className="flex-1 h-11 flex items-center justify-center bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] hover:text-[#e8d5b0] rounded-xl text-sm transition-all">
+          className="flex-1 h-11 flex items-center justify-center bg-surface border border-line hover:border-line-strong text-fg-3 hover:text-fg-2 rounded-xl text-sm transition-all">
           마이페이지
         </Link>
       </div>
@@ -88,7 +88,7 @@ export default function ChargeSuccessPage() {
   return (
     <Suspense fallback={
       <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="w-8 h-8 rounded-full border-2 border-[#2e2318] border-t-[#d4a853] animate-spin" />
+        <div className="w-8 h-8 rounded-full border-2 border-line border-t-accent animate-spin" />
       </div>
     }>
       <SuccessContent />

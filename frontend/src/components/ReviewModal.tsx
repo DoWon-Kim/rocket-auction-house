@@ -37,28 +37,28 @@ export function ReviewModal({ transactionId, targetNickname, role, onClose, onSu
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-[#150f0c] border border-[#2e2318] rounded-2xl p-6 w-full max-w-sm space-y-5" onClick={e => e.stopPropagation()}>
+      <div className="bg-sunken border border-line rounded-2xl p-6 w-full max-w-sm space-y-5" onClick={e => e.stopPropagation()}>
         {/* 헤더 */}
         <div className="flex items-start justify-between">
           <div>
-            <h3 className="font-bold text-base text-[#f5ead8]">{targetLabel} 평가</h3>
-            <p className="text-xs text-[#7a6040] mt-0.5">{targetNickname}님과의 거래는 어떠셨나요?</p>
+            <h3 className="font-bold text-base text-fg">{targetLabel} 평가</h3>
+            <p className="text-xs text-muted-2 mt-0.5">{targetNickname}님과의 거래는 어떠셨나요?</p>
           </div>
-          <button onClick={onClose} className="text-[#5a4830] hover:text-[#9e8a6a] transition-colors mt-0.5">
+          <button onClick={onClose} className="text-subtle hover:text-fg-3 transition-colors mt-0.5">
             <X size={16} />
           </button>
         </div>
 
         {/* 별점 */}
         <div className="space-y-2">
-          <p className="text-xs text-[#7a6040] uppercase tracking-wider font-semibold">별점 *</p>
+          <p className="text-xs text-muted-2 uppercase tracking-wider font-semibold">별점 *</p>
           <StarRating value={rating} onChange={setRating} size={32} showLabel />
         </div>
 
         {/* 코멘트 */}
         <div className="space-y-1.5">
-          <label className="text-xs text-[#7a6040] uppercase tracking-wider font-semibold">
-            한줄 평 <span className="font-normal normal-case text-[#4a3820]">(선택)</span>
+          <label className="text-xs text-muted-2 uppercase tracking-wider font-semibold">
+            한줄 평 <span className="font-normal normal-case text-subtle">(선택)</span>
           </label>
           <textarea
             value={comment}
@@ -66,9 +66,9 @@ export function ReviewModal({ transactionId, targetNickname, role, onClose, onSu
             maxLength={300}
             rows={3}
             placeholder={`${targetLabel}에 대한 경험을 공유해주세요.`}
-            className="w-full bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] focus:border-[#d4a853]/40 rounded-xl px-4 py-3 text-sm text-[#f5ead8] placeholder:text-[#5a4830] focus:outline-none transition-colors resize-none"
+            className="w-full bg-surface border border-line hover:border-line-strong focus:border-accent/40 rounded-xl px-4 py-3 text-sm text-fg placeholder:text-subtle focus:outline-none transition-colors resize-none"
           />
-          <p className="text-right text-[10px] text-[#4a3820]">{comment.length}/300</p>
+          <p className="text-right text-[10px] text-subtle">{comment.length}/300</p>
         </div>
 
         {error && (
@@ -80,14 +80,14 @@ export function ReviewModal({ transactionId, targetNickname, role, onClose, onSu
         {/* 버튼 */}
         <div className="flex gap-2">
           <button type="button" onClick={onClose}
-            className="flex-1 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] hover:text-[#e8d5b0] py-2.5 rounded-xl text-sm transition-colors">
+            className="flex-1 bg-surface border border-line hover:border-line-strong text-fg-3 hover:text-fg-2 py-2.5 rounded-xl text-sm transition-colors">
             취소
           </button>
           <button
             type="button"
             onClick={() => { setError(null); mut.mutate() }}
             disabled={rating === 0 || mut.isPending}
-            className="flex-1 bg-[#d4a853] hover:bg-[#c49440] disabled:opacity-40 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors"
+            className="flex-1 bg-accent hover:bg-accent-strong disabled:opacity-40 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors"
           >
             {mut.isPending
               ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />전송 중</span>

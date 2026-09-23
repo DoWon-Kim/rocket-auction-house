@@ -1,12 +1,12 @@
-﻿import { cn } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 
 const variants = {
-  default: 'bg-[#221a12] text-[#9e8060] border border-[#3a2510]',
-  indigo:  'bg-[#2a1c08] text-[#e0b878] border border-[#3d2a0c]',
-  green:   'bg-[#0d2820] text-[#4ade80] border border-[#1a4030]',
-  yellow:  'bg-[#2a1f08] text-[#f0a832] border border-[#3d2e0c]',
-  red:     'bg-[#2a0e0e] text-[#f87171] border border-[#3d1616]',
-  orange:  'bg-[#2a1808] text-[#fb923c] border border-[#3d2510]',
+  default: 'bg-white/[0.04] text-fg-3 border border-line-strong',
+  indigo:  'bg-violet-500/10 text-violet-200 border border-violet-400/25',
+  green:   'bg-emerald-500/10 text-emerald-300 border border-emerald-400/25',
+  yellow:  'bg-cyan-400/10 text-cyan-200 border border-cyan-300/25',
+  red:     'bg-rose-500/10 text-rose-300 border border-rose-400/25',
+  orange:  'bg-orange-500/10 text-orange-300 border border-orange-400/25',
 }
 
 interface BadgeProps {
@@ -18,7 +18,7 @@ interface BadgeProps {
 export default function Badge({ children, variant = 'default', className }: BadgeProps) {
   return (
     <span className={cn(
-      'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold tracking-wide',
+      'inline-flex items-center gap-1 h-7 px-3 rounded-full text-xs font-semibold',
       variants[variant],
       className
     )}>
