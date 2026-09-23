@@ -1,6 +1,8 @@
 import { Request, Response } from 'express'
 import { TcgType } from '@prisma/client'
 import { prisma } from '../lib/prisma'
+import { SNKRDUNK_PRODUCT_URL } from '../services/snkrdunk.service'
+import { buildPriceReference, TRADE_WINDOW_DAYS } from '../lib/priceReference'
 
 const VALID_TCG_TYPES = Object.values(TcgType)
 
@@ -275,6 +277,7 @@ export async function getCard(req: Request, res: Response) {
         supertype: true, subtypes: true, cardTypes: true, hp: true,
         attacks: true, abilities: true, weaknesses: true, resistances: true,
         retreatCost: true, artist: true, flavorText: true,
+        snkrdunkPrice: true, snkrdunkListings: true, snkrdunkUpdatedAt: true,
         createdAt: true,
         _count: {
           select: {
@@ -373,7 +376,7 @@ export async function getCardVariants(req: Request, res: Response) {
 
 export async function getCardPriceHistory(req: Request, res: Response) {
   const { id } = req.params as { id: string }
-  const days   = Math.min(180, Math.max(7, Number(req.query.days ?? 30)))
+  const days   = Math.min(365, Math.max(7, Number(req.query.days) || 30))
 
   try {
     const since = new Date(Date.now() - days * 86400 * 1000)
@@ -381,6 +384,25 @@ export async function getCardPriceHistory(req: Request, res: Response) {
     // 카드 존재 여부만 체크 (가볍게)
     const exists = await prisma.card.findUnique({ where: { id }, select: { id: true } })
     if (!exists) { res.status(404).json({ message: '카드를 찾을 수 없습니다.' }); return }
+
+    // 외부 시세 (스니덩 최저 호가 일일 스냅샷) — 체결 내역이 없어도 표시
+    const [snapshots, cheapestLink] = await Promise.all([
+      prisma.cardPriceSnapshot.findMany({
+        where: { cardId: id, source: 'SNKRDUNK', date: { gte: new Date(since.toISOString().slice(0, 10)) } },
+        select: { date: true, price: true, listings: true },
+        orderBy: { date: 'asc' },
+      }),
+      prisma.cardSourceItem.findFirst({
+        where: { cardId: id, source: 'SNKRDUNK', status: 'LINKED', price: { gt: 0 } },
+        orderBy: { price: 'asc' }, select: { externalId: true },
+      }),
+    ])
+    const market = {
+      source: 'SNKRDUNK' as const,
+      label: '스니덩 최저 호가',
+      url: cheapestLink ? SNKRDUNK_PRODUCT_URL(cheapestLink.externalId) : null,
+      history: snapshots.map(s => ({ date: s.date.toISOString().slice(0, 10), price: s.price, listings: s.listings })),
+    }
 
     // 체결된 거래만 (COMPLETED / AUTO_COMPLETED)
     const txns = await prisma.transaction.findMany({
@@ -398,14 +420,14 @@ export async function getCardPriceHistory(req: Request, res: Response) {
     })
 
     if (txns.length === 0) {
-      res.json({ history: [], summary: null, days })
+      res.json({ history: [], summary: null, days, market })
       return
     }
 
     // 일별 집계
     const byDay = new Map<string, { prices: number[]; types: string[] }>()
     for (const tx of txns) {
-      const key = tx.completedAt!.toISOString().slice(0, 10)  // YYYY-MM-DD
+      const key = new Date(tx.completedAt!.getTime() + 9 * 3600_000).toISOString().slice(0, 10)  // KST YYYY-MM-DD
       if (!byDay.has(key)) byDay.set(key, { prices: [], types: [] })
       byDay.get(key)!.prices.push(tx.finalPrice)
       byDay.get(key)!.types.push(tx.listing.listingType)
@@ -429,7 +451,7 @@ export async function getCardPriceHistory(req: Request, res: Response) {
       days,
     }
 
-    res.json({ history, summary, days })
+    res.json({ history, summary, days, market })
   } catch (err) {
     console.error('[getCardPriceHistory]', err)
     res.status(500).json({ message: '서버 오류가 발생했습니다.' })
@@ -484,5 +506,52 @@ export async function getCardListings(req: Request, res: Response) {
   } catch (err) {
     console.error('[getCardListings]', err)
     res.status(500).json({ message: '리스팅 조회 중 오류가 발생했습니다.' })
+  }
+}
+
+// ── GET /cards/:id/price-reference ── 판매 등록용 참고 시세 (그레이딩 제외) ─────
+export async function getCardPriceReference(req: Request, res: Response) {
+  const id = String(req.params.id)
+  try {
+    const card = await prisma.card.findUnique({
+      where: { id },
+      select: { id: true, snkrdunkPrice: true, snkrdunkListings: true, snkrdunkUpdatedAt: true },
+    })
+    if (!card) { res.status(404).json({ message: '카드를 찾을 수 없습니다.' }); return }
+
+    const since = new Date(Date.now() - TRADE_WINDOW_DAYS * 86400_000)
+    const [txns, active, cheapestLink] = await Promise.all([
+      prisma.transaction.findMany({
+        where: {
+          listing: { cardId: id, gradingCompany: null },
+          txStatus: { in: ['COMPLETED', 'AUTO_COMPLETED'] },
+          completedAt: { gte: since },
+        },
+        select: { finalPrice: true, completedAt: true },
+        orderBy: { completedAt: 'desc' },
+        take: 50,
+      }),
+      prisma.listing.aggregate({
+        where: { cardId: id, status: 'ACTIVE', listingType: 'BUY_NOW', gradingCompany: null },
+        _min: { buyNowPrice: true }, _count: { _all: true },
+      }),
+      prisma.cardSourceItem.findFirst({
+        where: { cardId: id, source: 'SNKRDUNK', status: 'LINKED', price: { gt: 0 } },
+        orderBy: { price: 'asc' }, select: { externalId: true },
+      }),
+    ])
+
+    res.json(buildPriceReference({
+      trades: txns.filter(t => t.completedAt).map(t => ({ price: t.finalPrice, date: t.completedAt! })),
+      activeMinBuyNow: active._min.buyNowPrice,
+      activeCount: active._count._all,
+      market: {
+        price: card.snkrdunkPrice, listings: card.snkrdunkListings, updatedAt: card.snkrdunkUpdatedAt,
+        url: cheapestLink ? SNKRDUNK_PRODUCT_URL(cheapestLink.externalId) : null,
+      },
+    }))
+  } catch (err) {
+    console.error('[getCardPriceReference]', err)
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' })
   }
 }

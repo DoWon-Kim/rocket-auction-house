@@ -42,6 +42,10 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'assets.tcgdex.net' },
       // 포켓몬 카드게임 공식 (일본판)
       { protocol: 'https', hostname: 'www.pokemon-card.com' },
+      // 스니덩 (공식 이미지가 없는 카드에 한해 채움)
+      { protocol: 'https', hostname: 'cdn.snkrdunk.com' },
+      // Limitless TCG CDN (디지몬 카드 이미지)
+      { protocol: 'https', hostname: 'limitlesstcg.nyc3.digitaloceanspaces.com' },
       // Google 이미지 (썸네일 등 외부 임포트 데이터)
       { protocol: 'https', hostname: '**.gstatic.com' },
       { protocol: 'https', hostname: '**.googleusercontent.com' },

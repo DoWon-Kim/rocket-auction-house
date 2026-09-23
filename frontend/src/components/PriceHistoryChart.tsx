@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import { TrendingUp, TrendingDown, Minus, AlertCircle } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, AlertCircle, ArrowUpRight } from 'lucide-react'
 
 interface DayData {
-  date: string
+  date: string   // YYYY-MM-DD (KST)
   avg: number
   min: number
   max: number
@@ -22,163 +22,154 @@ interface Summary {
   days: number
 }
 
-interface ChartData { history: DayData[]; summary: Summary | null; days: number }
+interface MarketPoint { date: string; price: number; listings: string | null }
+
+interface ChartData {
+  history: DayData[]
+  summary: Summary | null
+  days: number
+  market?: { source: string; label: string; url: string | null; history: MarketPoint[] }
+}
 
 const PERIODS = [
   { label: '7일',  value: 7 },
   { label: '30일', value: 30 },
   { label: '90일', value: 90 },
+  { label: '1년',  value: 365 },
 ]
 
-function formatDate(iso: string) {
-  const d = new Date(iso)
-  return `${d.getMonth() + 1}/${d.getDate()}`
+const MARKET_COLOR = '#38bdf8'
+
+// KST 기준 오늘부터 과거 days일의 날짜 배열
+function dayAxis(days: number): string[] {
+  const today = new Date(Date.now() + 9 * 3600_000)
+  const base = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())
+  return Array.from({ length: days }, (_, i) => new Date(base - (days - 1 - i) * 86400_000).toISOString().slice(0, 10))
 }
 
-// ── SVG Line Chart ─────────────────────────────────────────────────────────────
+const md = (iso: string) => { const [, m, d] = iso.split('-'); return `${Number(m)}/${Number(d)}` }
+const won = (v: number) => (v >= 10000 ? `${(v / 10000).toFixed(v >= 100000 ? 0 : 1)}만` : v.toLocaleString())
 
-const W = 600
-const H = 180
-const PAD = { top: 16, right: 16, bottom: 28, left: 60 }
-const INNER_W = W - PAD.left - PAD.right
-const INNER_H = H - PAD.top - PAD.bottom
+// ── SVG 차트 ──────────────────────────────────────────────────────────────────
 
-function SvgChart({ history }: { history: DayData[] }) {
-  const [tooltip, setTooltip] = useState<{ x: number; y: number; d: DayData } | null>(null)
+const PAD = { top: 16, right: 12, bottom: 28, left: 48 }
+
+function SvgChart({ axis, trades, market, showTrades, showMarket }: {
+  axis: string[]; trades: DayData[]; market: MarketPoint[]; showTrades: boolean; showMarket: boolean
+}) {
+  const [hover, setHover] = useState<number | null>(null)
   const svgRef = useRef<SVGSVGElement>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  // 실제 픽셀 폭으로 그려 모바일에서도 글자 크기 유지
+  const [W, setW] = useState(600)
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([e]) => setW(Math.max(260, Math.round(e.contentRect.width))))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const H = W < 480 ? 180 : 210
+  const INNER_W = W - PAD.left - PAD.right
+  const INNER_H = H - PAD.top - PAD.bottom
 
-  const prices = history.flatMap(d => [d.min, d.max])
-  const yMin   = Math.min(...prices)
-  const yMax   = Math.max(...prices)
-  const yRange = yMax - yMin || 1
+  const idx = useMemo(() => new Map(axis.map((d, i) => [d, i])), [axis])
+  const tradeByDay = useMemo(() => new Map(trades.map(t => [t.date, t])), [trades])
+  const marketByDay = useMemo(() => new Map(market.map(m => [m.date, m])), [market])
+  const tPts = trades.filter(t => idx.has(t.date))
+  const mPts = market.filter(m => idx.has(m.date))
 
-  // X坐标: 均匀分布
-  const xScale = (i: number) => PAD.left + (i / Math.max(history.length - 1, 1)) * INNER_W
-  const yScale = (v: number) => PAD.top + INNER_H - ((v - yMin) / yRange) * INNER_H
+  const values = [
+    ...(showTrades ? tPts.flatMap(t => [t.min, t.max]) : []),
+    ...(showMarket ? mPts.map(m => m.price) : []),
+  ]
+  const lo = values.length ? Math.min(...values) : 0
+  const hi = values.length ? Math.max(...values) : 1
+  const padY = (hi - lo) * 0.08 || hi * 0.1 || 1
+  const yMin = Math.max(0, lo - padY), yMax = hi + padY
 
-  // avg 라인
-  const avgPath = history.map((d, i) => `${i === 0 ? 'M' : 'L'}${xScale(i).toFixed(1)},${yScale(d.avg).toFixed(1)}`).join(' ')
+  const x = (date: string) => PAD.left + ((idx.get(date) ?? 0) / Math.max(axis.length - 1, 1)) * INNER_W
+  const y = (v: number) => PAD.top + INNER_H - ((v - yMin) / (yMax - yMin)) * INNER_H
+  const line = (pts: Array<[string, number]>) => pts.map(([d, v], i) => `${i ? 'L' : 'M'}${x(d).toFixed(1)},${y(v).toFixed(1)}`).join(' ')
 
-  // min~max 영역 (shaded)
-  const areaTop    = history.map((d, i) => `${i === 0 ? 'M' : 'L'}${xScale(i).toFixed(1)},${yScale(d.max).toFixed(1)}`).join(' ')
-  const areaBottom = [...history].reverse().map((d, i) => `L${xScale(history.length - 1 - i).toFixed(1)},${yScale(d.min).toFixed(1)}`).join(' ')
-  const areaPath   = `${areaTop} ${areaBottom} Z`
-
-  // Y 눈금 (3개)
+  const bandPath = tPts.length > 1
+    ? `${line(tPts.map(t => [t.date, t.max]))} ${[...tPts].reverse().map(t => `L${x(t.date).toFixed(1)},${y(t.min).toFixed(1)}`).join(' ')} Z`
+    : ''
   const yTicks = [yMin, (yMin + yMax) / 2, yMax]
+  const xStep = Math.max(1, Math.ceil(axis.length / (W < 480 ? 4 : 6)))
+  const xTicks = axis.filter((_, i) => i % xStep === 0 || i === axis.length - 1)
+  const dense = axis.length > (W < 480 ? 20 : 45)
 
-  // X 눈금 (최대 6개)
-  const xStep = Math.max(1, Math.floor(history.length / 6))
-  const xTicks = history.filter((_, i) => i % xStep === 0 || i === history.length - 1)
+  function onMove(e: React.PointerEvent<SVGSVGElement>) {
+    const rect = svgRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const rel = ((e.clientX - rect.left) / rect.width) * W - PAD.left
+    setHover(Math.max(0, Math.min(axis.length - 1, Math.round((rel / INNER_W) * (axis.length - 1)))))
+  }
 
-  const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
-    const svg = svgRef.current
-    if (!svg || history.length === 0) return
-    const rect = svg.getBoundingClientRect()
-    const svgX  = ((e.clientX - rect.left) / rect.width) * W
-    const relX  = svgX - PAD.left
-    const idx   = Math.round((relX / INNER_W) * (history.length - 1))
-    const clamped = Math.max(0, Math.min(history.length - 1, idx))
-    const d = history[clamped]
-    setTooltip({
-      x: xScale(clamped),
-      y: yScale(d.avg),
-      d,
-    })
-  }, [history])  // eslint-disable-line react-hooks/exhaustive-deps
+  const hDate = hover != null ? axis[hover] : null
+  const hTrade = hDate ? tradeByDay.get(hDate) : undefined
+  const hMarket = hDate ? marketByDay.get(hDate) : undefined
+  const hx = hDate ? x(hDate) : 0
 
   return (
-    <div className="relative">
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${W} ${H}`}
-        className="w-full"
-        onMouseMove={handleMouseMove}
-        onMouseLeave={() => setTooltip(null)}
-      >
+    <div ref={wrapRef} className="relative">
+      <svg ref={svgRef} width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="block w-full touch-none" onPointerMove={onMove} onPointerLeave={() => setHover(null)}>
         <defs>
-          <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stopColor="#d4a853" stopOpacity="0.18" />
-            <stop offset="100%" stopColor="#d4a853" stopOpacity="0.03" />
-          </linearGradient>
-          <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%"   stopColor="#d4a853" />
-            <stop offset="100%" stopColor="#f0c060" />
+          <linearGradient id="phc-band" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--color-accent)" stopOpacity="0.22" />
+            <stop offset="100%" stopColor="var(--color-accent)" stopOpacity="0.04" />
           </linearGradient>
         </defs>
 
-        {/* Y 그리드 + 레이블 */}
         {yTicks.map((v, i) => (
           <g key={i}>
-            <line
-              x1={PAD.left} y1={yScale(v)} x2={W - PAD.right} y2={yScale(v)}
-              stroke="#2e2318" strokeWidth={1}
-              strokeDasharray={i === 0 ? '0' : '3 3'}
-            />
-            <text
-              x={PAD.left - 6} y={yScale(v) + 4}
-              textAnchor="end" fontSize={9} fill="#5a4830"
-              className="font-mono"
-            >
-              {v >= 10000 ? `${(v / 10000).toFixed(1)}만` : v.toLocaleString()}P
-            </text>
+            <line x1={PAD.left} y1={y(v)} x2={W - PAD.right} y2={y(v)} stroke="var(--color-line)" strokeDasharray={i ? '3 3' : undefined} />
+            <text x={PAD.left - 6} y={y(v) + 3} textAnchor="end" fontSize={10} fill="var(--color-subtle)" className="tabular-nums">{won(Math.round(v))}</text>
           </g>
         ))}
-
-        {/* X 눈금 */}
-        {xTicks.map((d, i) => (
-          <text
-            key={i}
-            x={xScale(history.indexOf(d))} y={H - 6}
-            textAnchor="middle" fontSize={9} fill="#4a3820"
-          >
-            {formatDate(d.date)}
-          </text>
+        {xTicks.map(d => (
+          <text key={d} x={x(d)} y={H - 8} textAnchor="middle" fontSize={10} fill="var(--color-subtle)">{md(d)}</text>
         ))}
 
-        {/* Min~Max 음영 영역 */}
-        <path d={areaPath} fill="url(#areaGrad)" />
-
-        {/* 평균 라인 */}
-        <path d={avgPath} fill="none" stroke="url(#lineGrad)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-
-        {/* 데이터 포인트 (5개 이하일 때만) */}
-        {history.length <= 14 && history.map((d, i) => (
-          <circle key={i} cx={xScale(i)} cy={yScale(d.avg)} r={3}
-            fill="#d4a853" stroke="#0f0b08" strokeWidth={1.5} />
+        {showTrades && bandPath && <path d={bandPath} fill="url(#phc-band)" />}
+        {showTrades && tPts.length > 1 && (
+          <path d={line(tPts.map(t => [t.date, t.avg]))} fill="none" stroke="var(--color-accent)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+        )}
+        {showTrades && (tPts.length === 1 || !dense) && tPts.map(t => (
+          <circle key={t.date} cx={x(t.date)} cy={y(t.avg)} r={3} fill="var(--color-accent)" stroke="var(--color-bg)" strokeWidth={1.5} />
         ))}
 
-        {/* 툴팁 라인 */}
-        {tooltip && (
+        {showMarket && mPts.length > 1 && (
+          <path d={line(mPts.map(m => [m.date, m.price]))} fill="none" stroke={MARKET_COLOR} strokeWidth={1.75} strokeDasharray="5 3" strokeLinejoin="round" />
+        )}
+        {showMarket && (mPts.length === 1 || !dense) && mPts.map(m => (
+          <circle key={m.date} cx={x(m.date)} cy={y(m.price)} r={2.5} fill={MARKET_COLOR} stroke="var(--color-bg)" strokeWidth={1.5} />
+        ))}
+
+        {hDate && (
           <>
-            <line
-              x1={tooltip.x} y1={PAD.top} x2={tooltip.x} y2={H - PAD.bottom}
-              stroke="#d4a853" strokeWidth={1} strokeDasharray="3 3" opacity={0.6}
-            />
-            <circle cx={tooltip.x} cy={tooltip.y} r={4}
-              fill="#d4a853" stroke="#0f0b08" strokeWidth={2} />
+            <line x1={hx} y1={PAD.top} x2={hx} y2={H - PAD.bottom} stroke="var(--color-line-strong)" strokeDasharray="3 3" />
+            {showTrades && hTrade && <circle cx={hx} cy={y(hTrade.avg)} r={4} fill="var(--color-accent)" stroke="var(--color-bg)" strokeWidth={2} />}
+            {showMarket && hMarket && <circle cx={hx} cy={y(hMarket.price)} r={4} fill={MARKET_COLOR} stroke="var(--color-bg)" strokeWidth={2} />}
           </>
         )}
       </svg>
 
-      {/* 툴팁 박스 */}
-      {tooltip && (
-        <div
-          className="pointer-events-none absolute z-10 min-w-[140px] bg-[#0f0b08] border border-[#3a2810] rounded-xl px-3 py-2 shadow-2xl text-xs"
-          style={{
-            left: `${(tooltip.x / W) * 100}%`,
-            top:  `${(tooltip.y / H) * 100}%`,
-            transform: tooltip.x > W * 0.6 ? 'translate(-110%, -50%)' : 'translate(12px, -50%)',
-          }}
-        >
-          <p className="font-semibold text-[#d4a853] mb-1">{tooltip.d.date}</p>
-          <div className="space-y-0.5 text-[11px]">
-            <p className="text-[#f5ead8]">평균 <span className="font-bold tabular-nums">{tooltip.d.avg.toLocaleString()}P</span></p>
-            <p className="text-[#7a6040]">
-              범위 <span className="tabular-nums">{tooltip.d.min.toLocaleString()}P ~ {tooltip.d.max.toLocaleString()}P</span>
-            </p>
-            <p className="text-[#5a4830]">거래 {tooltip.d.count}건</p>
-          </div>
+      {hDate && (
+        <div className="pointer-events-none absolute top-2 z-10 min-w-[150px] bg-bg/95 border border-line-strong rounded-xl px-3 py-2 shadow-2xl text-[11px] space-y-1"
+          style={{ left: `${(hx / W) * 100}%`, transform: hx > W * 0.55 ? 'translateX(calc(-100% - 10px))' : 'translateX(10px)' }}>
+          <p className="font-semibold text-fg">{hDate}</p>
+          {showTrades && (hTrade ? (
+            <div>
+              <p className="text-accent-fg">체결 평균 <b className="tabular-nums">{hTrade.avg.toLocaleString()}P</b></p>
+              <p className="text-subtle tabular-nums">{hTrade.min.toLocaleString()} ~ {hTrade.max.toLocaleString()}P · {hTrade.count}건</p>
+            </div>
+          ) : <p className="text-subtle">체결 없음</p>)}
+          {showMarket && (hMarket ? (
+            <p style={{ color: MARKET_COLOR }}>스니덩 최저 <b className="tabular-nums">₩{hMarket.price.toLocaleString()}</b>
+              {hMarket.listings && hMarket.listings !== '0' && <span className="text-subtle"> · {hMarket.listings}건</span>}</p>
+          ) : <p className="text-subtle">스니덩 기록 없음</p>)}
         </div>
       )}
     </div>
@@ -187,8 +178,22 @@ function SvgChart({ history }: { history: DayData[] }) {
 
 // ── 메인 컴포넌트 ──────────────────────────────────────────────────────────────
 
+function Trend({ from, to, days, unit }: { from: number; to: number; days: number; unit: string }) {
+  const diff = to - from
+  const pct = from > 0 ? ((diff / from) * 100).toFixed(1) : null
+  const cls = diff > 0 ? 'text-red-400 bg-red-400/8 border-red-400/20' : diff < 0 ? 'text-emerald-400 bg-emerald-400/8 border-emerald-400/20' : 'text-subtle bg-surface-2 border-line'
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border ${cls}`}>
+      {diff > 0 ? <TrendingUp size={12} /> : diff < 0 ? <TrendingDown size={12} /> : <Minus size={12} />}
+      {days}일 {diff > 0 ? '+' : ''}{unit === '₩' ? `₩${diff.toLocaleString()}` : `${diff.toLocaleString()}P`}{pct !== null && ` (${diff >= 0 ? '+' : ''}${pct}%)`}
+    </span>
+  )
+}
+
 export function PriceHistoryChart({ cardId }: { cardId: string }) {
   const [days, setDays] = useState(30)
+  const [showTrades, setShowTrades] = useState(true)
+  const [showMarket, setShowMarket] = useState(true)
 
   const { data, isLoading } = useQuery<ChartData>({
     queryKey: ['price-history', cardId, days],
@@ -196,94 +201,91 @@ export function PriceHistoryChart({ cardId }: { cardId: string }) {
     staleTime: 5 * 60 * 1000,
   })
 
-  const history = data?.history ?? []
+  const axis = useMemo(() => dayAxis(days), [days])
+  const trades = data?.history ?? []
+  const market = data?.market?.history ?? []
   const summary = data?.summary
-
-  // 가격 추이 계산 (첫날 → 마지막날)
-  const trend = history.length >= 2
-    ? history[history.length - 1].avg - history[0].avg
-    : null
-
-  const trendPct = trend !== null && history[0].avg > 0
-    ? ((trend / history[0].avg) * 100).toFixed(1)
-    : null
+  const hasTrades = trades.length > 0
+  const hasMarket = market.length > 0
+  const mFirst = market[0], mLast = market[market.length - 1]
 
   return (
-    <div className="bg-[#1a1410] border border-[#2e2318] rounded-xl p-5 space-y-4">
-      {/* 헤더 */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-[#f5ead8] flex items-center gap-2">
-          <TrendingUp size={15} className="text-[#d4a853]" />
-          체결 가격 히스토리
+    <div className="bg-surface border border-line rounded-xl p-5 space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-fg flex items-center gap-2">
+          <TrendingUp size={15} className="text-accent-fg" />
+          시세 히스토리
         </h2>
-        {/* 기간 선택 */}
         <div className="flex gap-1">
           {PERIODS.map(p => (
-            <button
-              key={p.value}
-              onClick={() => setDays(p.value)}
+            <button key={p.value} onClick={() => setDays(p.value)}
               className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all ${
-                days === p.value
-                  ? 'bg-[#2a1c08] text-[#d4a853] border-[#3a2810]'
-                  : 'text-[#5a4830] border-[#2e2318] hover:border-[#3a2810] hover:text-[#7a6040]'
-              }`}
-            >
+                days === p.value ? 'bg-accent-tint text-accent-fg border-accent-line' : 'text-subtle border-line hover:border-accent-line hover:text-muted-2'
+              }`}>
               {p.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* 로딩 */}
       {isLoading ? (
-        <div className="h-[180px] bg-[#150f0c] rounded-lg animate-pulse" />
-      ) : history.length === 0 ? (
-        <div className="h-[180px] flex flex-col items-center justify-center gap-2 text-[#4a3820]">
+        <div className="h-[200px] bg-sunken rounded-lg animate-pulse" />
+      ) : !hasTrades && !hasMarket ? (
+        <div className="h-[200px] flex flex-col items-center justify-center gap-2 text-subtle">
           <AlertCircle size={24} className="opacity-40" />
-          <p className="text-xs">최근 {days}일간 체결 내역이 없습니다.</p>
+          <p className="text-xs">최근 {days}일간 체결 내역과 참고 시세가 없습니다.</p>
         </div>
       ) : (
         <>
-          {/* 차트 */}
-          <div className="bg-[#110d08] rounded-xl p-2 overflow-hidden">
-            <SvgChart history={history} />
+          <div className="flex flex-wrap gap-2 text-[11px]">
+            <button onClick={() => setShowTrades(v => !v)} disabled={!hasTrades} aria-pressed={showTrades}
+              className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg border transition-opacity ${showTrades && hasTrades ? 'border-accent-line text-fg-2' : 'border-line text-subtle opacity-60'}`}>
+              <span className="w-3 h-0.5 rounded bg-accent" />체결가 (P){!hasTrades && ' · 없음'}
+            </button>
+            <button onClick={() => setShowMarket(v => !v)} disabled={!hasMarket} aria-pressed={showMarket}
+              className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg border transition-opacity ${showMarket && hasMarket ? 'border-sky-400/30 text-fg-2' : 'border-line text-subtle opacity-60'}`}>
+              <span className="w-3 h-0 border-t-2 border-dashed" style={{ borderColor: MARKET_COLOR }} />스니덩 최저 호가 (₩){!hasMarket && ' · 없음'}
+            </button>
           </div>
 
-          {/* 요약 통계 */}
+          <div className="bg-sunken rounded-xl p-2 overflow-hidden">
+            <SvgChart axis={axis} trades={trades} market={market} showTrades={showTrades && hasTrades} showMarket={showMarket && hasMarket} />
+          </div>
+
           {summary && (
             <div className="grid grid-cols-4 gap-2">
-              <div className="text-center">
-                <p className="text-[10px] text-[#5a4830] uppercase tracking-wider mb-1">거래 수</p>
-                <p className="text-sm font-bold text-[#f5ead8] tabular-nums">{summary.totalTrades.toLocaleString()}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-[10px] text-[#5a4830] uppercase tracking-wider mb-1">평균가</p>
-                <p className="text-sm font-bold text-[#d4a853] tabular-nums">{summary.avgPrice.toLocaleString()}P</p>
-              </div>
-              <div className="text-center">
-                <p className="text-[10px] text-[#5a4830] uppercase tracking-wider mb-1">최저</p>
-                <p className="text-sm font-bold text-emerald-400 tabular-nums">{summary.minPrice.toLocaleString()}P</p>
-              </div>
-              <div className="text-center">
-                <p className="text-[10px] text-[#5a4830] uppercase tracking-wider mb-1">최고</p>
-                <p className="text-sm font-bold text-red-400 tabular-nums">{summary.maxPrice.toLocaleString()}P</p>
-              </div>
+              {[
+                { label: '거래 수', value: summary.totalTrades.toLocaleString(), cls: 'text-fg' },
+                { label: '평균가', value: `${summary.avgPrice.toLocaleString()}P`, cls: 'text-accent-fg' },
+                { label: '최저', value: `${summary.minPrice.toLocaleString()}P`, cls: 'text-emerald-400' },
+                { label: '최고', value: `${summary.maxPrice.toLocaleString()}P`, cls: 'text-red-400' },
+              ].map(s => (
+                <div key={s.label} className="text-center">
+                  <p className="text-[10px] text-subtle uppercase tracking-wider mb-1">{s.label}</p>
+                  <p className={`text-sm font-bold tabular-nums ${s.cls}`}>{s.value}</p>
+                </div>
+              ))}
             </div>
           )}
 
-          {/* 추이 배지 */}
-          {trend !== null && trendPct !== null && (
-            <div className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl border w-fit ${
-              trend > 0
-                ? 'text-red-400 bg-red-400/8 border-red-400/20'
-                : trend < 0
-                ? 'text-emerald-400 bg-emerald-400/8 border-emerald-400/20'
-                : 'text-[#5a4830] bg-[#1a1208] border-[#2e2318]'
-            }`}>
-              {trend > 0 ? <TrendingUp size={12} /> : trend < 0 ? <TrendingDown size={12} /> : <Minus size={12} />}
-              {days}일간{' '}
-              {trend > 0 ? '+' : ''}{trend.toLocaleString()}P ({trend >= 0 ? '+' : ''}{trendPct}%)
-            </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {trades.length >= 2 && <Trend from={trades[0].avg} to={trades[trades.length - 1].avg} days={days} unit="P" />}
+            {market.length >= 2 && mFirst && mLast && (
+              <span className="inline-flex items-center gap-1.5 text-xs text-muted">
+                스니덩 <Trend from={mFirst.price} to={mLast.price} days={days} unit="₩" />
+              </span>
+            )}
+          </div>
+
+          {hasMarket && (
+            <p className="text-[11px] text-subtle leading-relaxed">
+              스니덩 시세는 매일 수집한 최저 판매 호가로, 실제 체결가와 다를 수 있는 참고 정보입니다.
+              {data?.market?.url && (
+                <a href={data.market.url} target="_blank" rel="noreferrer" className="ml-1 inline-flex items-center gap-0.5 text-sky-300 hover:underline">
+                  스니덩에서 보기<ArrowUpRight size={11} />
+                </a>
+              )}
+            </p>
           )}
         </>
       )}

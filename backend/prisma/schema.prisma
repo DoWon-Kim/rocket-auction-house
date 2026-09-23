@@ -42,6 +42,7 @@ model User {
   comments            Comment[]
   adminPermissions    AdminPermission[]
   postLikes           PostLike[]
+  postScraps          PostScrap[]
   commentLikes        CommentLike[]
   reportsGiven        Report[]    @relation("ReportReporter")
   reportsReceived     Report[]    @relation("ReportedUser")
@@ -156,10 +157,17 @@ model Card {
   artist      String?   // 일러스트레이터
   flavorText  String?   // 풀레이버 텍스트
 
+  // 스니덩 (snkrdunk.com) 마켓 데이터
+  snkrdunkPrice    Int?    // 최저 호가 (KRW), null=아직 미조회
+  snkrdunkListings String? // 리스팅 수 ("0", "5", "99+" 등)
+  snkrdunkUpdatedAt DateTime? // 마지막 스니덩 가격 업데이트
+
   listings        Listing[]
   oripaItems      OripaItem[]
   inventoryItems  InventoryItem[]
   wishlists       Wishlist[]
+  sourceItems     CardSourceItem[]
+  priceSnapshots  CardPriceSnapshot[]
 
   @@index([tcgType])
   @@index([name])
@@ -177,6 +185,106 @@ enum TcgType {
   ONEPIECE
   WEISS
   OTHER
+}
+
+// ─── 외부 소스 상품 ↔ 카드 연결 (연결 표 + 매칭 검수함) ───────────────────
+// 외부 상품 1건당 1행. 확실한 매칭(세트+번호 일치)만 자동 연결하고,
+// 나머지는 PENDING으로 쌓아 관리자가 연결/신규 등록/무시를 결정한다.
+
+enum CardSource {
+  SNKRDUNK
+}
+
+enum CardSourceStatus {
+  PENDING   // 검수 대기
+  LINKED    // 카드와 연결됨
+  IGNORED   // 무시 (동기화 때 가격만 갱신, 매칭 안 함)
+}
+
+enum CardMatchMethod {
+  AUTO      // 세트+번호 일치로 자동 연결
+  MANUAL    // 관리자가 기존 카드에 연결
+  CREATED   // 관리자가 신규 카드로 등록
+  LEGACY    // 이전 임포터가 만든 snkrdunk_* 카드
+}
+
+model CardSourceItem {
+  id           String           @id @default(uuid())
+  source       CardSource
+  externalId   String           // 소스 쪽 상품 ID
+  tcgType      TcgType
+  lang         String?          // ja | en | ko
+  productCode  String?          // 소스 상품 코드 (pkmn-tcg-SV3a-079)
+  rawName      String           // 소스 원본 상품명
+  name         String           // 파싱한 카드명
+  setName      String?
+  setCode      String?
+  cardNumber   String?
+  rarity       String?
+  imageUrl     String?
+
+  price          Int?           // 최저 호가 (KRW, 0 = 매물 없음)
+  listings       String?        // 매물 수 ("0", "5", "99+")
+  priceUpdatedAt DateTime?
+
+  status       CardSourceStatus @default(PENDING)
+  matchMethod  CardMatchMethod?
+  cardId       String?
+  card         Card?            @relation(fields: [cardId], references: [id], onDelete: SetNull)
+  resolvedById String?          // 수동 처리한 관리자
+  resolvedAt   DateTime?
+
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@unique([source, externalId])
+  @@index([status, source, tcgType])
+  @@index([cardId])
+}
+
+// 카드별 외부 시세 일일 스냅샷 (KST 날짜 기준 하루 1행, 매물 있는 최저 호가)
+model CardPriceSnapshot {
+  id        String     @id @default(uuid())
+  cardId    String
+  card      Card       @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  source    CardSource
+  date      DateTime   @db.Date
+  price     Int
+  listings  String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([cardId, source, date])
+  @@index([source, date])
+}
+
+// 외부 소스 동기화 실행 기록 (중복 실행 방지 락 + 관리자 모니터링)
+enum SyncRunStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+enum SyncTrigger {
+  SCHEDULE
+  MANUAL
+}
+
+model SyncRun {
+  id            String        @id @default(uuid())
+  source        CardSource
+  trigger       SyncTrigger
+  status        SyncRunStatus @default(RUNNING)
+  triggeredById String?
+  startedAt     DateTime      @default(now())
+  heartbeatAt   DateTime      @default(now())   // 진행 중 갱신, 오래 멈추면 비정상 종료로 간주
+  finishedAt    DateTime?
+  stats         Json?
+  warnings      String[]      @default([])
+  error         String?
+
+  @@index([source, startedAt])
 }
 
 // ─── 거래 리스팅 ─────────────────────────────────────────────────────────
@@ -691,16 +799,73 @@ enum PostType {
   COMMUNITY
 }
 
+// 커뮤니티(카페) 게시판 분류
+enum BoardCategory {
+  FREE      // 자유게시판
+  SHOWOFF   // 카드 자랑
+  INFO      // 정보 · 공략
+  QNA       // 질문 답변
+  REVIEW    // 거래 후기
+}
+
+enum ContentFormat {
+  TEXT   // 일반 텍스트 + 이미지 줄 토큰 (구형)
+  HTML   // 서식 에디터 (서버에서 sanitize 후 저장)
+}
+
+// 게시판 권한 단계: 활동 등급 이상 / 운영진만
+enum BoardPermission {
+  ALL
+  MEMBER
+  GOOD
+  DEVOTED
+  VIP
+  ADMIN
+}
+
+model BoardSetting {
+  category          BoardCategory   @id
+  writePermission   BoardPermission @default(ALL)
+  commentPermission BoardPermission @default(ALL)
+  updatedAt         DateTime        @updatedAt
+}
+
+model PostScrap {
+  postId    String
+  userId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([postId, userId])
+  @@index([userId, createdAt])
+}
+
+// 조회수 중복 방지 (viewerKey = 유저 id 또는 IP 해시)
+model PostView {
+  postId    String
+  viewerKey String
+  viewedAt  DateTime @default(now())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@id([postId, viewerKey])
+  @@index([viewedAt])
+}
+
 model Post {
   id           String    @id @default(uuid())
   type         PostType
   title        String
   content      String
+  contentFormat ContentFormat @default(TEXT)
+  contentText  String?   // 검색용 평문 (HTML 태그 제거)
   author       User      @relation(fields: [authorId], references: [id])
   authorId     String
   pinned       Boolean   @default(false)
   viewCount    Int       @default(0)
   imageUrl     String?
+  imageUrls    String[]  @default([])   // 본문 첨부 이미지 (커뮤니티)
+  category     BoardCategory?           // 커뮤니티 게시판 분류 (공지/이벤트는 null)
   tcgType      TcgType?  // 커뮤니티 게시글 TCG 카테고리 (선택)
   eventStartAt DateTime?
   eventEndAt   DateTime?
@@ -709,9 +874,13 @@ model Post {
 
   comments     Comment[]
   likes        PostLike[]
+  scraps       PostScrap[]
+  views        PostView[]
 
   @@index([type])
   @@index([type, tcgType])
+  @@index([type, category, createdAt])
+  @@index([authorId])
   @@index([pinned])
   @@index([createdAt])
 }
@@ -738,7 +907,14 @@ model Comment {
   updatedAt DateTime @updatedAt
   likes     CommentLike[]
 
+  // 답글(대댓글) — 1단계만 허용
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  parentId  String?
+  replies   Comment[] @relation("CommentReplies")
+  deletedAt DateTime? // 답글이 달린 댓글은 내용만 지우고 자리를 남김
+
   @@index([postId])
+  @@index([parentId])
   @@index([authorId])
 }
 
@@ -939,5 +1115,6 @@ enum NotificationType {
   FRIEND_REQUEST        // 친구 요청
   FRIEND_ACCEPTED       // 친구 수락
   WISHLIST_PRICE_ALERT  // 위시리스트 가격 알림
+  COMMUNITY_COMMENT     // 내 글/댓글에 댓글
   SYSTEM                // 시스템 공지
 }

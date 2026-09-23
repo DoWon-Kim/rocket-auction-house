@@ -42,7 +42,7 @@ import {
 } from '../controllers/admin.controller'
 import { authenticate, optionalAuth, requireAdmin, requireSuperAdmin } from '../middleware/auth'
 import { requireSection } from '../middleware/permissions'
-import { searchCards, getCardMeta, getCardRank, getCard, getCardVariants, getCardListings, getCardPriceHistory } from '../controllers/card.controller'
+import { searchCards, getCardMeta, getCardRank, getCard, getCardVariants, getCardListings, getCardPriceHistory, getCardPriceReference } from '../controllers/card.controller'
 import { proxyImage } from '../controllers/imageProxy.controller'
 import { upload } from '../middleware/upload'
 import { uploadImage } from '../controllers/upload.controller'
@@ -64,6 +64,7 @@ import {
   enrichOnePieceDetails,
   mergeLanguageDuplicates,
   importAll,
+  importSnkrdunk,
 } from '../controllers/import.controller'
 import { authLimiter, paymentLimiter, uploadLimiter, apiLimiter } from '../middleware/rateLimit'
 import {
@@ -75,7 +76,8 @@ import { getOrCreateRoom, getMyRooms, getRoomMessages, getUnreadCount } from '..
 import { shipItem, confirmReceipt, adminReleaseEscrow, getCarriers } from '../controllers/escrow.controller'
 import { getMenus, toggleMenu, updateMenuOrder } from '../controllers/menu.controller'
 import { getMaintenanceStatus, updateMaintenance } from '../controllers/siteConfig.controller'
-import { getPosts, getPost, addComment, deleteComment, togglePostLike, toggleCommentLike, userCreatePost, userUpdatePost, userDeletePost, adminCreatePost, adminUpdatePost, adminDeletePost, adminTogglePin } from '../controllers/post.controller'
+import { getPosts, getPost, getCommunityStats, addComment, updateComment, deleteComment, togglePostScrap, adminUpdateBoardSetting, togglePostLike, toggleCommentLike, userCreatePost, userUpdatePost, userDeletePost, adminCreatePost, adminUpdatePost, adminDeletePost, adminTogglePin } from '../controllers/post.controller'
+import { listCardSourceItems, linkCardSourceItem, createCardFromSourceItem, bulkUpdateCardSourceItems, rematchCardSourceItems, getSyncStatus, startSync, cancelSync } from '../controllers/cardSource.controller'
 import { createReport, getMyReports, getAdminReports, updateReport } from '../controllers/report.controller'
 import { createReview, getUserReviews, getUserProfile, getMyPendingReviews, replyToReview } from '../controllers/review.controller'
 import { getNotifications, getUnreadCount as getNotifUnreadCount, markRead, markAllRead, deleteNotification } from '../controllers/notification.controller'
@@ -135,6 +137,7 @@ router.get('/cards', searchCards)
 router.get('/cards/:id', getCard)
 router.get('/cards/:id/variants', getCardVariants)
 router.get('/cards/:id/price-history', getCardPriceHistory)
+router.get('/cards/:id/price-reference', getCardPriceReference)
 router.get('/cards/:id/listings', getCardListings)
 
 // 이미지 프록시 (외부 이미지 핫링크 차단 우회)
@@ -221,6 +224,15 @@ router.get('/admin/my-permissions', authenticate, requireAdmin, getMyPermissions
 router.get('/admin/cards',        authenticate, requireSection('cards'), getCards)
 router.post('/admin/cards',       authenticate, requireSection('cards'), createCard)
 router.patch('/admin/cards/:id',  authenticate, requireSection('cards'), updateCard)
+// 외부 소스(스니덩) 상품 ↔ 카드 매칭 검수
+router.get('/admin/card-sources',              authenticate, requireSection('cards'), listCardSourceItems)
+router.post('/admin/card-sources/bulk',        authenticate, requireSection('cards'), bulkUpdateCardSourceItems)
+router.post('/admin/card-sources/rematch',     authenticate, requireSection('cards'), rematchCardSourceItems)
+router.get('/admin/card-sources/sync',         authenticate, requireSection('cards'), getSyncStatus)
+router.post('/admin/card-sources/sync',        authenticate, requireSuperAdmin, startSync)
+router.post('/admin/card-sources/sync/:runId/cancel', authenticate, requireSuperAdmin, cancelSync)
+router.post('/admin/card-sources/:id/link',    authenticate, requireSection('cards'), linkCardSourceItem)
+router.post('/admin/card-sources/:id/create',  authenticate, requireSection('cards'), createCardFromSourceItem)
 router.delete('/admin/cards',     authenticate, requireSection('cards'), deleteAllCards)
 router.delete('/admin/cards/:id', authenticate, requireSection('cards'), deleteCard)
 
@@ -280,19 +292,23 @@ router.patch('/admin/menus/order',      authenticate, requireSuperAdmin, updateM
 router.patch('/admin/menus/:key/toggle', authenticate, requireSuperAdmin, toggleMenu)
 
 // 게시판
-router.get('/posts',                                   getPosts)
+router.get('/posts',                                   optionalAuth, getPosts)
+router.get('/posts/community/stats',                   optionalAuth, getCommunityStats)
 router.get('/posts/:id',                               optionalAuth, getPost)
 router.post('/posts',                                  authenticate, apiLimiter, userCreatePost)
 router.patch('/posts/:id',                             authenticate, userUpdatePost)
 router.delete('/posts/:id',                            authenticate, userDeletePost)
 router.post('/posts/:id/like',                         authenticate, togglePostLike)
+router.post('/posts/:id/scrap',                        authenticate, togglePostScrap)
 router.post('/posts/:id/comments',                     authenticate, apiLimiter, addComment)
+router.patch('/posts/:id/comments/:commentId',         authenticate, updateComment)
 router.delete('/posts/:id/comments/:commentId',        authenticate, deleteComment)
 router.post('/posts/:id/comments/:commentId/like',     authenticate, toggleCommentLike)
 router.post('/admin/posts',            authenticate, requireSection('posts'), adminCreatePost)
 router.patch('/admin/posts/:id',       authenticate, requireSection('posts'), adminUpdatePost)
 router.patch('/admin/posts/:id/pin',   authenticate, requireSection('posts'), adminTogglePin)
 router.delete('/admin/posts/:id',      authenticate, requireSection('posts'), adminDeletePost)
+router.patch('/admin/community/boards/:category', authenticate, requireSection('posts'), adminUpdateBoardSetting)
 
 // 네이버 쇼핑 API
 router.get('/admin/naver-shopping/search', authenticate, requireAdmin, searchNaverShop)
@@ -368,5 +384,6 @@ router.get('/admin/import/onepiece/enrich-details',   authenticate, requireSuper
 router.post('/admin/import/merge-duplicates', authenticate, requireSuperAdmin, mergeLanguageDuplicates)
 router.post('/admin/import/yugioh-all',    authenticate, requireSuperAdmin, importYugiohAll)
 router.post('/admin/import/all',           authenticate, requireSuperAdmin, importAll)
+router.get('/admin/import/snkrdunk',       authenticate, requireSuperAdmin, importSnkrdunk)
 
 export default router

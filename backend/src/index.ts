@@ -24,6 +24,7 @@ import { initIo } from './lib/socketio'
 import { startAuctionExpiryJob } from './jobs/auctionExpiry'
 import { startEscrowAutoReleaseJob } from './jobs/escrowAutoRelease'
 import { startShipmentDeadlineJob } from './jobs/shipmentDeadlineJob'
+import { startSnkrdunkSyncJob } from './jobs/snkrdunkSync'
 import { apiLimiter } from './middleware/rateLimit'
 import { errorHandler } from './middleware/errorHandler'
 import { prisma } from './lib/prisma'
@@ -216,6 +217,9 @@ startEscrowAutoReleaseJob()
 
 // ── 미발송 자동 취소 잡 ───────────────────────────────────────────────────────
 startShipmentDeadlineJob()
+
+// ── 스니덩 시세 자동 동기화 잡 ─────────────────────────────────────────────────
+startSnkrdunkSyncJob()
 
 // ── 중앙 에러 핸들러 (라우트 이후 마지막에 등록) ──────────────────────────────
 app.use(errorHandler)

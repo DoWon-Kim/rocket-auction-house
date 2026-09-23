@@ -1,13 +1,14 @@
 ﻿'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import Image from 'next/image'
 import { api } from '@/lib/api'
-import { useAuthStore } from '@/lib/store'
+import { useAuthStore, useAuthHydrated } from '@/lib/store'
 import { TCG_LABELS, CONDITION_LABELS, rarityLabel, resolveImageSrc } from '@/lib/utils'
 import Badge from '@/components/ui/Badge'
+import { PriceReferencePanel, PriceReferenceSummary, usePriceReference, priceDeviation, BASIS_LABEL } from '@/components/sell/PriceReference'
 import { Search, Tag, Gavel, Handshake, Check, ChevronRight, Info, ImagePlus, X as XIcon, Loader2 } from 'lucide-react'
 
 const TCG_TYPES = ['POKEMON', 'YUGIOH', 'MTG', 'DIGIMON', 'ONEPIECE', 'WEISS', 'OTHER'] as const
@@ -18,8 +19,8 @@ type ListingType = 'BUY_NOW' | 'AUCTION' | 'OFFER'
 type Condition = typeof CONDITIONS[number]
 
 const LISTING_TYPES = [
-  { id: 'BUY_NOW' as const, label: '즉시구매', icon: <Tag size={20} className="text-[#e0b878]" />, desc: '고정 가격을 설정하고 구매자가 바로 구매' },
-  { id: 'AUCTION' as const, label: '경매', icon: <Gavel size={20} className="text-[#f0a832]" />, desc: '시작가를 설정하고 시간 제한 경매 진행' },
+  { id: 'BUY_NOW' as const, label: '즉시구매', icon: <Tag size={20} className="text-accent-soft" />, desc: '고정 가격을 설정하고 구매자가 바로 구매' },
+  { id: 'AUCTION' as const, label: '경매', icon: <Gavel size={20} className="text-accent-2" />, desc: '시작가를 설정하고 시간 제한 경매 진행' },
   { id: 'OFFER' as const, label: '가격 제안', icon: <Handshake size={20} className="text-emerald-400" />, desc: '구매자가 가격을 제안하면 수락/거절' },
 ]
 
@@ -28,8 +29,8 @@ interface CardResult {
   tcgType: string; setName: string; cardNumber?: string; rarity: string; imageUrl?: string
 }
 
-const inputCls = 'w-full bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] focus:border-[#d4a853]/40 rounded-xl px-4 py-3 text-sm text-[#f5ead8] placeholder:text-[#5a4830] focus:outline-none transition-colors'
-const labelCls = 'block text-xs text-[#7a6040] uppercase tracking-wider font-semibold mb-1.5'
+const inputCls = 'w-full bg-surface border border-line hover:border-line-strong focus:border-accent/40 rounded-xl px-4 py-3 text-sm text-fg placeholder:text-subtle focus:outline-none transition-colors'
+const labelCls = 'block text-xs text-muted-2 uppercase tracking-wider font-semibold mb-1.5'
 
 function StepIndicator({ step }: { step: number }) {
   const steps = ['카드 선택', '거래 방식', '상세 정보', '확인']
@@ -38,13 +39,13 @@ function StepIndicator({ step }: { step: number }) {
       {steps.map((s, i) => (
         <div key={i} className="flex items-center">
           <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-            i + 1 === step ? 'bg-[#d4a853] text-white' :
-            i + 1 < step  ? 'bg-[#2a1c08] text-[#e0b878]' : 'bg-[#1a1410] text-[#5a4830]'
+            i + 1 === step ? 'bg-accent text-white' :
+            i + 1 < step  ? 'bg-accent-tint text-accent-soft' : 'bg-surface text-subtle'
           }`}>
             {i + 1 < step ? <Check size={13} /> : <span>{i + 1}</span>}
             {s}
           </div>
-          {i < steps.length - 1 && <ChevronRight size={14} className="text-[#2e2318] mx-1" />}
+          {i < steps.length - 1 && <ChevronRight size={14} className="text-line mx-1" />}
         </div>
       ))}
     </div>
@@ -101,11 +102,14 @@ export default function SellForm({ onSuccess }: SellFormProps) {
     }
   }
 
-  const { data: searchResults } = useQuery({
+  const { data: searchResults } = useQuery<CardResult[]>({
     queryKey: ['cards', 'search', cardSearch, tcgFilter],
-    queryFn: () => api.get('/cards', { params: { q: cardSearch || undefined, tcgType: tcgFilter || undefined } }).then(r => r.data),
+    // /cards 는 { cards, total, ... } 형태로 응답
+    queryFn: () => api.get<{ cards: CardResult[] }>('/cards', { params: { q: cardSearch || undefined, tcgType: tcgFilter || undefined, limit: 12 } }).then(r => r.data.cards),
     enabled: cardSearch.length >= 1 || tcgFilter.length > 0,
   })
+
+  const { data: priceRef } = usePriceReference(selectedCard?.id)
 
   const submitMut = useMutation({
     mutationFn: () => {
@@ -132,10 +136,13 @@ export default function SellForm({ onSuccess }: SellFormProps) {
     },
   })
 
-  if (!user) {
-    router.replace('/login')
-    return null
-  }
+  // 로그인 정보 복원 후에만 판단 (렌더 중 라우팅 금지)
+  const hydrated = useAuthHydrated()
+  useEffect(() => {
+    if (hydrated && !user) router.replace('/login')
+  }, [hydrated, user, router])
+
+  if (!user) return null
 
   function canGoNext() {
     if (step === 1) return !!selectedCard
@@ -156,6 +163,14 @@ export default function SellForm({ onSuccess }: SellFormProps) {
     return '-'
   }
 
+  // 확인 단계: 참고 시세 대비
+  const mainPrice = Number(listingType === 'BUY_NOW' ? buyNowPrice : listingType === 'AUCTION' ? startingPrice : minOfferPrice)
+  const dev = priceDeviation(mainPrice, priceRef?.suggested?.price)
+  const refRow = priceRef?.suggested && dev ? {
+    label: '참고 시세 대비',
+    value: `${dev.pct > 0 ? '+' : ''}${dev.pct}% (추천가 ${priceRef.suggested.price.toLocaleString()}P · ${BASIS_LABEL[priceRef.suggested.basis]})`,
+  } : null
+
   function auctionEndDisplay() {
     const d = Number(auctionDays), h = Number(auctionHours)
     const parts = []
@@ -174,64 +189,65 @@ export default function SellForm({ onSuccess }: SellFormProps) {
           <h2 className="font-semibold text-lg">어떤 카드를 판매할까요?</h2>
           <div className="flex flex-wrap gap-2">
             <button onClick={() => setTcgFilter('')}
-              className={`px-3 py-1.5 rounded-full text-sm transition-colors ${!tcgFilter ? 'bg-[#d4a853] text-white' : 'bg-[#1a1410] border border-[#2e2318] text-[#8a7055] hover:text-[#e8d5b0] hover:border-[#4a3520]'}`}>
+              className={`px-3 py-1.5 rounded-full text-sm transition-colors ${!tcgFilter ? 'bg-accent text-white' : 'bg-surface border border-line text-muted hover:text-fg-2 hover:border-line-strong'}`}>
               전체
             </button>
             {TCG_TYPES.map(t => (
               <button key={t} onClick={() => setTcgFilter(tcgFilter === t ? '' : t)}
-                className={`px-3 py-1.5 rounded-full text-sm transition-colors ${tcgFilter === t ? 'bg-[#d4a853] text-white' : 'bg-[#1a1410] border border-[#2e2318] text-[#8a7055] hover:text-[#e8d5b0] hover:border-[#4a3520]'}`}>
+                className={`px-3 py-1.5 rounded-full text-sm transition-colors ${tcgFilter === t ? 'bg-accent text-white' : 'bg-surface border border-line text-muted hover:text-fg-2 hover:border-line-strong'}`}>
                 {TCG_LABELS[t]}
               </button>
             ))}
           </div>
           <div className="relative">
-            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5a4830]" />
+            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-subtle" />
             <input value={cardSearch} onChange={e => { setCardSearch(e.target.value); setSelectedCard(null) }}
               placeholder="카드명 또는 카드번호로 검색..."
               className={`${inputCls} pl-11`} />
           </div>
           {selectedCard && (
-            <div className="bg-[#0d1a2e] border border-[#3d2a0c]/60 rounded-xl p-4 flex items-center gap-4">
-              <div className="relative w-12 h-16 shrink-0 rounded-lg overflow-hidden bg-[#1a1410]">
+            <div className="bg-[#0d1a2e] border border-accent-line/60 rounded-xl p-4 flex items-center gap-4">
+              <div className="relative w-12 h-16 shrink-0 rounded-lg overflow-hidden bg-surface">
                 {selectedCard.imageUrl
                   ? <Image src={resolveImageSrc(selectedCard.imageUrl)!} alt={selectedCard.name} fill className="object-cover" />
                   : <div className="absolute inset-0 flex items-center justify-center text-xl">🃏</div>}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <p className="font-semibold text-[#f5ead8]">{selectedCard.nameKo ?? selectedCard.name}</p>
-                  {selectedCard.nameKo && selectedCard.nameKo !== selectedCard.name && <p className="text-xs text-[#5a4830]">{selectedCard.name}</p>}
+                  <p className="font-semibold text-fg">{selectedCard.nameKo ?? selectedCard.name}</p>
+                  {selectedCard.nameKo && selectedCard.nameKo !== selectedCard.name && <p className="text-xs text-subtle">{selectedCard.name}</p>}
                   <Badge>{TCG_LABELS[selectedCard.tcgType]}</Badge>
                 </div>
-                <p className="text-xs text-[#8a7055]">{selectedCard.setName}{selectedCard.cardNumber && ` #${selectedCard.cardNumber}`} · {rarityLabel(selectedCard.rarity)}</p>
+                <p className="text-xs text-muted">{selectedCard.setName}{selectedCard.cardNumber && ` #${selectedCard.cardNumber}`} · {rarityLabel(selectedCard.rarity)}</p>
+                <PriceReferenceSummary cardId={selectedCard.id} />
               </div>
-              <Check size={20} className="text-[#d4a853] shrink-0" />
+              <Check size={20} className="text-accent-fg shrink-0" />
             </div>
           )}
           {!selectedCard && searchResults && searchResults.length > 0 && (
-            <div className="bg-[#1a1410] border border-[#2e2318] rounded-xl overflow-hidden">
+            <div className="bg-surface border border-line rounded-xl overflow-hidden">
               {searchResults.map((c: CardResult, i: number) => (
                 <button key={c.id} onClick={() => { setSelectedCard(c); setCardSearch(c.name) }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-[#1a1208] transition-colors text-left ${i > 0 ? 'border-t border-[#2e2318]' : ''}`}>
-                  <div className="relative w-9 h-12 shrink-0 rounded bg-[#1a1208] overflow-hidden">
+                  className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-2 transition-colors text-left ${i > 0 ? 'border-t border-line' : ''}`}>
+                  <div className="relative w-9 h-12 shrink-0 rounded bg-surface-2 overflow-hidden">
                     {c.imageUrl ? <Image src={resolveImageSrc(c.imageUrl)!} alt={c.name} fill className="object-cover" /> : <div className="absolute inset-0 flex items-center justify-center text-sm">🃏</div>}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-sm text-[#f5ead8]">{c.nameKo ?? c.name}</span>
+                      <span className="font-medium text-sm text-fg">{c.nameKo ?? c.name}</span>
                       <Badge>{TCG_LABELS[c.tcgType]}</Badge>
                     </div>
-                    {c.nameKo && c.nameKo !== c.name && <p className="text-xs text-[#5a4830] mt-0.5">{c.name}</p>}
-                    <p className="text-xs text-[#7a6040] mt-0.5">{c.setName}{c.cardNumber && ` #${c.cardNumber}`} · {rarityLabel(c.rarity)}</p>
+                    {c.nameKo && c.nameKo !== c.name && <p className="text-xs text-subtle mt-0.5">{c.name}</p>}
+                    <p className="text-xs text-muted-2 mt-0.5">{c.setName}{c.cardNumber && ` #${c.cardNumber}`} · {rarityLabel(c.rarity)}</p>
                   </div>
                 </button>
               ))}
             </div>
           )}
           {!selectedCard && searchResults?.length === 0 && cardSearch && (
-            <div className="bg-[#1a1410] border border-[#2e2318] rounded-xl p-6 text-center text-sm">
-              <p className="text-[#8a7055] mb-1">"{cardSearch}"에 해당하는 카드가 없습니다.</p>
-              <p className="text-xs text-[#5a4830]">관리자에게 카드 등록을 요청하세요.</p>
+            <div className="bg-surface border border-line rounded-xl p-6 text-center text-sm">
+              <p className="text-muted mb-1">"{cardSearch}"에 해당하는 카드가 없습니다.</p>
+              <p className="text-xs text-subtle">관리자에게 카드 등록을 요청하세요.</p>
             </div>
           )}
         </div>
@@ -244,13 +260,13 @@ export default function SellForm({ onSuccess }: SellFormProps) {
           <div className="grid grid-cols-1 gap-3">
             {LISTING_TYPES.map(t => (
               <button key={t.id} onClick={() => setListingType(t.id)}
-                className={`flex items-center gap-4 p-5 rounded-xl border-2 text-left transition-colors ${listingType === t.id ? 'border-[#d4a853]/60 bg-[#0d1a2e]' : 'border-[#2e2318] bg-[#1a1410] hover:border-[#4a3520]'}`}>
-                <div className="p-2.5 bg-[#1a1208] rounded-lg shrink-0">{t.icon}</div>
+                className={`flex items-center gap-4 p-5 rounded-xl border-2 text-left transition-colors ${listingType === t.id ? 'border-accent/60 bg-[#0d1a2e]' : 'border-line bg-surface hover:border-line-strong'}`}>
+                <div className="p-2.5 bg-surface-2 rounded-lg shrink-0">{t.icon}</div>
                 <div>
-                  <p className="font-semibold text-[#f5ead8]">{t.label}</p>
-                  <p className="text-sm text-[#8a7055] mt-0.5">{t.desc}</p>
+                  <p className="font-semibold text-fg">{t.label}</p>
+                  <p className="text-sm text-muted mt-0.5">{t.desc}</p>
                 </div>
-                {listingType === t.id && <Check size={18} className="text-[#d4a853] ml-auto shrink-0" />}
+                {listingType === t.id && <Check size={18} className="text-accent-fg ml-auto shrink-0" />}
               </button>
             ))}
           </div>
@@ -266,7 +282,7 @@ export default function SellForm({ onSuccess }: SellFormProps) {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {CONDITIONS.map(c => (
                 <button key={c} onClick={() => setCondition(c)}
-                  className={`py-2 px-3 rounded-lg text-sm border transition-colors ${condition === c ? 'border-[#d4a853]/60 bg-[#0d1a2e] text-[#e0b878] font-medium' : 'border-[#2e2318] bg-[#1a1410] text-[#8a7055] hover:border-[#4a3520]'}`}>
+                  className={`py-2 px-3 rounded-lg text-sm border transition-colors ${condition === c ? 'border-accent/60 bg-[#0d1a2e] text-accent-soft font-medium' : 'border-line bg-surface text-muted hover:border-line-strong'}`}>
                   {CONDITION_LABELS[c]}
                 </button>
               ))}
@@ -280,6 +296,12 @@ export default function SellForm({ onSuccess }: SellFormProps) {
             <div>
               <label className={labelCls}>판매 가격 (P) *</label>
               <input type="number" min="1" value={buyNowPrice} onChange={e => setBuyNowPrice(e.target.value)} placeholder="ex) 50000" className={inputCls} />
+              {selectedCard && (
+                <div className="mt-2.5">
+                  <PriceReferencePanel cardId={selectedCard.id} mode="BUY_NOW" value={Number(buyNowPrice)} graded={!!gradingCompany}
+                    onApply={p => setBuyNowPrice(String(p))} />
+                </div>
+              )}
             </div>
           )}
           {listingType === 'AUCTION' && (
@@ -287,6 +309,12 @@ export default function SellForm({ onSuccess }: SellFormProps) {
               <div>
                 <label className={labelCls}>경매 시작가 (P) *</label>
                 <input type="number" min="1" value={startingPrice} onChange={e => setStartingPrice(e.target.value)} placeholder="ex) 10000" className={inputCls} />
+                {selectedCard && (
+                  <div className="mt-2.5">
+                    <PriceReferencePanel cardId={selectedCard.id} mode="AUCTION" value={Number(startingPrice)} graded={!!gradingCompany}
+                      onApply={p => setStartingPrice(String(p))} />
+                  </div>
+                )}
               </div>
               <div>
                 <label className={labelCls}>경매 기간 *</label>
@@ -321,19 +349,25 @@ export default function SellForm({ onSuccess }: SellFormProps) {
             <div>
               <label className={labelCls}>최소 제안가 (P) *</label>
               <input type="number" min="1" value={minOfferPrice} onChange={e => setMinOfferPrice(e.target.value)} placeholder="ex) 30000" className={inputCls} />
-              <p className="text-xs text-[#5a4830] mt-1.5">이 금액 미만의 제안은 자동 차단됩니다.</p>
+              <p className="text-xs text-subtle mt-1.5">이 금액 미만의 제안은 자동 차단됩니다.</p>
+              {selectedCard && (
+                <div className="mt-2.5">
+                  <PriceReferencePanel cardId={selectedCard.id} mode="OFFER" value={Number(minOfferPrice)} graded={!!gradingCompany}
+                    onApply={p => setMinOfferPrice(String(p))} />
+                </div>
+              )}
             </div>
           )}
           <div>
             <label className={labelCls}>그레이딩 <span className="text-gray-500 font-normal">(선택)</span></label>
             <div className="flex flex-wrap gap-2 mb-3">
               <button onClick={() => { setGradingCompany(null); setGradingGrade('') }}
-                className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${!gradingCompany ? 'border-[#d4a853]/60 bg-[#0d1a2e] text-[#e0b878] font-medium' : 'border-[#2e2318] bg-[#1a1410] text-[#8a7055] hover:border-[#4a3520]'}`}>
+                className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${!gradingCompany ? 'border-accent/60 bg-[#0d1a2e] text-accent-soft font-medium' : 'border-line bg-surface text-muted hover:border-line-strong'}`}>
                 None
               </button>
               {GRADING_COMPANIES.map(c => (
                 <button key={c} onClick={() => setGradingCompany(c)}
-                  className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${gradingCompany === c ? 'border-[#d4a853]/60 bg-[#0d1a2e] text-[#e0b878] font-medium' : 'border-[#2e2318] bg-[#1a1410] text-[#8a7055] hover:border-[#4a3520]'}`}>
+                  className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${gradingCompany === c ? 'border-accent/60 bg-[#0d1a2e] text-accent-soft font-medium' : 'border-line bg-surface text-muted hover:border-line-strong'}`}>
                   {c}
                 </button>
               ))}
@@ -347,7 +381,7 @@ export default function SellForm({ onSuccess }: SellFormProps) {
             <label className={labelCls}>카드 사진 <span className="text-gray-500 font-normal">(선택, 최대 5장)</span></label>
             <div className="flex flex-wrap gap-2">
               {imageUrls.map((url, i) => (
-                <div key={url} className="relative w-20 h-28 rounded-lg overflow-hidden border border-[#2e2318] group">
+                <div key={url} className="relative w-20 h-28 rounded-lg overflow-hidden border border-line group">
                   <Image src={url} alt={`카드 사진 ${i + 1}`} fill className="object-cover" />
                   <button onClick={() => setImageUrls(prev => prev.filter((_, idx) => idx !== i))}
                     className="absolute top-1 right-1 bg-black/70 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -357,7 +391,7 @@ export default function SellForm({ onSuccess }: SellFormProps) {
               ))}
               {imageUrls.length < 5 && (
                 <button onClick={() => fileInputRef.current?.click()} disabled={uploadingImages}
-                  className="w-20 h-28 rounded-lg border-2 border-dashed border-[#4a3520] hover:border-[#d4a853]/60 flex flex-col items-center justify-center gap-1 text-[#5a4830] hover:text-[#d4a853] transition-colors disabled:opacity-50">
+                  className="w-20 h-28 rounded-lg border-2 border-dashed border-line-strong hover:border-accent/60 flex flex-col items-center justify-center gap-1 text-subtle hover:text-accent-fg transition-colors disabled:opacity-50">
                   {uploadingImages ? <Loader2 size={18} className="animate-spin" /> : <ImagePlus size={18} />}
                   <span className="text-xs">{uploadingImages ? '업로드 중' : '사진 추가'}</span>
                 </button>
@@ -377,41 +411,42 @@ export default function SellForm({ onSuccess }: SellFormProps) {
       {step === 4 && selectedCard && listingType && (
         <div className="space-y-4">
           <h2 className="font-semibold text-lg">등록 내용을 확인해주세요.</h2>
-          <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl overflow-hidden">
-            <div className="p-5 flex items-center gap-4 border-b border-[#2e2318]">
-              <div className="relative w-14 h-20 shrink-0 rounded-lg overflow-hidden bg-[#1a1208]">
+          <div className="bg-surface border border-line rounded-2xl overflow-hidden">
+            <div className="p-5 flex items-center gap-4 border-b border-line">
+              <div className="relative w-14 h-20 shrink-0 rounded-lg overflow-hidden bg-surface-2">
                 {selectedCard.imageUrl
                   ? <Image src={resolveImageSrc(selectedCard.imageUrl)!} alt={selectedCard.name} fill className="object-cover" />
                   : <div className="absolute inset-0 flex items-center justify-center text-2xl">🃏</div>}
               </div>
               <div>
                 <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <p className="font-bold text-[#f5ead8]">{selectedCard.nameKo ?? selectedCard.name}</p>
-                  {selectedCard.nameKo && selectedCard.nameKo !== selectedCard.name && <p className="text-xs text-[#5a4830]">{selectedCard.name}</p>}
+                  <p className="font-bold text-fg">{selectedCard.nameKo ?? selectedCard.name}</p>
+                  {selectedCard.nameKo && selectedCard.nameKo !== selectedCard.name && <p className="text-xs text-subtle">{selectedCard.name}</p>}
                   <Badge>{TCG_LABELS[selectedCard.tcgType]}</Badge>
                 </div>
-                <p className="text-sm text-[#8a7055]">{selectedCard.setName}{selectedCard.cardNumber && ` #${selectedCard.cardNumber}`} · {rarityLabel(selectedCard.rarity)}</p>
+                <p className="text-sm text-muted">{selectedCard.setName}{selectedCard.cardNumber && ` #${selectedCard.cardNumber}`} · {rarityLabel(selectedCard.rarity)}</p>
               </div>
             </div>
-            <div className="divide-y divide-[#2e2318]">
+            <div className="divide-y divide-line">
               {[
                 { label: '거래 방식', value: listingType === 'BUY_NOW' ? '즉시구매' : listingType === 'AUCTION' ? '경매' : '가격 제안' },
                 { label: '카드 상태', value: CONDITION_LABELS[condition] },
                 { label: '그레이딩', value: gradingCompany ? `${gradingCompany}${gradingGrade ? ` ${gradingGrade}` : ''}` : 'None' },
                 { label: '수량', value: `${quantity}장` },
                 { label: '가격', value: displayPrice() },
+                ...(refRow ? [refRow] : []),
                 ...(listingType === 'AUCTION' ? [{ label: '경매 기간', value: auctionEndDisplay() }] : []),
                 ...(listingType === 'AUCTION' && instantBuyPrice ? [{ label: '즉시낙찰가', value: `${Number(instantBuyPrice).toLocaleString()}P` }] : []),
                 ...(description ? [{ label: '설명', value: description }] : []),
               ].map(row => (
                 <div key={row.label} className="flex items-start justify-between px-5 py-3 text-sm">
-                  <span className="text-[#8a7055]">{row.label}</span>
-                  <span className="font-medium text-right max-w-xs text-[#f5ead8]">{row.value}</span>
+                  <span className="text-muted">{row.label}</span>
+                  <span className="font-medium text-right max-w-xs text-fg">{row.value}</span>
                 </div>
               ))}
             </div>
           </div>
-          <div className="flex items-start gap-2.5 bg-[#2a1f08]/60 border border-[#3d2e0c] rounded-xl p-4 text-sm text-[#f0a832]">
+          <div className="flex items-start gap-2.5 bg-accent-tint/60 border border-accent-line rounded-xl p-4 text-sm text-accent-2">
             <Info size={16} className="shrink-0 mt-0.5" />
             <p>등록 후에는 리스팅을 수정할 수 없습니다. 내용을 다시 한번 확인해주세요.</p>
           </div>
@@ -424,14 +459,14 @@ export default function SellForm({ onSuccess }: SellFormProps) {
       )}
 
       {/* 네비게이션 */}
-      <div className="flex items-center justify-between pt-2 border-t border-[#2e2318]">
+      <div className="flex items-center justify-between pt-2 border-t border-line">
         <button onClick={() => setStep(s => s - 1)} disabled={step === 1}
-          className="px-5 py-2.5 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] disabled:opacity-30 disabled:cursor-not-allowed text-sm rounded-xl transition-colors">
+          className="px-5 py-2.5 bg-surface border border-line hover:border-line-strong text-fg-3 disabled:opacity-30 disabled:cursor-not-allowed text-sm rounded-xl transition-colors">
           이전
         </button>
         {step < 4 ? (
           <button onClick={() => setStep(s => s + 1)} disabled={!canGoNext()}
-            className="px-6 py-2.5 bg-[#d4a853] hover:bg-[#c49440] disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm rounded-xl transition-colors shadow-[0_0_16px_rgba(212,168,83,0.2)]">
+            className="px-6 py-2.5 bg-accent hover:bg-accent-strong disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm rounded-xl transition-colors shadow-[0_0_16px_rgba(139,92,246,0.2)]">
             다음
           </button>
         ) : (

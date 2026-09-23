@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma'
 import { AuthRequest } from '../middleware/auth'
 import { fetchWithRetry, ExternalApiError } from '../lib/fetchWithRetry'
 import { nodeRequest } from '../lib/nodeRequest'
+import { runSnkrdunkSync, SyncBusyError } from '../services/syncRun.service'
 
 // ── 공통 ────────────────────────────────────────────────────────────────────────
 
@@ -812,6 +813,14 @@ interface DigimonIoCard {
   set_name?: string[]
 }
 
+// Limitless TCG CDN: "BT1-001" → "BT01/BT01-001_EN.webp"
+function digimonImageUrl(cardId: string): string | null {
+  const m = cardId.match(/^([A-Z]+)(\d+)-(\d+)$/)
+  if (!m) return null
+  const setCode = `${m[1]}${m[2].padStart(2, '0')}`
+  return `https://limitlesstcg.nyc3.digitaloceanspaces.com/digimon/${setCode}/${setCode}-${m[3]}_EN.webp`
+}
+
 export async function importDigimon(_req: AuthRequest, res: Response) {
   // digimoncard.io는 페이지네이션 파라미터를 무시하고 전체 카드를 한번에 반환함
   try {
@@ -828,7 +837,7 @@ export async function importDigimon(_req: AuthRequest, res: Response) {
       setCode: c.id.replace(/-\d+$/, ''),
       cardNumber: c.id,
       rarity: c.rarity ?? 'Unknown',
-      imageUrl: null,
+      imageUrl: digimonImageUrl(c.id),
     }))
 
     const unique = [...new Map(records.map(r => [r.externalId, r])).values()]
@@ -1415,7 +1424,7 @@ export async function importAll(req: AuthRequest, res: Response) {
           externalId: `digimon_${c.id}`, name: c.name, tcgType: 'DIGIMON' as const,
           setName: c.set_name?.[0] ?? 'Unknown',
           setCode: c.id.replace(/-\d+$/, ''), cardNumber: c.id,
-          rarity: c.rarity ?? 'Unknown', imageUrl: null,
+          rarity: c.rarity ?? 'Unknown', imageUrl: digimonImageUrl(c.id),
         }))
         const unique = [...new Map(records.map(r => [r.externalId, r])).values()]
         const result = await prisma.card.createMany({ data: unique, skipDuplicates: true })
@@ -2037,5 +2046,36 @@ export async function mergeLanguageDuplicates(_req: AuthRequest, res: Response) 
   } catch (err) {
     console.error('[mergeLanguageDuplicates]', err)
     res.status(500).json({ message: '병합 중 오류가 발생했습니다.' })
+  }
+}
+
+// ── 스니덩 (snkrdunk.com) 시세 동기화 ────────────────────────────────────────
+// 세트+번호가 확실히 일치하는 카드만 자동 연결하고, 나머지는 카드 매칭 검수함(/admin/card-sources)으로 보낸다.
+
+export async function importSnkrdunk(req: AuthRequest, res: Response) {
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+
+  let closed = false
+  res.on('close', () => { closed = true })
+  const send = (data: object) => { if (!closed) res.write(`data: ${JSON.stringify(data)}\n\n`) }
+  const heartbeat = setInterval(() => { if (!closed && !res.writableEnded) res.write(': heartbeat\n\n') }, 15_000)
+
+  try {
+    const { run, totals } = await runSnkrdunkSync({
+      trigger: 'MANUAL', triggeredById: req.userId,
+      onStart: () => send({ type: 'start', message: '스니덩 동기화 시작...' }),
+      onEvent: send, isCancelled: () => closed,
+    })
+    if (totals) send({ type: 'done', ...totals, status: run.status, warnings: run.warnings })
+    else send({ type: 'error', reason: run.error ?? '동기화 실패' })
+  } catch (err) {
+    if (err instanceof SyncBusyError) { send({ type: 'error', reason: '이미 동기화가 실행 중입니다. 카드 매칭 검수 화면에서 진행 상황을 확인하세요.' }); return }
+    console.error('[importSnkrdunk]', err)
+    send({ type: 'error', reason: String(err) })
+  } finally {
+    clearInterval(heartbeat)
+    res.end()
   }
 }
