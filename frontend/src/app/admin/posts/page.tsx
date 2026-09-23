@@ -9,6 +9,7 @@ import { ImageUpload } from '@/components/ImageUpload'
 import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { TCG_LABELS } from '@/lib/utils'
+import { BoardPermissionPanel } from '@/components/community/BoardPermissionPanel'
 
 type PostType = 'NOTICE' | 'EVENT' | 'COMMUNITY'
 
@@ -194,13 +195,13 @@ function PostsContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[#f5ead8]">게시글 관리</h1>
-          <p className="text-sm text-[#8a7055] mt-1">공지, 이벤트, 커뮤니티 게시글을 관리합니다.</p>
+          <h1 className="text-[26px] sm:text-3xl font-bold tracking-tight text-fg">게시글 관리</h1>
+          <p className="text-sm text-muted mt-1">공지, 이벤트, 커뮤니티 게시글을 관리합니다.</p>
         </div>
         {!showForm && !editingPost && (
           <button
             onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#d4a853] hover:bg-[#c49440] text-white rounded-xl font-semibold text-sm transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-strong text-white rounded-xl font-semibold text-sm transition-colors"
           >
             <Plus size={15} />
             글 작성
@@ -209,15 +210,15 @@ function PostsContent() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-[#1a1410] border border-[#2e2318] rounded-xl p-1 w-fit">
+      <div className="flex gap-1 bg-surface border border-line rounded-xl p-1 w-fit">
         {TABS.map(tab => (
           <button
             key={tab.value}
             onClick={() => handleTabChange(tab.value)}
             className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               activeType === tab.value
-                ? 'bg-[#2e2318] text-[#f5ead8]'
-                : 'text-[#8a7055] hover:text-[#e8d5b0]'
+                ? 'bg-line text-fg'
+                : 'text-muted hover:text-fg-2'
             }`}
           >
             {tab.label}
@@ -225,16 +226,18 @@ function PostsContent() {
         ))}
       </div>
 
+      {activeType === 'COMMUNITY' && !showForm && !editingPost && <BoardPermissionPanel />}
+
       {/* Create / Edit Form */}
       {(showForm || editingPost) && (
-        <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl p-5 space-y-4">
+        <div className="bg-surface border border-line rounded-2xl p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-[#f5ead8]">
+            <h2 className="font-semibold text-fg">
               {editingPost ? `글 수정 — ${editingPost.title.slice(0, 30)}` : `새 글 작성 (${TABS.find(t => t.value === activeType)?.label})`}
             </h2>
             <button
               onClick={resetForm}
-              className="h-7 w-7 flex items-center justify-center text-[#5a4830] hover:text-[#f5ead8] hover:bg-[#2e2318] rounded-lg transition-colors"
+              className="h-7 w-7 flex items-center justify-center text-subtle hover:text-fg hover:bg-line rounded-lg transition-colors"
             >
               <X size={15} />
             </button>
@@ -243,34 +246,34 @@ function PostsContent() {
           <form onSubmit={handleSubmit} className="space-y-3">
             {/* Title */}
             <div>
-              <label className="block text-xs text-[#8a7055] mb-1.5 font-medium">제목 *</label>
+              <label className="block text-xs text-muted mb-1.5 font-medium">제목 *</label>
               <input
                 value={title}
                 onChange={e => setTitle(e.target.value)}
                 placeholder="제목을 입력하세요"
                 required
-                className="w-full bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] focus:border-[#d4a853]/40 rounded-xl px-4 py-2.5 text-sm text-[#f5ead8] placeholder:text-[#5a4830] focus:outline-none transition-colors"
+                className="w-full bg-surface border border-line hover:border-line-strong focus:border-accent/40 rounded-xl px-4 py-2.5 text-sm text-fg placeholder:text-subtle focus:outline-none transition-colors"
               />
             </div>
 
             {/* Content */}
             <div>
-              <label className="block text-xs text-[#8a7055] mb-1.5 font-medium">내용 *</label>
+              <label className="block text-xs text-muted mb-1.5 font-medium">내용 *</label>
               <textarea
                 value={content}
                 onChange={e => setContent(e.target.value)}
                 placeholder="내용을 입력하세요"
                 rows={8}
                 required
-                className="w-full bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] focus:border-[#d4a853]/40 rounded-xl px-4 py-2.5 text-sm text-[#f5ead8] placeholder:text-[#5a4830] focus:outline-none transition-colors resize-none"
+                className="w-full bg-surface border border-line hover:border-line-strong focus:border-accent/40 rounded-xl px-4 py-2.5 text-sm text-fg placeholder:text-subtle focus:outline-none transition-colors resize-none"
               />
             </div>
 
             {/* TCG 카테고리 (COMMUNITY 탭 전용) */}
             {(activeType === 'COMMUNITY' || editingPost?.type === 'COMMUNITY') && (
               <div>
-                <label className="block text-xs text-[#8a7055] mb-1.5 font-medium">
-                  TCG 카테고리 <span className="text-[#4a3820] font-normal">(선택)</span>
+                <label className="block text-xs text-muted mb-1.5 font-medium">
+                  TCG 카테고리 <span className="text-subtle font-normal">(선택)</span>
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {TCG_OPTIONS.map(opt => (
@@ -280,8 +283,8 @@ function PostsContent() {
                       onClick={() => setTcgType(prev => prev === opt.value ? '' : opt.value)}
                       className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
                         tcgType === opt.value
-                          ? 'bg-[#d4a853]/20 text-[#e0b878] border-[#d4a853]/40'
-                          : 'bg-transparent text-[#7a6040] border-[#2e2318] hover:border-[#4a3520] hover:text-[#9e8a6a]'
+                          ? 'bg-accent/20 text-accent-soft border-accent/40'
+                          : 'bg-transparent text-muted-2 border-line hover:border-line-strong hover:text-fg-3'
                       }`}
                     >
                       {opt.label}
@@ -299,12 +302,12 @@ function PostsContent() {
               {/* Pinned checkbox — NOTICE / EVENT only */}
               {activeType !== 'COMMUNITY' && (
                 <label className="flex items-center gap-2 cursor-pointer group">
-                  <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${pinned ? 'bg-[#d4a853] border-[#d4a853]' : 'bg-transparent border-[#4a3520] group-hover:border-[#d4a853]/60'}`}
+                  <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${pinned ? 'bg-accent border-accent' : 'bg-transparent border-line-strong group-hover:border-accent/60'}`}
                     onClick={() => setPinned(v => !v)}>
                     {pinned && <svg viewBox="0 0 10 8" className="w-2.5 h-2.5 fill-white"><path d="M1 4l3 3 5-6" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>}
                   </div>
                   <input type="checkbox" checked={pinned} onChange={e => setPinned(e.target.checked)} className="sr-only" />
-                  <span className="text-sm text-[#8a7055] select-none">핀고정</span>
+                  <span className="text-sm text-muted select-none">핀고정</span>
                 </label>
               )}
 
@@ -312,21 +315,21 @@ function PostsContent() {
               {activeType === 'EVENT' && (
                 <div className="flex flex-wrap gap-3 flex-1">
                   <div className="flex-1 min-w-[160px]">
-                    <label className="block text-xs text-[#8a7055] mb-1.5 font-medium">이벤트 시작일</label>
+                    <label className="block text-xs text-muted mb-1.5 font-medium">이벤트 시작일</label>
                     <input
                       type="datetime-local"
                       value={eventStartAt}
                       onChange={e => setEventStartAt(e.target.value)}
-                      className="w-full bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] focus:border-[#d4a853]/40 rounded-xl px-4 py-2.5 text-sm text-[#f5ead8] focus:outline-none transition-colors"
+                      className="w-full bg-surface border border-line hover:border-line-strong focus:border-accent/40 rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none transition-colors"
                     />
                   </div>
                   <div className="flex-1 min-w-[160px]">
-                    <label className="block text-xs text-[#8a7055] mb-1.5 font-medium">이벤트 종료일</label>
+                    <label className="block text-xs text-muted mb-1.5 font-medium">이벤트 종료일</label>
                     <input
                       type="datetime-local"
                       value={eventEndAt}
                       onChange={e => setEventEndAt(e.target.value)}
-                      className="w-full bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] focus:border-[#d4a853]/40 rounded-xl px-4 py-2.5 text-sm text-[#f5ead8] focus:outline-none transition-colors"
+                      className="w-full bg-surface border border-line hover:border-line-strong focus:border-accent/40 rounded-xl px-4 py-2.5 text-sm text-fg focus:outline-none transition-colors"
                     />
                   </div>
                 </div>
@@ -337,14 +340,14 @@ function PostsContent() {
               <button
                 type="button"
                 onClick={resetForm}
-                className="px-4 py-2 bg-[#1a1410] border border-[#2e2318] hover:border-[#4a3520] text-[#9e8a6a] rounded-xl text-sm transition-colors"
+                className="px-4 py-2 bg-surface border border-line hover:border-line-strong text-fg-3 rounded-xl text-sm transition-colors"
               >
                 취소
               </button>
               <button
                 type="submit"
                 disabled={createMutation.isPending || editMutation.isPending}
-                className="px-5 py-2 bg-[#d4a853] hover:bg-[#c49440] text-white rounded-xl font-semibold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-5 py-2 bg-accent hover:bg-accent-strong text-white rounded-xl font-semibold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {createMutation.isPending || editMutation.isPending ? '저장 중...' : editingPost ? '수정 완료' : '저장'}
               </button>
@@ -354,43 +357,43 @@ function PostsContent() {
       )}
 
       {/* Posts table */}
-      <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl overflow-hidden">
+      <div className="bg-surface border border-line rounded-2xl overflow-hidden">
         {isLoading ? (
           <div className="space-y-0">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="border-b border-[#2e2318] h-14 animate-pulse" />
+              <div key={i} className="border-b border-line h-14 animate-pulse" />
             ))}
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#2e2318]">
-                <th className="text-left px-5 py-3 text-xs text-[#5a4830] uppercase tracking-wider font-semibold">제목</th>
-                <th className="text-left px-5 py-3 text-xs text-[#5a4830] uppercase tracking-wider font-semibold hidden md:table-cell">작성자</th>
-                <th className="text-right px-5 py-3 text-xs text-[#5a4830] uppercase tracking-wider font-semibold hidden sm:table-cell">조회</th>
-                <th className="text-right px-5 py-3 text-xs text-[#5a4830] uppercase tracking-wider font-semibold hidden sm:table-cell">댓글</th>
-                <th className="text-right px-5 py-3 text-xs text-[#5a4830] uppercase tracking-wider font-semibold hidden md:table-cell">작성일</th>
-                <th className="text-right px-5 py-3 text-xs text-[#5a4830] uppercase tracking-wider font-semibold">관리</th>
+              <tr className="border-b border-line">
+                <th className="text-left px-5 py-3 text-xs text-subtle uppercase tracking-wider font-semibold">제목</th>
+                <th className="text-left px-5 py-3 text-xs text-subtle uppercase tracking-wider font-semibold hidden md:table-cell">작성자</th>
+                <th className="text-right px-5 py-3 text-xs text-subtle uppercase tracking-wider font-semibold hidden sm:table-cell">조회</th>
+                <th className="text-right px-5 py-3 text-xs text-subtle uppercase tracking-wider font-semibold hidden sm:table-cell">댓글</th>
+                <th className="text-right px-5 py-3 text-xs text-subtle uppercase tracking-wider font-semibold hidden md:table-cell">작성일</th>
+                <th className="text-right px-5 py-3 text-xs text-subtle uppercase tracking-wider font-semibold">관리</th>
               </tr>
             </thead>
             <tbody>
               {posts.map(post => (
-                <tr key={post.id} className="border-b border-[#2e2318] hover:bg-[#1a1208] transition-colors last:border-b-0">
+                <tr key={post.id} className="border-b border-line hover:bg-surface-2 transition-colors last:border-b-0">
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2">
                       {post.pinned && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#2a1f08] text-[#f0a832] shrink-0">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-accent-tint text-accent-2 shrink-0">
                           <Pin size={9} />
                           고정
                         </span>
                       )}
-                      <span className="font-medium text-[#f5ead8] truncate max-w-[200px] sm:max-w-xs">{post.title}</span>
+                      <span className="font-medium text-fg truncate max-w-[200px] sm:max-w-xs">{post.title}</span>
                     </div>
                   </td>
-                  <td className="px-5 py-3 text-[#8a7055] hidden md:table-cell">{post.author.nickname}</td>
-                  <td className="px-5 py-3 text-right text-[#8a7055] tabular-nums hidden sm:table-cell">{post.viewCount.toLocaleString()}</td>
-                  <td className="px-5 py-3 text-right text-[#8a7055] tabular-nums hidden sm:table-cell">{post._count.comments}</td>
-                  <td className="px-5 py-3 text-right text-[#5a4830] text-xs hidden md:table-cell">
+                  <td className="px-5 py-3 text-muted hidden md:table-cell">{post.author.nickname}</td>
+                  <td className="px-5 py-3 text-right text-muted tabular-nums hidden sm:table-cell">{post.viewCount.toLocaleString()}</td>
+                  <td className="px-5 py-3 text-right text-muted tabular-nums hidden sm:table-cell">{post._count.comments}</td>
+                  <td className="px-5 py-3 text-right text-subtle text-xs hidden md:table-cell">
                     {format(new Date(post.createdAt), 'MM/dd HH:mm', { locale: ko })}
                   </td>
                   <td className="px-5 py-3 text-right">
@@ -402,8 +405,8 @@ function PostsContent() {
                           title={post.pinned ? '고정 해제' : '상단 고정'}
                           className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-lg transition-colors disabled:opacity-40 ${
                             post.pinned
-                              ? 'text-[#f0a832] bg-[#2a1f08] hover:bg-[#3d2e0c]'
-                              : 'text-[#7a6040] hover:text-[#f0a832] hover:bg-[#2a1f08]'
+                              ? 'text-accent-2 bg-accent-tint hover:bg-accent-line'
+                              : 'text-muted-2 hover:text-accent-2 hover:bg-accent-tint'
                           }`}
                         >
                           <Pin size={12} />
@@ -412,7 +415,7 @@ function PostsContent() {
                       )}
                       <button
                         onClick={() => startEdit(post)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs text-[#7a6040] hover:text-[#e0b878] hover:bg-[#2a1c08] rounded-lg transition-colors"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs text-muted-2 hover:text-accent-soft hover:bg-accent-tint rounded-lg transition-colors"
                       >
                         <Pencil size={12} />
                         수정
@@ -435,7 +438,7 @@ function PostsContent() {
               ))}
               {posts.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-5 py-10 text-center text-[#5a4830]">게시글이 없습니다.</td>
+                  <td colSpan={6} className="px-5 py-10 text-center text-subtle">게시글이 없습니다.</td>
                 </tr>
               )}
             </tbody>
@@ -450,8 +453,8 @@ export default function AdminPostsPage() {
   return (
     <Suspense fallback={
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-[#f5ead8]">게시글 관리</h1>
-        <div className="bg-[#1a1410] border border-[#2e2318] rounded-2xl h-32 animate-pulse" />
+        <h1 className="text-[26px] sm:text-3xl font-bold tracking-tight text-fg">게시글 관리</h1>
+        <div className="bg-surface border border-line rounded-2xl h-32 animate-pulse" />
       </div>
     }>
       <PostsContent />
