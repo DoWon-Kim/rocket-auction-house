@@ -18,6 +18,10 @@ import { WishlistButton } from '@/components/WishlistButton'
 import { useRecentlyViewed } from '@/hooks/useRecentlyViewed'
 import { useCollection } from '@/hooks/useCollection'
 import { TiltCard } from '@/components/TiltCard'
+import { LANG_LABEL, LANG_SHORT, setHref, stageLabel, won, fmtDate, type CardLang } from '@/lib/cardDex'
+import { ArrowRight, GitBranch, Sparkles } from 'lucide-react'
+import { useKoreanView } from '@/hooks/useKoreanView'
+import { KoViewToggle, PokedexPanel, TcgStatsPanel, type SpeciesInfo } from '@/components/cards/KoreanDex'
 
 // ─── 타입 ─────────────────────────────────────────────────────────────────────
 
@@ -71,9 +75,36 @@ interface CardDetail {
   snkrdunkPrice: number | null
   snkrdunkListings: string | null
   snkrdunkUpdatedAt: string | null
+  stage: string | null
+  evolvesFrom: string | null
+  dexIds: number[]
+  regulationMark: string | null
+  lang: CardLang
+  stats: Record<string, unknown> | null
+  textKo: {
+    attacks?: Array<{ name: string | null; text: string | null }>
+    abilities?: Array<{ name: string | null; text: string | null }>
+    effect?: string | null; flavor?: string | null; typeLine?: string | null
+  } | null
+  textKoSource: string | null
+  species: SpeciesInfo[]
+  set: { name: string; series: string | null; releaseDate: string | null; logoUrl: string | null; symbolUrl: string | null; officialCount: number | null; totalCount: number | null } | null
   createdAt: string
   _count: { listings: number; oripaItems: number }
   marketStats: MarketStats | null
+}
+
+interface RelatedCard {
+  id: string; name: string; nameKo: string | null; nameJa: string | null; setName: string; setCode: string | null
+  cardNumber: string | null; rarity: string; imageUrl: string | null; stage: string | null; snkrdunkPrice: number | null
+  lang: CardLang; activeListings: number
+}
+interface EvoNode { name: string; card: RelatedCard | null; children?: EvoNode[] }
+interface Related {
+  lang: CardLang
+  versions: RelatedCard[]
+  evolution: { ancestors: EvoNode[]; current: string; descendants: EvoNode[] }
+  samePokemon: { total: number; cards: RelatedCard[] }
 }
 
 interface Listing {
@@ -327,6 +358,78 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
 
 // ─── 메인 페이지 ─────────────────────────────────────────────────────────────
 
+// ─── 관련 카드 (진화 라인 · 같은 포켓몬) ─────────────────────────────────────
+
+const relName = (c: RelatedCard) => (c.lang === 'ja' ? c.nameJa ?? c.name : c.nameKo ?? c.name)
+
+function EvoCard({ node, current }: { node: EvoNode; current?: boolean }) {
+  const inner = (
+    <div className={`w-[88px] flex flex-col items-center gap-1.5 ${current ? '' : 'group'}`}>
+      <div className={`relative w-[88px] aspect-[3/4] rounded-xl overflow-hidden border bg-surface-2 transition-all ${current ? 'border-accent shadow-[0_0_24px_-4px_rgba(139,92,246,0.6)]' : 'border-line group-hover:border-accent/50 group-hover:-translate-y-0.5'}`}>
+        {node.card?.imageUrl
+          ? <Image src={resolveImageSrc(node.card.imageUrl)!} alt={node.name} fill sizes="88px" className="object-contain" />
+          : <div className="absolute inset-0 flex items-center justify-center px-2 text-center text-[10px] text-subtle">도감에 없음</div>}
+      </div>
+      <p className={`text-[11px] text-center leading-tight line-clamp-2 ${current ? 'text-fg font-semibold' : 'text-muted group-hover:text-fg'}`}>{node.name}</p>
+      {node.card?.stage && <span className="text-[9px] text-subtle">{stageLabel(node.card.stage)}</span>}
+    </div>
+  )
+  return node.card && !current ? <Link href={`/cards/${node.card.id}`}>{inner}</Link> : inner
+}
+
+function EvolutionLine({ evo, currentCard }: { evo: Related['evolution']; currentCard: RelatedCard }) {
+  if (!evo.ancestors.length && !evo.descendants.length) return null
+  const arrow = <ArrowRight size={16} className="shrink-0 text-subtle mt-12" />
+  return (
+    <section className="space-y-3">
+      <h2 className="text-2xl font-bold tracking-tight text-fg flex items-center gap-2"><GitBranch size={20} className="text-accent-fg" />진화 라인</h2>
+      <div className="rounded-2xl border border-line bg-surface p-4 sm:p-5 overflow-x-auto">
+        <div className="flex items-start gap-3 w-max">
+          {evo.ancestors.map(a => <div key={a.name} className="flex items-start gap-3"><EvoCard node={a} />{arrow}</div>)}
+          <EvoCard node={{ name: evo.current, card: currentCard }} current />
+          {evo.descendants.length > 0 && arrow}
+          {evo.descendants.length > 0 && (
+            <div className="flex flex-col gap-3">
+              {evo.descendants.map(d => (
+                <div key={d.name} className="flex items-start gap-3">
+                  <EvoCard node={d} />
+                  {d.children && d.children.length > 0 && (
+                    <>{arrow}<div className="flex gap-3">{d.children.map(g => <EvoCard key={g.name} node={g} />)}</div></>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function RelatedStrip({ title, icon, cards, more }: { title: string; icon: React.ReactNode; cards: RelatedCard[]; more?: React.ReactNode }) {
+  if (!cards.length) return null
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-2xl font-bold tracking-tight text-fg flex items-center gap-2">{icon}{title}</h2>
+        {more}
+      </div>
+      <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
+        {cards.map(c => (
+          <Link key={c.id} href={`/cards/${c.id}`} className="shrink-0 w-28 group">
+            <div className="relative w-28 aspect-[3/4] rounded-xl overflow-hidden border border-line group-hover:border-accent/50 group-hover:-translate-y-1 transition-all bg-surface">
+              {c.imageUrl ? <Image src={resolveImageSrc(c.imageUrl)!} alt={relName(c)} fill sizes="112px" className="object-contain" /> : <div className="absolute inset-0 flex items-center justify-center text-xl text-line">🃏</div>}
+            </div>
+            <p className="mt-1.5 text-[11px] text-muted group-hover:text-fg truncate">{relName(c)}</p>
+            <p className="text-[10px] text-subtle truncate">{c.setCode} · {rarityLabel(c.rarity)}</p>
+            {(c.snkrdunkPrice ?? 0) > 0 && <p className="text-[10px] text-sky-300 font-semibold tabular-nums">{won(c.snkrdunkPrice!)}</p>}
+          </Link>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 export default function CardDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
@@ -337,6 +440,7 @@ export default function CardDetailPage() {
   const [imgError, setImgError] = useState(false)
   const { addCard } = useRecentlyViewed()
   const { isCollected, toggle: toggleCollection } = useCollection()
+  const koView = useKoreanView()
 
   const { data: card, isLoading } = useQuery<CardDetail>({
     queryKey: ['card', id],
@@ -348,20 +452,24 @@ export default function CardDetailPage() {
   }, [card?.id])
 
   const { data: sameSetData } = useQuery<{ cards: Array<{ id: string; name: string; nameKo: string | null; cardNumber: string | null; imageUrl: string | null; rarity: string }> }>({
-    queryKey: ['same-set', card?.setName, card?.tcgType, id],
+    queryKey: ['same-set', card?.setCode, card?.lang, card?.tcgType, id],
     queryFn: () => api.get('/cards', {
-      params: { setName: card!.setName, tcgType: card!.tcgType, limit: 18, sort: 'name' },
+      params: card!.setCode
+        ? { setCode: card!.setCode, setLang: card!.lang, tcgType: card!.tcgType, limit: 18, sort: 'price_desc' }
+        : { setName: card!.setName, tcgType: card!.tcgType, limit: 18, sort: 'name' },
     }).then(r => r.data),
     enabled: !!card,
     staleTime: 60_000,
   })
 
-  const { data: variants } = useQuery<Array<{ id: string; name: string; nameKo: string | null; cardNumber: string | null; rarity: string; imageUrl: string | null; _count: { listings: number } }>>({
-    queryKey: ['card-variants', id],
-    queryFn: () => api.get(`/cards/${id}/variants`).then(r => r.data),
+  // 같은 세트·번호의 다른 버전/언어판, 진화 라인, 같은 포켓몬
+  const { data: related } = useQuery<Related>({
+    queryKey: ['card-related', id],
+    queryFn: () => api.get(`/cards/${id}/related`).then(r => r.data),
     enabled: !!card,
     staleTime: 60_000,
   })
+  const variants = related?.versions
 
   const { data: listingsData, isLoading: listingsLoading } = useQuery<ListingsResponse>({
     queryKey: ['card-listings', id, listingSort, listingType, listingPage],
@@ -402,7 +510,12 @@ export default function CardDetailPage() {
     )
   }
 
-  const displayName    = card.nameKo ?? card.nameJa ?? card.name
+  const originalName   = card.lang === 'ja' ? card.nameJa ?? card.name : card.name
+  const displayName    = koView.on ? card.nameKo ?? originalName : originalName
+  const kt             = koView.on && card.lang !== 'ko' ? card.textKo : null
+  // 번역이 없는 항목은 원문 그대로 (섞이지 않게 항목 단위로)
+  const koOr = (ko: string | null | undefined, orig: string | null | undefined) => (kt && ko ? ko : orig)
+  const hasKoText = !!card.textKo && card.lang !== 'ko' && !!card.textKoSource
   const rColor         = rarityColorClass(card.rarity)
   const listings       = listingsData?.listings ?? []
   const cheapestBuyNow = listings
@@ -477,7 +590,7 @@ export default function CardDetailPage() {
           {/* 다른 버전 */}
           {variants && variants.length > 0 && (
             <div className="w-full max-w-[340px]">
-              <p className="text-[10px] text-subtle uppercase tracking-wider mb-2 font-semibold">다른 버전 ({variants.length})</p>
+              <p className="text-[10px] text-subtle uppercase tracking-wider mb-2 font-semibold">다른 버전·언어판 ({variants.length})</p>
               <div className="grid grid-cols-3 gap-2">
                 {variants.map(v => (
                   <Link key={v.id} href={`/cards/${v.id}`} className="group flex flex-col items-center gap-1">
@@ -497,9 +610,10 @@ export default function CardDetailPage() {
                     <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded border ${rarityColorClass(v.rarity)}`}>
                       {rarityLabel(v.rarity)}
                     </span>
-                    <span className="text-[9px] text-subtle font-mono text-center leading-tight">
-                      {v.cardNumber?.replace(/.*_/, '_') ?? ''}
+                    <span className="text-[9px] text-subtle text-center leading-tight">
+                      {v.lang !== card.lang ? LANG_SHORT[v.lang] : v.cardNumber?.replace(/.*_/, '_') ?? ''}
                     </span>
+                    {(v.snkrdunkPrice ?? 0) > 0 && <span className="text-[9px] text-sky-300 font-semibold tabular-nums">{won(v.snkrdunkPrice!)}</span>}
                   </Link>
                 ))}
               </div>
@@ -520,6 +634,12 @@ export default function CardDetailPage() {
               <span className="inline-flex items-center gap-1 h-7 px-3 rounded-full border border-line bg-surface-2 text-[11px] text-muted-2">
                 {TCG_ICONS[card.tcgType]} {TCG_LABELS[card.tcgType] ?? card.tcgType}
               </span>
+              <span className="inline-flex items-center h-7 px-3 rounded-full border border-line bg-surface-2 text-[11px] text-muted-2">{LANG_LABEL[card.lang]}</span>
+              {card.regulationMark && (
+                <span className="inline-flex items-center gap-1 h-7 px-3 rounded-full border border-line bg-surface-2 text-[11px] text-muted-2" title="레귤레이션 마크">
+                  레귤레이션 <b className="text-fg">{card.regulationMark}</b>
+                </span>
+              )}
               {card.nameKo && (
                 <span className="inline-flex items-center gap-1 h-7 px-3 rounded-full border border-emerald-700/40 bg-emerald-900/20 text-[11px] text-emerald-400 font-medium">
                   🇰🇷 한국어
@@ -552,16 +672,16 @@ export default function CardDetailPage() {
 
             {/* 서브 이름 (원문, 일본어) */}
             <div className="mt-1.5 space-y-0.5">
-              {card.nameKo && card.name !== card.nameKo && (
-                <p className="text-sm text-muted-2">
-                  <span className="text-[10px] mr-1.5 opacity-60">🇺🇸</span>{card.name}
+              {/* 제목과 다른 언어 이름만 한 번씩 */}
+              {[
+                { flag: '🇰🇷', value: card.nameKo },
+                { flag: '🇯🇵', value: card.nameJa ?? (card.lang === 'ja' ? card.name : null) },
+                { flag: '🇺🇸', value: card.lang === 'en' ? card.name : null },
+              ].filter((x, i, arr) => x.value && x.value !== displayName && arr.findIndex(y => y.value === x.value) === i).map(x => (
+                <p key={x.flag} className="text-sm text-muted-2">
+                  <span className="text-[10px] mr-1.5 opacity-60">{x.flag}</span>{x.value}
                 </p>
-              )}
-              {card.nameJa && (
-                <p className="text-sm text-subtle">
-                  <span className="text-[10px] mr-1.5 opacity-60">🇯🇵</span>{card.nameJa}
-                </p>
-              )}
+              ))}
             </div>
           </div>
 
@@ -622,8 +742,25 @@ export default function CardDetailPage() {
                 <span className="text-blue-300">{card.nameJa}</span>
               } />
             )}
-            <InfoRow label="세트" value={card.setName} />
+            <InfoRow label="세트" value={card.setCode
+              ? <Link href={setHref(card.tcgType, card.lang, card.setCode)} className="text-accent-fg hover:underline">{card.set?.name ?? card.setName}</Link>
+              : card.setName} />
             <InfoRow label="세트 코드" value={card.setCode} />
+            {card.set?.releaseDate && <InfoRow label="발매일" value={fmtDate(card.set.releaseDate)} />}
+            {card.stage && <InfoRow label="진화 단계" value={stageLabel(card.stage)} />}
+            {card.evolvesFrom && <InfoRow label="진화 전" value={card.evolvesFrom} />}
+            {card.dexIds?.length > 0 && (
+              <InfoRow label="전국 도감" value={
+                <span className="flex flex-wrap gap-1">{card.dexIds.map(n => (
+                  <Link key={n} href={`/cards?q=%23${n}&tcgType=${card.tcgType}`} className="text-accent-fg hover:underline">No.{n}</Link>
+                ))}</span>
+              } />
+            )}
+            {card.artist && (
+              <InfoRow label="일러스트레이터" value={
+                <Link href={`/cards?artist=${encodeURIComponent(card.artist)}&tcgType=${card.tcgType}`} className="text-accent-fg hover:underline">{card.artist}</Link>
+              } />
+            )}
             <InfoRow label="카드 번호" value={card.cardNumber ? `[${card.cardNumber}]` : null} />
             <InfoRow label="레어도" value={
               <span className={`px-1.5 py-0.5 rounded border text-[10px] font-semibold ${rColor}`}>
@@ -649,6 +786,7 @@ export default function CardDetailPage() {
                   {card.cardTypes && card.cardTypes.split(',').map(t => (
                     <EnergyBadge key={t} type={t.trim()} />
                   ))}
+                  {hasKoText && <KoViewToggle source={card.textKoSource} />}
                 </div>
                 {card.hp && (
                   <div className="flex items-center gap-1">
@@ -667,9 +805,9 @@ export default function CardDetailPage() {
                         <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded bg-red-900/40 text-red-400 border border-red-700/30">
                           {ab.type === 'Pokémon Power' ? '포켓몬 파워' : ab.type === 'Ancient Trait' ? '고대 특성' : '특성'}
                         </span>
-                        <span className="text-sm font-semibold text-fg">{ab.name}</span>
+                        <span className="text-sm font-semibold text-fg">{koOr(kt?.abilities?.[i]?.name, ab.name)}</span>
                       </div>
-                      <p className="text-xs text-muted leading-relaxed">{ab.text}</p>
+                      <p className="text-xs text-muted leading-relaxed">{koOr(kt?.abilities?.[i]?.text, ab.text)}</p>
                     </div>
                   ))}
                 </div>
@@ -686,14 +824,14 @@ export default function CardDetailPage() {
                           {atk.cost.map((c, j) => (
                             <EnergyBadge key={j} type={c} />
                           ))}
-                          <span className="text-sm font-semibold text-fg">{atk.name}</span>
+                          <span className="text-sm font-semibold text-fg">{koOr(kt?.attacks?.[i]?.name, atk.name)}</span>
                         </div>
                         {atk.damage && (
                           <span className="text-lg font-black text-accent-2 whitespace-nowrap">{atk.damage}</span>
                         )}
                       </div>
                       {atk.text && (
-                        <p className="text-xs text-muted leading-relaxed">{atk.text}</p>
+                        <p className="text-xs text-muted leading-relaxed">{koOr(kt?.attacks?.[i]?.text, atk.text)}</p>
                       )}
                     </div>
                   ))}
@@ -741,7 +879,7 @@ export default function CardDetailPage() {
               {/* 풀레이버 텍스트 */}
               {card.flavorText && (
                 <div className="px-4 py-3 border-t border-surface-2">
-                  <p className="text-[11px] text-subtle italic leading-relaxed">&ldquo;{card.flavorText}&rdquo;</p>
+                  <p className="text-[11px] text-subtle italic leading-relaxed">&ldquo;{koOr(kt?.flavor, card.flavorText)}&rdquo;</p>
                 </div>
               )}
 
@@ -825,11 +963,19 @@ export default function CardDetailPage() {
             </div>
           )}
 
-          {card.description && card.tcgType !== 'ONEPIECE' && (
-            <div className="bg-surface border border-line rounded-2xl p-4">
-              <p className="text-xs text-muted leading-relaxed">{card.description}</p>
+          {(card.tcgType === 'YUGIOH' || card.tcgType === 'MTG' || card.tcgType === 'DIGIMON') && (
+            <TcgStatsPanel tcgType={card.tcgType} stats={card.stats} description={card.description}
+              textKo={card.textKo} textKoSource={card.textKoSource} />
+          )}
+
+          {card.description && !['ONEPIECE', 'YUGIOH', 'MTG', 'DIGIMON'].includes(card.tcgType) && (
+            <div className="bg-surface border border-line rounded-2xl p-4 space-y-2">
+              {hasKoText && card.textKo?.effect && <div className="flex justify-end"><KoViewToggle source={card.textKoSource} /></div>}
+              <p className="text-xs text-muted leading-relaxed whitespace-pre-line">{koOr(kt?.effect, card.description)}</p>
             </div>
           )}
+
+          <PokedexPanel species={card.species ?? []} />
 
           {/* 시세 패널 */}
           <MarketPanel stats={card.marketStats} card={card} />
@@ -838,6 +984,26 @@ export default function CardDetailPage() {
           <PriceHistoryChart cardId={card.id} />
         </div>
       </div>
+
+      {/* ── 진화 라인 · 같은 포켓몬 ── */}
+      {related && (
+        <EvolutionLine evo={related.evolution} currentCard={{
+          id: card.id, name: card.name, nameKo: card.nameKo, nameJa: card.nameJa, setName: card.setName, setCode: card.setCode,
+          cardNumber: card.cardNumber, rarity: card.rarity, imageUrl: card.imageUrl, stage: card.stage,
+          snkrdunkPrice: card.snkrdunkPrice, lang: card.lang, activeListings: card._count.listings,
+        }} />
+      )}
+      {related && (
+        <RelatedStrip
+          title="같은 포켓몬의 다른 카드" icon={<Sparkles size={20} className="text-accent-fg" />}
+          cards={related.samePokemon.cards}
+          more={card.dexIds?.[0] != null && related.samePokemon.total > related.samePokemon.cards.length ? (
+            <Link href={`/cards?q=%23${card.dexIds[0]}&tcgType=${card.tcgType}`} className="text-xs text-muted-2 hover:text-accent-fg">
+              전체 {related.samePokemon.total}장 보기 →
+            </Link>
+          ) : undefined}
+        />
+      )}
 
       {/* ── 활성 리스팅 ── */}
       <div className="space-y-4">
@@ -937,10 +1103,10 @@ export default function CardDetailPage() {
               <span className="text-xs font-normal text-subtle">— {card.setName}</span>
             </h2>
             <Link
-              href={`/cards?setName=${encodeURIComponent(card.setName)}&tcgType=${card.tcgType}`}
+              href={card.setCode ? setHref(card.tcgType, card.lang, card.setCode) : `/cards?setName=${encodeURIComponent(card.setName)}&tcgType=${card.tcgType}`}
               className="text-xs text-muted-2 hover:text-accent-fg transition-colors"
             >
-              전체 보기 →
+              세트 도감에서 보기 →
             </Link>
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">

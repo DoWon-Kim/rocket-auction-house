@@ -5,6 +5,9 @@ import { AuthRequest } from '../middleware/auth'
 import { fetchWithRetry, ExternalApiError } from '../lib/fetchWithRetry'
 import { nodeRequest } from '../lib/nodeRequest'
 import { runSnkrdunkSync, SyncBusyError } from '../services/syncRun.service'
+import { mapPtcgExtra, runCardDetailSync, CardDetailBusyError } from '../services/cardDetail.service'
+import { runKoreanDexPipeline, KoDexBusyError } from '../services/koDex.service'
+import { syncYugioh, syncDigimon, syncMtg } from '../services/otherTcg.service'
 
 // ── 공통 ────────────────────────────────────────────────────────────────────────
 
@@ -207,6 +210,9 @@ interface PokemonCard {
   convertedRetreatCost?: number
   artist?: string
   flavorText?: string
+  evolvesFrom?: string
+  nationalPokedexNumbers?: number[]
+  regulationMark?: string
 }
 
 export async function getPokemonSets(_req: AuthRequest, res: Response) {
@@ -344,6 +350,7 @@ export async function importPokemon(req: AuthRequest, res: Response) {
       retreatCost: c.convertedRetreatCost ?? null,
       artist:      c.artist ?? null,
       flavorText:  c.flavorText ?? null,
+      ...mapPtcgExtra(c),
     }))
 
     const result = await prisma.card.createMany({ data: records, skipDuplicates: true })
@@ -813,12 +820,10 @@ interface DigimonIoCard {
   set_name?: string[]
 }
 
-// Limitless TCG CDN: "BT1-001" → "BT01/BT01-001_EN.webp"
+// digimoncard.io 공식 이미지 CDN: "BT1-001" → images.digimoncard.io/images/cards/BT1-001.webp
+// (Limitless TCG CDN은 외부 접근이 403으로 막혀 있어 교체)
 function digimonImageUrl(cardId: string): string | null {
-  const m = cardId.match(/^([A-Z]+)(\d+)-(\d+)$/)
-  if (!m) return null
-  const setCode = `${m[1]}${m[2].padStart(2, '0')}`
-  return `https://limitlesstcg.nyc3.digitaloceanspaces.com/digimon/${setCode}/${setCode}-${m[3]}_EN.webp`
+  return cardId ? `https://images.digimoncard.io/images/cards/${encodeURIComponent(cardId)}.webp` : null
 }
 
 export async function importDigimon(_req: AuthRequest, res: Response) {
@@ -1197,6 +1202,7 @@ export async function importAll(req: AuthRequest, res: Response) {
                 resistances: c.resistances ? c.resistances as unknown as Prisma.InputJsonValue : undefined,
                 retreatCost: c.convertedRetreatCost ?? null, artist: c.artist ?? null,
                 flavorText: c.flavorText ?? null,
+                ...mapPtcgExtra(c),
               }))
               const result = await prisma.card.createMany({ data: records, skipDuplicates: true })
               totals['POKEMON'].imported += result.count
@@ -2074,6 +2080,63 @@ export async function importSnkrdunk(req: AuthRequest, res: Response) {
     if (err instanceof SyncBusyError) { send({ type: 'error', reason: '이미 동기화가 실행 중입니다. 카드 매칭 검수 화면에서 진행 상황을 확인하세요.' }); return }
     console.error('[importSnkrdunk]', err)
     send({ type: 'error', reason: String(err) })
+  } finally {
+    clearInterval(heartbeat)
+    res.end()
+  }
+}
+
+// ── 카드 상세·세트 정보 보강 (TCGdex / pokemontcg.io) ─────────────────────────
+
+export async function importCardDetails(_req: AuthRequest, res: Response) {
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+
+  let closed = false
+  res.on('close', () => { closed = true })
+  const send = (data: object) => { if (!closed) res.write(`data: ${JSON.stringify(data)}\n\n`) }
+  const heartbeat = setInterval(() => { if (!closed && !res.writableEnded) res.write(': heartbeat\n\n') }, 15_000)
+
+  try {
+    send({ type: 'start', message: '세트 정보·카드 상세 보강 시작...' })
+    const result = await runCardDetailSync({ onEvent: send, isCancelled: () => closed })
+    send({ type: 'done', ...result })
+  } catch (err) {
+    if (err instanceof CardDetailBusyError) send({ type: 'error', reason: err.message })
+    else { console.error('[importCardDetails]', err); send({ type: 'error', reason: String(err) }) }
+  } finally {
+    clearInterval(heartbeat)
+    res.end()
+  }
+}
+
+// ── 한국어 도감 데이터 구축 (포켓몬 전체 + 다른 TCG) ─────────────────────────
+// 쿼리: pokemon=1 importCards=1 yugioh=1 digimon=1 mtg=1 (기본 모두 켜짐, 0으로 끔)
+
+export async function importKoreanDex(req: AuthRequest, res: Response) {
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+
+  let closed = false
+  res.on('close', () => { closed = true })
+  const send = (data: object) => { if (!closed) res.write(`data: ${JSON.stringify(data)}\n\n`) }
+  const heartbeat = setInterval(() => { if (!closed && !res.writableEnded) res.write(': heartbeat\n\n') }, 15_000)
+  const on = (k: string) => req.query[k] !== '0'
+
+  const result: Record<string, unknown> = {}
+  try {
+    if (on('pokemon')) {
+      result.pokemon = await runKoreanDexPipeline({ importCards: on('importCards'), emit: send, isCancelled: () => closed })
+    }
+    if (on('yugioh') && !closed) { send({ type: 'step', step: '유희왕 상세·한국어' }); result.yugioh = await syncYugioh({ emit: send }) }
+    if (on('digimon') && !closed) { send({ type: 'step', step: '디지몬 상세' }); result.digimon = await syncDigimon({ emit: send }) }
+    if (on('mtg') && !closed) { send({ type: 'step', step: 'MTG 상세·한국어' }); result.mtg = await syncMtg({ emit: send, isCancelled: () => closed }) }
+    send({ type: 'done', ...result })
+  } catch (err) {
+    if (err instanceof KoDexBusyError) send({ type: 'error', reason: err.message })
+    else { console.error('[importKoreanDex]', err); send({ type: 'error', reason: String(err) }) }
   } finally {
     clearInterval(heartbeat)
     res.end()

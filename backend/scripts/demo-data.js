@@ -1,5 +1,6 @@
 // 로컬 디자인 확인용 데모 데이터. 모든 레코드는 demo_ 접두어로 식별됩니다.
 //   생성: node scripts/demo-data.js
+//   샵 상품만: node scripts/demo-data.js --shop
 //   삭제: node scripts/demo-data.js --clean
 require('dotenv/config')
 
@@ -30,7 +31,15 @@ async function clean() {
   const cardIds = cards.map(c => c.id)
   const listings = await prisma.listing.findMany({ where: { OR: [{ cardId: { in: cardIds } }, { sellerId: { in: userIds } }] }, select: { id: true } })
   const listingIds = listings.map(l => l.id)
+  const shopItems = await prisma.shopItem.findMany({ where: { name: { startsWith: DEMO_SHOP_PREFIX } }, select: { id: true } })
+  const shopIds = shopItems.map(i => i.id)
+  const shopOrderWhere = { OR: [{ userId: { in: userIds } }, { shopItemId: { in: shopIds } }] }
   await prisma.$transaction([
+    prisma.shopReview.deleteMany({ where: { OR: [{ userId: { in: userIds } }, { shopItemId: { in: shopIds } }] } }),
+    prisma.cartItem.deleteMany({ where: { OR: [{ userId: { in: userIds } }, { shopItemId: { in: shopIds } }] } }),
+    prisma.shopOrder.deleteMany({ where: shopOrderWhere }),
+    prisma.shopPurchase.deleteMany({ where: { userId: { in: userIds } } }),
+    prisma.shopItem.deleteMany({ where: { id: { in: shopIds } } }),
     prisma.commentLike.deleteMany({ where: { userId: { in: userIds } } }),
     prisma.postLike.deleteMany({ where: { userId: { in: userIds } } }),
     prisma.comment.deleteMany({ where: { authorId: { in: userIds }, replies: { none: {} } } }),
@@ -45,7 +54,41 @@ async function clean() {
     prisma.notification.deleteMany({ where: { userId: { in: userIds } } }),
     prisma.user.deleteMany({ where: { id: { in: userIds } } }),
   ])
-  console.log(`삭제: 유저 ${userIds.length}, 카드 ${cardIds.length}, 리스팅 ${listingIds.length}`)
+  console.log(`삭제: 유저 ${userIds.length}, 카드 ${cardIds.length}, 리스팅 ${listingIds.length}, 샵 상품 ${shopIds.length}`)
+}
+
+// 샵 데모 상품 (이미지는 DB에 있는 카드 이미지를 빌려 씀)
+const DEMO_SHOP_PREFIX = '[데모] '
+async function createShop() {
+  const imgs = (await prisma.card.findMany({ where: { imageUrl: { not: null }, snkrdunkPrice: { gt: 100000 } }, select: { imageUrl: true }, take: 12 })).map(c => c.imageUrl)
+  const img = i => imgs[i % Math.max(imgs.length, 1)] ?? null
+  const items = [
+    ['포켓몬 카드 MEGA 확장팩 「닌자스피너」 부스터 박스', 'POKEMON', 'BOOSTER_BOX', 54000, 60000, 12, true],
+    ['포켓몬 카드 MEGA 확장팩 「어비스아이」 부스터 박스', 'POKEMON', 'BOOSTER_BOX', 52000, 58000, 4, true],
+    ['포켓몬 카드 스타터 덱 ex 「메가개굴닌자」', 'POKEMON', 'STARTER_DECK', 16500, 18000, 30, false],
+    ['포켓몬 카드 MEGA 확장팩 단품 팩 (5장)', 'POKEMON', 'SINGLE_PACK', 1100, null, 200, false],
+    ['포켓몬 카드 프리미엄 트레이너 박스', 'POKEMON', 'GIFT_SET', 69000, 79000, 3, true],
+    ['유희왕 OCG 부스터 「블레이징 도미니언」 박스', 'YUGIOH', 'BOOSTER_BOX', 48000, null, 8, false],
+    ['유희왕 스트럭처 덱 「블루아이즈」', 'YUGIOH', 'STARTER_DECK', 13000, 15000, 0, false],
+    ['원피스 카드게임 부스터 팩 박스 OP-10', 'ONEPIECE', 'BOOSTER_BOX', 62000, 66000, 6, false],
+    ['디지몬 카드게임 스타터 덱 ST-20', 'DIGIMON', 'STARTER_DECK', 14000, null, 15, false],
+    ['포켓몬 카드 30주년 스페셜 세트', 'POKEMON', 'SPECIAL', 120000, 139000, 2, true],
+  ]
+  let n = 0
+  for (const [name, tcgType, category, price, originalPrice, stock, isFeatured] of items) {
+    await prisma.shopItem.create({ data: {
+      name: DEMO_SHOP_PREFIX + name, tcgType, category, price, originalPrice, stock, isFeatured,
+      isSoldOut: stock === 0, imageUrl: img(n), images: [img(n + 1), img(n + 2)].filter(Boolean),
+      description: `로컬 확인용 데모 상품입니다.
+
+- 정품 미개봉
+- 주문 후 영업일 기준 1~2일 내 발송
+- 개봉 후 교환·환불 불가`,
+      soldCount: [37, 12, 58, 240, 9, 21, 44, 5, 7, 3][n],
+    } })
+    n++
+  }
+  console.log(`샵 데모 상품 ${n}개 생성`)
 }
 
 async function create() {
@@ -122,6 +165,6 @@ async function create() {
   console.log(`카드 상세: /cards/${cards[0].id}  경매 상세: /listings/${auction.id}`)
 }
 
-;(process.argv.includes('--clean') ? clean() : create())
+;(process.argv.includes('--clean') ? clean() : process.argv.includes('--shop') ? createShop() : create())
   .catch(e => { console.error(e); process.exitCode = 1 })
   .finally(() => prisma.$disconnect())

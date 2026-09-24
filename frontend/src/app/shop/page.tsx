@@ -1,508 +1,225 @@
-﻿'use client'
+'use client'
 
-import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useSearchParams, useRouter } from 'next/navigation'
-import { api } from '@/lib/api'
-import { useAuthStore } from '@/lib/store'
-import Image from 'next/image'
+import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useQuery } from '@tanstack/react-query'
+import { ChevronLeft, ChevronRight, Truck, ShieldCheck, Coins, Package, Flame, Sparkles, Timer } from 'lucide-react'
+import { api } from '@/lib/api'
 import { TCG_LABELS } from '@/lib/utils'
-import { ShoppingCart, Package, ChevronLeft, ChevronRight, Minus, Plus, X, Store, AlertCircle, CheckCircle, EyeOff, Eye } from 'lucide-react'
-import Badge from '@/components/ui/Badge'
-import { Suspense } from 'react'
+import { CATEGORY_ICON, CATEGORY_LABELS, P, type ShippingPolicy, type ShopItemCard } from '@/lib/shop'
+import { ProductCard, PriceBlock } from '@/components/shop/ProductCard'
+import { ShopTopBar } from '@/components/shop/ShopTopBar'
+import { OripaGrid } from '@/components/shop/OripaGrid'
 
-// ─── 공용 상수 ──────────────────────────────────────────────────────────────
-
-const CATEGORY_LABELS: Record<string, string> = {
-  BOOSTER_BOX: '부스터 박스',
-  STARTER_DECK: '스타터 덱',
-  SINGLE_PACK: '단품 팩',
-  GIFT_SET: '기프트 세트',
-  SPECIAL: '특별판',
-  OTHER: '기타',
+interface Home {
+  featured: Array<ShopItemCard & { description: string | null; images: string[] }>
+  newArrivals: ShopItemCard[]; best: ShopItemCard[]; lowStock: ShopItemCard[]
+  categories: Array<{ category: string; count: number }>
+  tcgTypes: Array<{ tcgType: string; count: number }>
+  shipping: ShippingPolicy
 }
 
-const CATEGORY_COLOR: Record<string, string> = {
-  BOOSTER_BOX: 'bg-accent/20 text-[#8ba8ff]',
-  STARTER_DECK: 'bg-emerald-500/20 text-emerald-300',
-  SINGLE_PACK:  'bg-yellow-500/20 text-yellow-300',
-  GIFT_SET:     'bg-pink-500/20 text-pink-300',
-  SPECIAL:      'bg-purple-500/20 text-purple-300',
-  OTHER:        'bg-line text-muted',
-}
+const SORTS = [
+  { value: 'new', label: '신상품순' }, { value: 'popular', label: '인기순' },
+  { value: 'discount', label: '할인율순' }, { value: 'price_asc', label: '낮은 가격순' }, { value: 'price_desc', label: '높은 가격순' },
+]
 
-interface ShopItem {
-  id: string; name: string; description: string | null
-  tcgType: string; category: string; price: number; stock: number
-  imageUrl: string | null; isActive: boolean; isSoldOut: boolean
-}
+// ── 메인 배너 (추천 상품 캐러셀) ───────────────────────────────────────────────
 
-// ─── TCG 박스 탭 ─────────────────────────────────────────────────────────────
-
-function Pagination({ page, total, onChange }: { page: number; total: number; onChange: (p: number) => void }) {
-  if (total <= 1) return null
+function HeroCarousel({ items }: { items: Home['featured'] }) {
+  const [i, setI] = useState(0)
+  useEffect(() => {
+    if (items.length < 2) return
+    const t = setInterval(() => setI(v => (v + 1) % items.length), 5000)
+    return () => clearInterval(t)
+  }, [items.length])
+  if (!items.length) return null
+  const it = items[i % items.length]
   return (
-    <div className="flex items-center justify-center gap-2 mt-6">
-      <button onClick={() => onChange(page - 1)} disabled={page <= 1}
-        className="p-2 rounded-xl bg-surface border border-line hover:border-line-strong text-fg-3 hover:text-fg-2 disabled:opacity-30 transition-colors">
-        <ChevronLeft size={16} />
-      </button>
-      <span className="text-sm text-muted">{page} / {total}</span>
-      <button onClick={() => onChange(page + 1)} disabled={page >= total}
-        className="p-2 rounded-xl bg-surface border border-line hover:border-line-strong text-fg-3 hover:text-fg-2 disabled:opacity-30 transition-colors">
-        <ChevronRight size={16} />
-      </button>
-    </div>
-  )
-}
-
-const EMPTY_ADDR = { recipientName: '', recipientPhone: '', zipCode: '', address: '', addressDetail: '', shippingMemo: '' }
-
-function BuyModal({ item, onClose }: { item: ShopItem; onClose: () => void }) {
-  const { user } = useAuthStore()
-  const router = useRouter()
-  const qc = useQueryClient()
-  const [step, setStep] = useState<'qty' | 'addr' | 'done'>('qty')
-  const [qty, setQty] = useState(1)
-  const [addr, setAddr] = useState(EMPTY_ADDR)
-  const [errMsg, setErrMsg] = useState('')
-
-  const mut = useMutation({
-    mutationFn: () => api.post(`/shop/${item.id}/buy`, { quantity: qty, ...addr }),
-    onSuccess: () => {
-      setStep('done')
-      qc.invalidateQueries({ queryKey: ['shop'] })
-      qc.invalidateQueries({ queryKey: ['me'] })
-    },
-    onError: (e: { response?: { data?: { message?: string } } }) =>
-      setErrMsg(e.response?.data?.message ?? '구매 실패'),
-  })
-
-  const total = item.price * qty
-
-  const addrValid = addr.recipientName && addr.recipientPhone && addr.zipCode && addr.address
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/70" onClick={onClose}>
-      <div className="bg-surface border border-line rounded-2xl p-6 w-full max-w-sm space-y-4" onClick={e => e.stopPropagation()}>
-        {/* 헤더 */}
-        <div className="flex items-start justify-between">
-          <div className="flex-1 min-w-0 pr-3">
-            <h3 className="font-bold text-base leading-tight mb-1 text-fg">{item.name}</h3>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-muted">{TCG_LABELS[item.tcgType]}</span>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${CATEGORY_COLOR[item.category]}`}>{CATEGORY_LABELS[item.category]}</span>
-            </div>
-          </div>
-          <button onClick={onClose} className="text-subtle hover:text-fg shrink-0 transition-colors"><X size={18} /></button>
+    <section className="relative overflow-hidden rounded-3xl border border-line bg-gradient-to-br from-accent/25 via-surface to-sky-500/10">
+      <div className="absolute -top-24 -left-20 w-80 h-80 rounded-full bg-accent/25 blur-3xl pointer-events-none" />
+      <div className="relative grid md:grid-cols-[1.1fr_1fr] gap-6 p-6 sm:p-10 items-center min-h-[320px]">
+        <div className="space-y-4 order-2 md:order-1">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/20 text-accent-soft text-xs font-semibold"><Sparkles size={12} />추천 상품</span>
+          <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-fg leading-tight line-clamp-2">{it.name}</h2>
+          {it.description && <p className="text-sm text-muted line-clamp-2 max-w-lg">{it.description.split('\n')[0]}</p>}
+          <PriceBlock price={it.price} originalPrice={it.originalPrice} discountRate={it.discountRate} size="lg" />
+          <Link href={`/shop/${it.id}`} className="inline-flex h-12 px-7 items-center rounded-full bg-white text-bg text-sm font-bold hover:bg-fg-2">지금 구매하기</Link>
         </div>
-
-        {/* 스텝 인디케이터 */}
-        {step !== 'done' && (
-          <div className="flex items-center gap-2 text-xs text-subtle">
-            <span className={step === 'qty' ? 'text-accent-fg font-semibold' : 'text-subtle'}>① 수량 선택</span>
-            <span>›</span>
-            <span className={step === 'addr' ? 'text-accent-fg font-semibold' : 'text-subtle'}>② 배송지 입력</span>
-            <span>›</span>
-            <span>③ 구매 완료</span>
-          </div>
-        )}
-
-        {/* 완료 */}
-        {step === 'done' && (
-          <div className="space-y-3">
-            <div className="flex items-start gap-2 rounded-xl px-4 py-3 text-sm bg-emerald-950/50 border border-emerald-800/50 text-emerald-400">
-              <CheckCircle size={16} className="shrink-0 mt-0.5" />
-              <div>
-                <p className="font-semibold">구매가 완료됐습니다!</p>
-                <p className="text-xs mt-0.5 text-emerald-500/80">{total.toLocaleString()}P 결제 · 마이페이지에서 배송 현황을 확인하세요.</p>
-              </div>
-            </div>
-            <button onClick={onClose} className="w-full bg-surface border border-line hover:border-line-strong text-fg-3 hover:text-fg-2 py-2.5 rounded-xl text-sm transition-colors">닫기</button>
-          </div>
-        )}
-
-        {/* 1단계 - 수량 */}
-        {step === 'qty' && (
-          <>
-            <div className="bg-surface-2 border border-line rounded-xl p-4 space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted">단가</span>
-                <span className="font-semibold text-fg">{item.price.toLocaleString()}P</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted">수량</span>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setQty(q => Math.max(1, q - 1))}
-                    className="w-7 h-7 rounded-lg bg-surface border border-line hover:border-line-strong text-fg-3 hover:text-fg-2 flex items-center justify-center transition-colors">
-                    <Minus size={12} />
-                  </button>
-                  <span className="w-8 text-center font-semibold text-fg">{qty}</span>
-                  <button onClick={() => setQty(q => Math.min(10, item.stock, q + 1))}
-                    className="w-7 h-7 rounded-lg bg-surface border border-line hover:border-line-strong text-fg-3 hover:text-fg-2 flex items-center justify-center transition-colors">
-                    <Plus size={12} />
-                  </button>
-                </div>
-              </div>
-              <div className="border-t border-line pt-3 flex justify-between">
-                <span className="font-medium text-fg">합계</span>
-                <span className="text-lg text-accent-2 font-bold tabular-nums">{total.toLocaleString()}P</span>
-              </div>
-              {user && (
-                <p className={`text-xs text-right ${user.balance < total ? 'text-red-400' : 'text-subtle'}`}>
-                  보유: {user.balance.toLocaleString()}P{user.balance < total && ' · 포인트 부족'}
-                </p>
-              )}
-            </div>
-            <button
-              onClick={() => { if (!user) { router.push('/login'); return } if (user.balance >= total) setStep('addr') }}
-              disabled={!!user && user.balance < total}
-              className="w-full bg-accent hover:bg-accent-strong disabled:opacity-50 text-white py-3 rounded-xl font-semibold transition-colors shadow-[0_0_20px_rgba(139,92,246,0.25)]">
-              {user ? '다음 — 배송지 입력' : '로그인 후 구매'}
-            </button>
-          </>
-        )}
-
-        {/* 2단계 - 배송지 */}
-        {step === 'addr' && (
-          <>
-            <div className="space-y-2.5">
-              {[
-                { key: 'recipientName',  label: '수령인',   placeholder: '받으실 분 이름', type: 'text' },
-                { key: 'recipientPhone', label: '연락처',   placeholder: '010-0000-0000',  type: 'tel'  },
-                { key: 'zipCode',        label: '우편번호', placeholder: '12345',           type: 'text' },
-                { key: 'address',        label: '주소',     placeholder: '기본 주소',       type: 'text' },
-                { key: 'addressDetail',  label: '상세주소', placeholder: '상세 주소 (선택)', type: 'text' },
-                { key: 'shippingMemo',   label: '배송 메모', placeholder: '예: 문 앞에 놔주세요 (선택)', type: 'text' },
-              ].map(({ key, label, placeholder, type }) => (
-                <div key={key}>
-                  <label className="block text-xs text-muted-2 mb-1">{label}</label>
-                  <input
-                    type={type}
-                    value={addr[key as keyof typeof addr]}
-                    onChange={e => setAddr(p => ({ ...p, [key]: e.target.value }))}
-                    placeholder={placeholder}
-                    className="w-full bg-surface-2 border border-line focus:border-accent/60 rounded-lg px-3 py-2 text-sm text-fg placeholder:text-subtle outline-none transition-colors"
-                  />
-                </div>
-              ))}
-            </div>
-            {errMsg && (
-              <div className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm bg-red-950/50 border border-red-800/50 text-red-400">
-                <AlertCircle size={14} className="shrink-0" />{errMsg}
-              </div>
-            )}
-            <div className="flex gap-2">
-              <button onClick={() => { setErrMsg(''); setStep('qty') }}
-                className="flex-1 bg-surface border border-line hover:border-line-strong text-fg-3 hover:text-fg-2 py-2.5 rounded-xl text-sm transition-colors">
-                이전
-              </button>
-              <button
-                onClick={() => { setErrMsg(''); mut.mutate() }}
-                disabled={mut.isPending || !addrValid}
-                className="flex-[2] bg-accent hover:bg-accent-strong disabled:opacity-50 text-white py-2.5 rounded-xl font-semibold text-sm transition-colors shadow-[0_0_20px_rgba(139,92,246,0.25)]">
-                {mut.isPending ? '처리 중...' : `${total.toLocaleString()}P 결제 · 구매 완료`}
-              </button>
-            </div>
-          </>
-        )}
+        <div className="relative h-56 sm:h-72 order-1 md:order-2">
+          {it.imageUrl && <Image src={it.imageUrl} alt={it.name} fill sizes="(max-width:768px) 100vw, 45vw" className="object-contain drop-shadow-[0_20px_40px_rgba(0,0,0,0.6)]" priority />}
+        </div>
       </div>
-    </div>
+      {items.length > 1 && (
+        <>
+          <button onClick={() => setI(v => (v - 1 + items.length) % items.length)} aria-label="이전 배너"
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-bg/60 border border-line flex items-center justify-center hover:bg-bg"><ChevronLeft size={16} /></button>
+          <button onClick={() => setI(v => (v + 1) % items.length)} aria-label="다음 배너"
+            className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-bg/60 border border-line flex items-center justify-center hover:bg-bg"><ChevronRight size={16} /></button>
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
+            {items.map((_, n) => <button key={n} onClick={() => setI(n)} aria-label={`${n + 1}번 배너`} className={`h-1.5 rounded-full transition-all ${n === i % items.length ? 'w-6 bg-white' : 'w-1.5 bg-white/40'}`} />)}
+          </div>
+        </>
+      )}
+    </section>
   )
 }
 
-function BoxesTab() {
-  const [tcgType, setTcgType] = useState('')
-  const [category, setCategory] = useState('')
-  const [page, setPage] = useState(1)
-  const [hideSoldOut, setHideSoldOut] = useState(false)
-  const [buying, setBuying] = useState<ShopItem | null>(null)
+function Section({ title, icon, items, more }: { title: string; icon: React.ReactNode; items: ShopItemCard[]; more?: () => void }) {
+  if (!items.length) return null
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="flex items-center gap-2 text-xl font-bold text-fg">{icon}{title}</h2>
+        {more && <button onClick={more} className="text-xs text-muted hover:text-fg">전체 보기 →</button>}
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+        {items.slice(0, 5).map(i => <ProductCard key={i.id} item={i} />)}
+      </div>
+    </section>
+  )
+}
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['shop', tcgType, category, page, hideSoldOut],
-    queryFn: () => api.get('/shop', { params: { tcgType: tcgType || undefined, category: category || undefined, page, hideSoldOut: hideSoldOut || undefined } }).then(r => r.data),
-    staleTime: 60000,
+// ── 전체 상품 (필터·정렬·페이지) ───────────────────────────────────────────────
+
+function AllProducts({ q, tcgType, category, sort, page, hideSoldOut, setParam }: {
+  q: string; tcgType: string; category: string; sort: string; page: number; hideSoldOut: boolean
+  setParam: (k: string, v: string) => void
+}) {
+  const { data, isLoading } = useQuery<{ items: ShopItemCard[]; total: number; limit: number }>({
+    queryKey: ['shop-list', q, tcgType, category, sort, page, hideSoldOut],
+    queryFn: () => api.get('/shop', { params: { q: q || undefined, tcgType: tcgType || undefined, category: category || undefined, sort, page, hideSoldOut: hideSoldOut || undefined } }).then(r => r.data),
+    placeholderData: prev => prev,
   })
-  const items: ShopItem[] = data?.items ?? []
   const totalPages = data ? Math.ceil(data.total / data.limit) : 0
-
+  const chip = (active: boolean) => `h-8 px-3 rounded-full text-xs border transition-colors ${active ? 'bg-accent text-white border-accent' : 'text-muted-2 border-line hover:border-line-strong hover:text-fg-3'}`
   return (
-    <div className="space-y-5">
-      {/* 필터 */}
-      <div className="bg-surface border border-line rounded-xl p-4 space-y-3">
-        <div className="space-y-1.5">
-          <p className="text-xs text-muted-2 uppercase tracking-wider font-semibold">TCG 종류</p>
-          <div className="flex flex-wrap gap-1.5">
-            {['', ...Object.keys(TCG_LABELS)].map(key => (
-              <button key={key} onClick={() => { setTcgType(key); setPage(1) }}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                  tcgType === key
-                    ? 'bg-accent text-white shadow-[0_0_12px_rgba(139,92,246,0.3)]'
-                    : 'bg-surface-2 border border-line text-muted hover:text-fg-2 hover:border-line-strong'
-                }`}>
-                {key ? TCG_LABELS[key] : '전체'}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="space-y-1.5">
-          <p className="text-xs text-muted-2 uppercase tracking-wider font-semibold">카테고리</p>
-          <div className="flex flex-wrap gap-1.5">
-            {['', ...Object.keys(CATEGORY_LABELS)].map(key => (
-              <button key={key} onClick={() => { setCategory(key); setPage(1) }}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                  category === key
-                    ? 'bg-accent text-white shadow-[0_0_12px_rgba(139,92,246,0.3)]'
-                    : 'bg-surface-2 border border-line text-muted hover:text-fg-2 hover:border-line-strong'
-                }`}>
-                {key ? CATEGORY_LABELS[key] : '전체'}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex items-center justify-end pt-1 border-t border-line">
-          <button onClick={() => { setHideSoldOut(v => !v); setPage(1) }}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-              hideSoldOut
-                ? 'bg-accent/15 border border-accent/40 text-accent-soft'
-                : 'bg-surface-2 border border-line text-muted-2 hover:text-muted hover:border-line-strong'
-            }`}>
-            {hideSoldOut ? <EyeOff size={11} /> : <Eye size={11} />}
-            품절 {hideSoldOut ? '숨김' : '표시'}
-          </button>
+    <section id="all" className="space-y-4 scroll-mt-24">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <h2 className="text-xl font-bold text-fg">{q ? <>&lsquo;{q}&rsquo; 검색 결과</> : '전체 상품'} <span className="text-sm font-normal text-subtle">{data?.total ?? 0}개</span></h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-1.5 text-xs text-muted cursor-pointer">
+            <input type="checkbox" checked={hideSoldOut} onChange={e => setParam('hideSoldOut', e.target.checked ? '1' : '')} />품절 제외
+          </label>
+          <select value={sort} onChange={e => setParam('sort', e.target.value)} aria-label="정렬"
+            className="h-9 bg-surface border border-line rounded-lg px-3 text-xs text-fg focus:outline-none cursor-pointer">
+            {SORTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
         </div>
       </div>
-
+      <div className="flex flex-wrap gap-1.5">
+        <button onClick={() => setParam('tcgType', '')} className={chip(!tcgType)}>전체 TCG</button>
+        {['POKEMON', 'YUGIOH', 'ONEPIECE', 'DIGIMON', 'MTG', 'WEISS'].map(t => (
+          <button key={t} onClick={() => setParam('tcgType', tcgType === t ? '' : t)} className={chip(tcgType === t)}>{TCG_LABELS[t]}</button>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        <button onClick={() => setParam('category', '')} className={chip(!category)}>전체 종류</button>
+        {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
+          <button key={k} onClick={() => setParam('category', category === k ? '' : k)} className={chip(category === k)}>{v}</button>
+        ))}
+      </div>
       {isLoading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="bg-surface border border-line rounded-2xl overflow-hidden animate-pulse">
-              <div className="aspect-square bg-surface-2" />
-              <div className="p-3 space-y-2">
-                <div className="h-3 bg-surface-2 rounded w-3/4" />
-                <div className="h-3 bg-surface-2 rounded w-1/2" />
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : items.length === 0 ? (
-        <div className="text-center py-20 text-subtle">
-          <Package size={40} className="mx-auto mb-3 opacity-30" />
-          <p>등록된 상품이 없습니다.</p>
-        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">{Array.from({ length: 10 }).map((_, i) => <div key={i} className="aspect-[3/4] rounded-2xl bg-surface animate-pulse" />)}</div>
+      ) : !data?.items.length ? (
+        <div className="py-20 text-center text-subtle"><Package size={36} className="mx-auto mb-2 opacity-40" />조건에 맞는 상품이 없습니다.</div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          {items.map(item => (
-            <div key={item.id} className="bg-surface border border-line rounded-2xl overflow-hidden hover:border-accent/40 transition-colors group card-hover">
-              {(() => {
-                const soldOut = item.isSoldOut || item.stock === 0
-                const lowStock = !soldOut && item.stock <= 5
-                return (
-                  <div className="aspect-square bg-sunken relative overflow-hidden">
-                    {item.imageUrl
-                      ? <Image src={item.imageUrl} alt={item.name} fill sizes="(max-width:640px) 50vw,(max-width:1024px) 33vw,25vw" className={`object-contain transition-transform duration-300 ${soldOut ? 'grayscale opacity-60' : 'group-hover:scale-105'}`} />
-                      : <div className="flex items-center justify-center h-full text-subtle"><Package size={40} /></div>}
-                    {soldOut && (
-                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                        <span className="text-sm font-bold text-white bg-surface/80 px-3 py-1 rounded-full border border-line-strong backdrop-blur-sm">품절</span>
-                      </div>
-                    )}
-                    {lowStock && (
-                      <div className="absolute top-2 right-2 bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg">
-                        잔여 {item.stock}개
-                      </div>
-                    )}
-                  </div>
-                )
-              })()}
-              <div className="p-3 space-y-2">
-                <div className="flex gap-1 flex-wrap">
-                  <Badge>{TCG_LABELS[item.tcgType] ?? item.tcgType}</Badge>
-                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${CATEGORY_COLOR[item.category]}`}>
-                    {CATEGORY_LABELS[item.category]}
-                  </span>
-                </div>
-                <p className="text-sm font-semibold leading-tight line-clamp-2 text-fg">{item.name}</p>
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-accent-2 font-bold tabular-nums">{item.price.toLocaleString()}P</span>
-                  {(() => {
-                    const soldOut = item.isSoldOut || item.stock === 0
-                    return (
-                      <button onClick={() => setBuying(item)} disabled={soldOut}
-                        className="flex items-center gap-1 bg-accent hover:bg-accent-strong disabled:bg-surface-2 disabled:border disabled:border-line disabled:text-subtle text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors shadow-[0_0_12px_rgba(139,92,246,0.2)]">
-                        <ShoppingCart size={11} />{soldOut ? '품절' : '구매'}
-                      </button>
-                    )
-                  })()}
-                </div>
-              </div>
-            </div>
-          ))}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">{data.items.map(i => <ProductCard key={i.id} item={i} />)}</div>
+      )}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-3 text-sm text-muted">
+          <button disabled={page <= 1} onClick={() => setParam('page', String(page - 1))} aria-label="이전 페이지" className="w-9 h-9 rounded-lg border border-line inline-flex items-center justify-center disabled:opacity-30"><ChevronLeft size={16} /></button>
+          <span className="tabular-nums">{page} / {totalPages}</span>
+          <button disabled={page >= totalPages} onClick={() => setParam('page', String(page + 1))} aria-label="다음 페이지" className="w-9 h-9 rounded-lg border border-line inline-flex items-center justify-center disabled:opacity-30"><ChevronRight size={16} /></button>
         </div>
       )}
-
-      <Pagination page={page} total={totalPages} onChange={setPage} />
-      {buying && <BuyModal item={buying} onClose={() => setBuying(null)} />}
-    </div>
+    </section>
   )
 }
-
-// ─── 오리파 탭 ───────────────────────────────────────────────────────────────
-
-interface OripaCardItem {
-  id: string
-  grade: number
-  card: { imageUrl?: string; name: string }
-}
-
-interface Oripa {
-  id: string; title: string; description?: string; imageUrl?: string
-  pricePerDraw: number; totalSlots: number; remainSlots: number
-  items: OripaCardItem[]; _count: { purchases: number }
-}
-
-function CardCollage({ items }: { items: OripaCardItem[] }) {
-  const picks = [...items].sort((a, b) => b.grade - a.grade).filter(i => i.card.imageUrl).slice(0, 4)
-  if (picks.length === 0) return <div className="absolute inset-0 flex items-center justify-center"><Package size={48} className="text-pink-400/40" /></div>
-  if (picks.length === 1) return <Image src={picks[0].card.imageUrl!} alt={picks[0].card.name} fill sizes="(max-width:640px) 100vw,50vw" className="object-cover opacity-80" />
-  return (
-    <div className="absolute inset-0 grid grid-cols-2 gap-0.5">
-      {picks.map((item, i) => (
-        <div key={item.id} className={`relative overflow-hidden ${picks.length === 3 && i === 0 ? 'row-span-2' : ''}`}>
-          <Image src={item.card.imageUrl!} alt={item.card.name} fill sizes="25vw" className="object-cover" />
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function OripasTab() {
-  const { data: oripas, isLoading } = useQuery({
-    queryKey: ['oripas'],
-    queryFn: () => api.get('/oripas').then(r => r.data),
-    staleTime: 60000,
-  })
-
-  return (
-    <div className="space-y-4">
-      <p className="text-sm text-muted">랜덤 뽑기로 레어 TCG 카드를 획득하세요</p>
-
-      {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => <div key={i} className="bg-surface border border-line rounded-2xl h-56 animate-pulse" />)}
-        </div>
-      ) : !oripas?.length ? (
-        <div className="text-center py-24 text-subtle">
-          <p className="text-4xl mb-4">📦</p>
-          <p>진행 중인 오리파가 없습니다.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {(oripas as Oripa[]).map(oripa => {
-            const soldPct = ((oripa.totalSlots - oripa.remainSlots) / oripa.totalSlots) * 100
-            const almostGone = oripa.remainSlots > 0 && oripa.remainSlots <= 5
-            return (
-              <Link key={oripa.id} href={`/oripas/${oripa.id}`} className="group">
-                <div className="bg-surface border border-line rounded-2xl overflow-hidden hover:border-pink-500/50 transition-all duration-200 hover:shadow-lg hover:shadow-pink-500/10 card-hover">
-                  <div className="relative h-44 bg-surface-2 overflow-hidden">
-                    {oripa.imageUrl
-                      ? <Image src={oripa.imageUrl} alt={oripa.title} fill className="object-cover group-hover:scale-105 transition-transform duration-300" />
-                      : <div className="absolute inset-0 group-hover:scale-105 transition-transform duration-300"><CardCollage items={oripa.items} /></div>}
-                    <div className="absolute inset-0 bg-gradient-to-t from-surface/80 via-transparent to-transparent" />
-                    <div className="absolute top-2 right-2">
-                      {almostGone
-                        ? <Badge variant="red">라스트 {oripa.remainSlots}장!</Badge>
-                        : oripa.remainSlots === 0
-                          ? <Badge variant="default">매진</Badge>
-                          : <Badge variant="red">{oripa.remainSlots}/{oripa.totalSlots} 남음</Badge>}
-                    </div>
-                    <div className="absolute bottom-2 left-3">
-                      <span className="text-accent-2 font-bold tabular-nums text-lg drop-shadow">{oripa.pricePerDraw.toLocaleString()}P</span>
-                      <span className="text-muted text-xs ml-1">/ 1회</span>
-                    </div>
-                  </div>
-                  <div className="p-4 space-y-2">
-                    <h3 className="font-semibold line-clamp-1 text-fg">{oripa.title}</h3>
-                    {oripa.description && <p className="text-xs text-muted line-clamp-2">{oripa.description}</p>}
-                    <div className="flex items-center justify-between text-xs text-subtle">
-                      <span>{oripa._count.purchases}명 참여</span>
-                      <span>{Math.round(soldPct)}% 소진</span>
-                    </div>
-                    <div className="w-full bg-line rounded-full h-1.5">
-                      <div className={`h-1.5 rounded-full transition-all ${almostGone ? 'bg-red-500' : 'bg-gradient-to-r from-pink-500 to-purple-500'}`} style={{ width: `${soldPct}%` }} />
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── 메인 샵 페이지 ──────────────────────────────────────────────────────────
-
-type ShopTab = 'boxes' | 'oripa'
 
 function ShopContent() {
-  const searchParams = useSearchParams()
   const router = useRouter()
-  const initialTab = (searchParams.get('tab') as ShopTab) ?? 'boxes'
-  const [tab, setTab] = useState<ShopTab>(initialTab)
+  const params = useSearchParams()
+  const tab = params.get('tab') === 'oripa' ? 'oripa' : 'mall'
+  const q = params.get('q') ?? ''
+  const tcgType = params.get('tcgType') ?? ''
+  const category = params.get('category') ?? ''
+  const sort = params.get('sort') ?? 'new'
+  const page = Math.max(1, Number(params.get('page')) || 1)
+  const hideSoldOut = params.get('hideSoldOut') === '1'
+  const filtering = !!(q || tcgType || category || params.get('page'))
 
-  function switchTab(t: ShopTab) {
-    setTab(t)
-    router.replace(t === 'boxes' ? '/shop' : '/shop?tab=oripa', { scroll: false })
+  const setParam = (k: string, v: string) => {
+    const p = new URLSearchParams(params.toString())
+    if (v) p.set(k, v); else p.delete(k)
+    if (k !== 'page') p.delete('page')
+    router.replace(`/shop?${p.toString()}#all`, { scroll: false })
   }
 
+  const { data: home } = useQuery<Home>({ queryKey: ['shop-home'], queryFn: () => api.get('/shop/home').then(r => r.data), staleTime: 60_000 })
+  const toAll = (k?: string, v?: string) => { if (k && v) setParam(k, v); document.getElementById('all')?.scrollIntoView({ behavior: 'smooth' }) }
+
   return (
-    <div className="space-y-5">
-      {/* 헤더 */}
-      <div className="flex items-center gap-3">
-        <Store size={22} className="text-accent-fg" />
-        <div>
-          <h1 className="text-[26px] sm:text-3xl font-bold tracking-tight text-fg">샵</h1>
-          <p className="text-sm text-muted">포인트로 TCG 상품을 구매하세요</p>
-        </div>
+    <div className="max-w-7xl mx-auto space-y-8">
+      <ShopTopBar initialQ={q} />
+
+      <div className="flex gap-1 rounded-xl bg-surface border border-line p-1 w-fit">
+        <Link href="/shop" className={`h-9 px-4 inline-flex items-center rounded-lg text-sm ${tab === 'mall' ? 'bg-surface-2 text-fg font-semibold' : 'text-muted hover:text-fg'}`}>TCG 상품</Link>
+        <Link href="/shop?tab=oripa" className={`h-9 px-4 inline-flex items-center rounded-lg text-sm ${tab === 'oripa' ? 'bg-gradient-to-r from-pink-600 to-purple-600 text-white font-semibold' : 'text-muted hover:text-fg'}`}>🎲 오리파 뽑기</Link>
       </div>
 
-      {/* 탭 */}
-      <div className="flex bg-surface border border-line rounded-xl p-1 w-fit">
-        <button onClick={() => switchTab('boxes')}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            tab === 'boxes'
-              ? 'bg-accent text-white shadow-[0_0_16px_rgba(139,92,246,0.3)]'
-              : 'text-muted hover:text-fg-2'
-          }`}>
-          <Package size={14} /> TCG 박스
-        </button>
-        <button onClick={() => switchTab('oripa')}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            tab === 'oripa'
-              ? 'bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-[0_0_16px_rgba(219,39,119,0.25)]'
-              : 'text-muted hover:text-fg-2'
-          }`}>
-          🎲 오리파 뽑기
-        </button>
-      </div>
+      {tab === 'oripa' ? <OripaGrid /> : (
+        <>
+          {!filtering && home && (
+            <>
+              <HeroCarousel items={home.featured} />
 
-      {/* 탭 콘텐츠 */}
-      {tab === 'boxes' ? <BoxesTab /> : <OripasTab />}
+              {/* 혜택 안내 */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {[
+                  { icon: <Truck size={18} />, title: home.shipping.freeOver > 0 ? `${P(home.shipping.freeOver)} 이상 무료배송` : '배송비 안내', desc: `기본 배송비 ${P(home.shipping.fee)}` },
+                  { icon: <ShieldCheck size={18} />, title: '100% 정품 미개봉', desc: '공식 유통 상품만 판매합니다' },
+                  { icon: <Coins size={18} />, title: '포인트 간편 결제', desc: '충전한 포인트로 바로 결제' },
+                ].map(b => (
+                  <div key={b.title} className="flex items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3">
+                    <span className="w-10 h-10 rounded-xl bg-accent/15 text-accent-fg flex items-center justify-center">{b.icon}</span>
+                    <span><span className="block text-sm font-semibold text-fg">{b.title}</span><span className="block text-xs text-muted">{b.desc}</span></span>
+                  </div>
+                ))}
+              </div>
+
+              {/* 카테고리 */}
+              <section className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                {Object.entries(CATEGORY_LABELS).map(([k, v]) => {
+                  const n = home.categories.find(c => c.category === k)?.count ?? 0
+                  return (
+                    <button key={k} onClick={() => toAll('category', k)} className="flex flex-col items-center gap-1.5 rounded-2xl border border-line bg-surface py-4 hover:border-accent/40">
+                      <span className="text-2xl">{CATEGORY_ICON[k]}</span>
+                      <span className="text-xs font-semibold text-fg-2">{v}</span>
+                      <span className="text-[10px] text-subtle">{n}개</span>
+                    </button>
+                  )
+                })}
+              </section>
+
+              <Section title="베스트" icon={<Flame size={18} className="text-rose-400" />} items={home.best} more={() => toAll('sort', 'popular')} />
+              <Section title="신상품" icon={<Sparkles size={18} className="text-sky-300" />} items={home.newArrivals} more={() => toAll('sort', 'new')} />
+              <Section title="품절 임박" icon={<Timer size={18} className="text-orange-400" />} items={home.lowStock} />
+            </>
+          )}
+
+          <AllProducts q={q} tcgType={tcgType} category={category} sort={sort} page={page} hideSoldOut={hideSoldOut} setParam={setParam} />
+        </>
+      )}
     </div>
   )
 }
 
 export default function ShopPage() {
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center py-10">
-        <div className="w-6 h-6 rounded-full border-2 border-line border-t-accent animate-spin" />
-      </div>
-    }>
+    <Suspense fallback={<div className="max-w-7xl mx-auto h-72 rounded-3xl bg-surface animate-pulse" />}>
       <ShopContent />
     </Suspense>
   )

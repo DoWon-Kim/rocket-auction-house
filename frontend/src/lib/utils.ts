@@ -127,9 +127,20 @@ export function resolveImageSrc(imageUrl: string | null | undefined): string | n
   return imageUrl
 }
 
+// 외부 소스마다 대소문자 표기가 달라(TCGdex 'Illustration rare' 등) 소문자로도 조회
+const RARITY_LABELS_LOWER: Record<string, string> = {
+  'mega hyper rare': '메가 하이퍼 레어',
+  'ace spec rare': 'ACE SPEC 레어',
+  'black white rare': '블랙 화이트 레어',
+  'art rare': '아트 레어',
+  'secret rare': '시크릿 레어',
+  'none': '레어도 없음',
+  ...Object.fromEntries(Object.entries(RARITY_LABELS).map(([k, v]) => [k.toLowerCase(), v])),
+}
+
 export function rarityLabel(rarity: string | null | undefined): string {
   if (!rarity) return '알 수 없음'
-  return RARITY_LABELS[rarity] ?? rarity
+  return RARITY_LABELS[rarity] ?? RARITY_LABELS_LOWER[rarity.toLowerCase()] ?? rarity
 }
 
 // TCG별 한국어 설명

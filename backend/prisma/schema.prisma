@@ -38,6 +38,9 @@ model User {
   chatMessages        ChatMessage[]       @relation("ChatMessages")
   passwordResetTokens PasswordResetToken[]
   shopOrders          ShopOrder[]
+  cartItems           CartItem[]
+  shopPurchases       ShopPurchase[]
+  shopReviews         ShopReview[]
   posts               Post[]
   comments            Comment[]
   adminPermissions    AdminPermission[]
@@ -156,6 +159,14 @@ model Card {
   retreatCost Int?      // 후퇴 비용
   artist      String?   // 일러스트레이터
   flavorText  String?   // 풀레이버 텍스트
+  stage          String?   // 진화 단계: Basic | Stage 1 | Stage 2 | ... (포켓몬)
+  evolvesFrom    String?   // 진화 전 포켓몬 이름 (카드와 같은 언어)
+  dexIds         Int[]     @default([])  // 전국 도감 번호
+  regulationMark String?   // 레귤레이션 마크 (G, H, I, J ...)
+  detailSyncedAt DateTime? // 외부 상세 정보 보강 시각 (null = 아직)
+  stats          Json?     // TCG별 스탯 (유희왕 ATK/DEF·레벨, 디지몬 DP·레벨, MTG 마나·P/T 등)
+  textKo         Json?     // 한국어 텍스트 { attacks, abilities, effect, flavor, typeLine, ... } — 원문 필드와 같은 구조
+  textKoSource   String?   // OFFICIAL(공식 한글) | DICT(사전 번역) | PARTIAL(일부만 번역)
 
   // 스니덩 (snkrdunk.com) 마켓 데이터
   snkrdunkPrice    Int?    // 최저 호가 (KRW), null=아직 미조회
@@ -175,6 +186,64 @@ model Card {
   @@index([nameJa])
   @@index([supertype])
   @@index([cardTypes])
+  @@index([tcgType, setCode])
+  @@index([regulationMark])
+  @@index([evolvesFrom])
+}
+
+// 포켓몬 도감 (PokeAPI, 한국어 이름·분류·도감 설명)
+model PokemonSpecies {
+  dexId            Int      @id
+  nameKo           String
+  nameJa           String?
+  nameEn           String
+  genusKo          String?  // 분류 (예: 쥐포켓몬)
+  flavorKo         String?  // 도감 설명 (최신 게임 기준)
+  heightDm         Int?     // 키 (데시미터)
+  weightHg         Int?     // 몸무게 (헥토그램)
+  types            String[] @default([])
+  generation       Int?
+  evolvesFromDexId Int?
+  updatedAt        DateTime @updatedAt
+
+  @@index([nameKo])
+  @@index([nameJa])
+  @@index([nameEn])
+}
+
+// 한국어 사전 (일본어·영어 → 한국어). PokeAPI 이름 + 공식 한판·일판 카드 문장 짝으로 구축
+model KoDictEntry {
+  id        String   @id @default(uuid())
+  kind      String   // POKEMON | MOVE | ABILITY | CARD_NAME | ATTACK_NAME | ABILITY_NAME | EFFECT
+  srcLang   String   // ja | en
+  src       String   // 정규화한 원문 (공백 제거·NFKC)
+  ko        String
+  source    String   // POKEAPI | TCGDEX_KO | MANUAL
+  hits      Int      @default(1)   // 같은 짝이 관측된 횟수
+  updatedAt DateTime @updatedAt
+
+  @@unique([kind, srcLang, src])
+}
+
+// 세트(확장팩) 메타데이터 — 카드의 (tcgType, setCode, 언어)와 대응
+model CardSet {
+  id            String    @id @default(uuid())
+  tcgType       TcgType
+  lang          String    // ja | ko | en
+  code          String    // 카드의 setCode와 같은 값
+  name          String
+  series        String?
+  releaseDate   DateTime?
+  logoUrl       String?
+  symbolUrl     String?
+  officialCount Int?      // 공식 카드 수 (시크릿 제외)
+  totalCount    Int?      // 시크릿 포함 전체
+  source        String    // TCGDEX | POKEMONTCG
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([tcgType, lang, code])
+  @@index([tcgType, releaseDate])
 }
 
 enum TcgType {
@@ -742,14 +811,21 @@ model ShopItem {
   imageUrl    String?
   isActive    Boolean      @default(true)
   isSoldOut   Boolean      @default(false)  // 명시적 품절 (재고와 무관하게 관리자가 토글)
+  originalPrice Int?                        // 정가 (판매가보다 높으면 할인 표시)
+  images      String[]     @default([])     // 추가 이미지 (상세 갤러리)
+  isFeatured  Boolean      @default(false)  // 메인 배너·추천 상품
+  soldCount   Int          @default(0)      // 누적 판매 수량 (베스트 정렬)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
   orders      ShopOrder[]
+  cartItems   CartItem[]
+  reviews     ShopReview[]
 
   @@index([tcgType])
   @@index([isActive])
   @@index([isSoldOut])
+  @@index([soldCount])
 }
 
 enum ShopCategory {
@@ -949,12 +1025,69 @@ model ShopOrder {
   trackingNumber String?
   courier        String?
 
+  purchaseId  String?         // 한 번에 결제한 주문 묶음 (장바구니 주문)
+  purchase    ShopPurchase?   @relation(fields: [purchaseId], references: [id])
+  review      ShopReview?
+
   createdAt   DateTime @default(now())
 
   @@index([userId])
   @@index([shopItemId])
   @@index([shippingStatus])
   @@index([createdAt])
+  @@index([purchaseId])
+}
+
+// 장바구니
+model CartItem {
+  id         String   @id @default(uuid())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  shopItem   ShopItem @relation(fields: [shopItemId], references: [id], onDelete: Cascade)
+  shopItemId String
+  quantity   Int      @default(1)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, shopItemId])
+}
+
+// 한 번의 결제 (여러 상품 + 배송비). 상품별 배송 처리는 ShopOrder 단위로 유지
+model ShopPurchase {
+  id             String      @id @default(uuid())
+  orderNo        String      @unique   // 고객에게 보여주는 주문번호
+  user           User        @relation(fields: [userId], references: [id])
+  userId         String
+  itemsTotal     Int
+  shippingFee    Int
+  totalPaid      Int
+  recipientName  String
+  recipientPhone String
+  zipCode        String
+  address        String
+  addressDetail  String?
+  shippingMemo   String?
+  createdAt      DateTime    @default(now())
+
+  orders         ShopOrder[]
+
+  @@index([userId, createdAt])
+}
+
+// 구매 후기 (주문 상품 1건당 1개)
+model ShopReview {
+  id         String    @id @default(uuid())
+  shopItem   ShopItem  @relation(fields: [shopItemId], references: [id], onDelete: Cascade)
+  shopItemId String
+  user       User      @relation(fields: [userId], references: [id])
+  userId     String
+  order      ShopOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId    String    @unique
+  rating     Int       // 1~5
+  content    String
+  createdAt  DateTime  @default(now())
+
+  @@index([shopItemId, createdAt])
 }
 
 enum ShopOrderStatus {

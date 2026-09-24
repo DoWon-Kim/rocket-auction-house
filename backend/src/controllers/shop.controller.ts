@@ -94,7 +94,7 @@ export async function buyShopItem(req: AuthRequest, res: Response) {
       // 재고 차감을 where 조건에 포함해 원자적으로 검증
       const stockUpdated = await tx.shopItem.updateMany({
         where: { id: item.id, stock: { gte: quantity }, isActive: true, isSoldOut: false },
-        data: { stock: { decrement: quantity } },
+        data: { stock: { decrement: quantity }, soldCount: { increment: quantity } },
       })
       if (stockUpdated.count === 0) {
         throw Object.assign(new Error('STOCK'), { status: 409, message: '재고가 부족하거나 품절된 상품입니다.' })
@@ -307,6 +307,9 @@ const itemSchema = z.object({
   stock:       z.number().int().min(0),
   imageUrl:    z.string().url().optional().or(z.literal('')),
   isActive:    z.boolean().optional(),
+  originalPrice: z.number().int().min(0).nullable().optional(),   // 정가 (할인 표시)
+  images:      z.array(z.string().url()).max(10).optional(),       // 상세 갤러리
+  isFeatured:  z.boolean().optional(),                             // 메인 추천
 })
 
 export async function adminGetShopItems(req: AuthRequest, res: Response) {

@@ -13,6 +13,8 @@ import {
 } from 'lucide-react'
 import { useRecentlyViewed } from '@/hooks/useRecentlyViewed'
 import { useCollection } from '@/hooks/useCollection'
+import { stageLabel, won } from '@/lib/cardDex'
+import { DexTabs } from '@/components/cards/DexTabs'
 
 // ─── 타입 ─────────────────────────────────────────────────────────────────────
 
@@ -31,6 +33,9 @@ interface Card {
   subtypes: string | null
   cardTypes: string | null
   hp: number | null
+  stage: string | null
+  regulationMark: string | null
+  snkrdunkPrice: number | null
   minPrice: number | null
   _count: { listings: number }
 }
@@ -43,7 +48,7 @@ interface CardsResponse {
 }
 
 interface MetaItem { name: string; count: number }
-interface CardMeta { sets: MetaItem[]; rarities: MetaItem[]; supertypes: MetaItem[] }
+interface CardMeta { sets: MetaItem[]; rarities: MetaItem[]; supertypes: MetaItem[]; regulations?: MetaItem[]; stages?: MetaItem[]; artists?: MetaItem[] }
 
 // ─── 상수 & 유틸 ──────────────────────────────────────────────────────────────
 
@@ -59,6 +64,8 @@ const SORT_OPTIONS = [
   { value: 'popular', label: '리스팅 많은순' },
   { value: 'hp_desc', label: 'HP 높은순' },
   { value: 'hp_asc',  label: 'HP 낮은순' },
+  { value: 'price_desc', label: '시세 높은순' },
+  { value: 'price_asc',  label: '시세 낮은순' },
 ]
 
 // 포켓몬 에너지 타입 (icu.gg 스타일)
@@ -179,6 +186,14 @@ function CardTile({
             </div>
           </div>
         )}
+        {/* 참고 시세 (거래소 매물이 없을 때) */}
+        {card.minPrice == null && (card.snkrdunkPrice ?? 0) > 0 && (
+          <div className="absolute bottom-2 left-0 right-0 flex justify-center">
+            <div className="bg-bg/85 backdrop-blur-sm border border-sky-400/30 text-sky-300 text-[10px] font-bold px-2 py-0.5 rounded-full" title="스니덩 최저 호가 (참고)">
+              시세 {won(card.snkrdunkPrice!)}
+            </div>
+          </div>
+        )}
         {/* 리스팅 수 배지 */}
         {card._count.listings > 0 && card.minPrice == null && (
           <div className="absolute top-2 right-2 bg-bg/80 backdrop-blur-sm border border-accent/30 text-accent-fg text-[10px] font-bold px-1.5 py-0.5 rounded-md">
@@ -211,6 +226,12 @@ function CardTile({
             <div className="inline-flex items-center px-1 py-0.5 rounded border border-blue-800/50 bg-blue-900/20 text-[9px] text-blue-500">
               🇯🇵
             </div>
+          )}
+          {card.stage && (
+            <div className="inline-flex items-center px-1 py-0.5 rounded border border-line bg-surface-2 text-[9px] text-fg-3">{stageLabel(card.stage)}</div>
+          )}
+          {card.regulationMark && (
+            <div className="inline-flex items-center justify-center w-4 h-4 rounded border border-line bg-surface-2 text-[9px] font-bold text-fg-3" title={`레귤레이션 ${card.regulationMark}`}>{card.regulationMark}</div>
           )}
         </div>
 
@@ -303,10 +324,15 @@ function SearchDropdown({
 
 // ─── 필터 사이드바 ────────────────────────────────────────────────────────────
 
+function toggleIn(list: string[], v: string) {
+  return (list.includes(v) ? list.filter(x => x !== v) : [...list, v]).join(',')
+}
+
 function FilterSidebar({
   tcgType, selectedRarities, setName, hpMin, hpMax,
   onRarityToggle, onClearRarities, onSet, onHpChange,
   metaData, metaLoading,
+  stages, regulations, artist, onParam,
 }: {
   tcgType: string
   selectedRarities: string[]
@@ -319,7 +345,16 @@ function FilterSidebar({
   onHpChange: (min: string, max: string) => void
   metaData: CardMeta | undefined
   metaLoading: boolean
+  stages: string[]
+  regulations: string[]
+  artist: string
+  onParam: (key: string, value: string) => void
 }) {
+  // URL 값이 바뀌면 입력창도 맞춤 (렌더 중 이전 값과 비교)
+  const [artistInput, setArtistInput] = useState(artist)
+  const [prevArtist, setPrevArtist] = useState(artist)
+  if (artist !== prevArtist) { setPrevArtist(artist); setArtistInput(artist) }
+  const chip = (active: boolean) => `inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-colors ${active ? 'bg-accent-tint text-accent-soft border-accent-line' : 'text-muted-2 border-line hover:border-line-strong hover:text-fg-3'}`
   const [setSearch, setSetSearch] = useState('')
   const [setOpen, setSetOpen] = useState(false)
   const [localMin, setLocalMin] = useState(hpMin)
@@ -410,6 +445,60 @@ function FilterSidebar({
               className="mt-1.5 flex items-center gap-1 text-[11px] text-muted-2 hover:text-fg-3 transition-colors"
             >
               <X size={10} /> HP 필터 해제
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* 진화 단계 */}
+      {(metaData?.stages?.length ?? 0) > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-muted-2 uppercase tracking-wider mb-3">진화 단계</p>
+          <div className="flex flex-wrap gap-1.5">
+            {metaData!.stages!.slice(0, 8).map(st => (
+              <button key={st.name} onClick={() => onParam('stage', toggleIn(stages, st.name))} className={chip(stages.includes(st.name))}>
+                {stageLabel(st.name)} <span className="text-subtle">{st.count.toLocaleString()}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 레귤레이션 */}
+      {(metaData?.regulations?.length ?? 0) > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-muted-2 uppercase tracking-wider mb-3">레귤레이션</p>
+          <div className="flex flex-wrap gap-1.5">
+            {metaData!.regulations!.map(r => (
+              <button key={r.name} onClick={() => onParam('regulation', toggleIn(regulations, r.name))} title={`${r.count.toLocaleString()}장`}
+                className={`${chip(regulations.includes(r.name))} w-8 justify-center font-bold`}>
+                {r.name}
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] text-subtle mt-1.5 leading-relaxed">카드 왼쪽 아래 알파벳. 대회에서 쓸 수 있는 카드를 고를 때 써요.</p>
+        </div>
+      )}
+
+      {/* 일러스트레이터 */}
+      {(metaData?.artists?.length ?? 0) > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-muted-2 uppercase tracking-wider mb-3">일러스트레이터</p>
+          <input
+            value={artistInput}
+            list="artist-options"
+            onChange={e => setArtistInput(e.target.value)}
+            onBlur={() => { if (artistInput.trim() !== artist) onParam('artist', artistInput.trim()) }}
+            onKeyDown={e => { if (e.key === 'Enter') onParam('artist', artistInput.trim()) }}
+            placeholder="이름 검색"
+            className="w-full bg-surface-2 border border-line rounded-lg px-2.5 py-1.5 text-xs text-fg placeholder:text-subtle focus:outline-none focus:border-accent/30"
+          />
+          <datalist id="artist-options">
+            {metaData!.artists!.map(a => <option key={a.name} value={a.name}>{a.count}장</option>)}
+          </datalist>
+          {artist && (
+            <button onClick={() => onParam('artist', '')} className="mt-1.5 flex items-center gap-1 text-[11px] text-muted-2 hover:text-fg-3">
+              <X size={10} /> 일러스트레이터 해제
             </button>
           )}
         </div>
@@ -530,6 +619,11 @@ function CardsContent() {
   const hpMax        = searchParams.get('hpMax')     ?? ''
   const parallel     = searchParams.get('parallel')  === 'true'
   const sort         = searchParams.get('sort')      ?? 'name'
+  const artist       = searchParams.get('artist')    ?? ''
+  const stageParam   = searchParams.get('stage')     ?? ''
+  const regParam     = searchParams.get('regulation') ?? ''
+  const stages       = stageParam ? stageParam.split(',').filter(Boolean) : []
+  const regulations  = regParam ? regParam.split(',').filter(Boolean) : []
   const page         = Math.max(1, Number(searchParams.get('page') ?? '1'))
 
   const selectedRarities = raritiesParam ? raritiesParam.split(',').filter(Boolean) : []
@@ -577,7 +671,7 @@ function CardsContent() {
     router.push(`/cards?${params.toString()}`)
   }
 
-  const hasFilter = !!(tcgType || raritiesParam || setName || q || lang || supertype || cardType || hpMin || hpMax || parallel)
+  const hasFilter = !!(tcgType || raritiesParam || setName || q || lang || supertype || cardType || hpMin || hpMax || parallel || artist || stageParam || regParam)
 
   function clearAll() {
     router.push('/cards')
@@ -601,7 +695,7 @@ function CardsContent() {
 
   // 카드 목록 조회
   const { data, isLoading } = useQuery<CardsResponse>({
-    queryKey: ['cards', { q, tcgType, raritiesParam, setName, lang, supertype, cardType, hpMin, hpMax, parallel, sort, page }],
+    queryKey: ['cards', { q, tcgType, raritiesParam, setName, lang, supertype, cardType, hpMin, hpMax, parallel, sort, page, artist, stageParam, regParam }],
     queryFn: () => api.get('/cards', { params: {
       q: q || undefined, tcgType: tcgType || undefined,
       rarities: raritiesParam || undefined,
@@ -612,6 +706,9 @@ function CardsContent() {
       hpMin: hpMin || undefined,
       hpMax: hpMax || undefined,
       parallel: parallel ? 'true' : undefined,
+      artist: artist || undefined,
+      stage: stageParam || undefined,
+      regulation: regParam || undefined,
       sort, page, limit: 24,
     }}).then(r => r.data),
     staleTime: 30_000,
@@ -646,6 +743,10 @@ function CardsContent() {
       onHpChange={handleHpChange}
       metaData={metaData}
       metaLoading={metaLoading}
+      stages={stages}
+      regulations={regulations}
+      artist={artist}
+      onParam={setParam}
     />
   )
 
@@ -654,10 +755,13 @@ function CardsContent() {
 
       {/* ── 헤더 ── */}
       <div className="space-y-1">
-        <h1 className="text-[26px] sm:text-3xl font-bold tracking-tight text-fg flex items-center gap-2">
-          <Layers size={22} className="text-accent-fg" />
-          카드 도감
-        </h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-[26px] sm:text-3xl font-bold tracking-tight text-fg flex items-center gap-2">
+            <Layers size={22} className="text-accent-fg" />
+            카드 도감
+          </h1>
+          <DexTabs active="cards" />
+        </div>
         <p className="text-xs text-subtle">
           {total > 0
             ? `${total.toLocaleString()}개 카드 — 포켓몬·유희왕·MTG·디지몬·원피스 통합 한글 검색`
@@ -673,7 +777,7 @@ function CardsContent() {
           onChange={e => { setSearchInput(e.target.value); setShowInstant(true) }}
           onFocus={() => setShowInstant(true)}
           onKeyDown={e => { if (e.key === 'Escape') setShowInstant(false) }}
-          placeholder="한국어·영어·일어로 카드명, 세트명, 번호 검색..."
+          placeholder="카드명·세트·번호·일러스트레이터 검색 (도감번호는 #25)"
           className="w-full pl-11 pr-10 py-3.5 bg-surface border border-line hover:border-line-strong focus:border-accent/40 rounded-xl text-sm text-fg placeholder:text-subtle focus:outline-none transition-colors shadow-sm"
         />
         {searchInput && (
@@ -898,6 +1002,24 @@ function CardsContent() {
                 <span className="flex items-center gap-1 text-[11px] bg-accent-tint border border-accent-line text-accent-soft px-2.5 py-1 rounded-lg max-w-[180px]">
                   <span className="truncate">{setName}</span>
                   <button onClick={() => setParam('setName', '')}><X size={9} /></button>
+                </span>
+              )}
+              {stages.map(st => (
+                <span key={st} className="flex items-center gap-1 text-[11px] bg-accent-tint border border-accent-line text-accent-soft px-2.5 py-1 rounded-lg">
+                  {stageLabel(st)}
+                  <button onClick={() => setParam('stage', toggleIn(stages, st))}><X size={9} /></button>
+                </span>
+              ))}
+              {regulations.length > 0 && (
+                <span className="flex items-center gap-1 text-[11px] bg-accent-tint border border-accent-line text-accent-soft px-2.5 py-1 rounded-lg">
+                  레귤레이션 {regulations.join('·')}
+                  <button onClick={() => setParam('regulation', '')}><X size={9} /></button>
+                </span>
+              )}
+              {artist && (
+                <span className="flex items-center gap-1 text-[11px] bg-accent-tint border border-accent-line text-accent-soft px-2.5 py-1 rounded-lg max-w-[200px]">
+                  <span className="truncate">🎨 {artist}</span>
+                  <button onClick={() => setParam('artist', '')}><X size={9} /></button>
                 </span>
               )}
               {parallel && (

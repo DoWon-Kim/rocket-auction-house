@@ -1,8 +1,9 @@
 import { Request, Response } from 'express'
-import { TcgType } from '@prisma/client'
+import { Prisma, TcgType } from '@prisma/client'
 import { prisma } from '../lib/prisma'
 import { SNKRDUNK_PRODUCT_URL } from '../services/snkrdunk.service'
 import { buildPriceReference, TRADE_WINDOW_DAYS } from '../lib/priceReference'
+import { cardLangOf, cardLangWhere, isCardLang } from '../lib/cardLang'
 
 const VALID_TCG_TYPES = Object.values(TcgType)
 
@@ -53,43 +54,58 @@ export async function searchCards(req: Request, res: Response) {
       { setName:    { contains: term, mode: 'insensitive' as const } },
       { setCode:    { contains: term, mode: 'insensitive' as const } },
       { cardNumber: { contains: term, mode: 'insensitive' as const } },
+      { artist:     { contains: term, mode: 'insensitive' as const } },
     ]
 
-    const where = {
-      ...(q ? {
-        OR: [
-          // 괄호 제거한 텍스트로 일반 검색 (cleanQ가 있을 때만)
-          ...(cleanQ ? buildTextOR(cleanQ) : []),
-          // [XXX] 안의 텍스트를 카드번호로 직접 검색
-          ...bracketNumbers.map(n => ({ cardNumber: { contains: n, mode: 'insensitive' as const } })),
-          // 원본 q 전체로도 검색 (괄호 없이 입력한 경우 대비)
-          ...(bracketNumbers.length === 0 ? [] : buildTextOR(q!)),
-        ],
-      } : {}),
-      ...(tcgType   ? { tcgType }   : {}),
-      ...(rarities.length > 0
-        ? { OR: rarities.map(r => ({ rarity: { contains: r, mode: 'insensitive' as const } })) }
-        : rarity
-        ? { rarity: { contains: rarity, mode: 'insensitive' as const } }
-        : {}),
-      ...(setName   ? { setName: { contains: setName, mode: 'insensitive' as const } } : {}),
-      ...(supertype ? { supertype: { contains: supertype, mode: 'insensitive' as const } } : {}),
-      ...(cardType  ? { cardTypes: { contains: cardType, mode: 'insensitive' as const } } : {}),
-      ...(hpMin !== undefined ? { hp: { gte: hpMin } } : {}),
-      ...(hpMax !== undefined ? { hp: { lte: hpMax } } : {}),
-      ...langFilter,
-      ...(parallel ? {
-        AND: [{
-          OR: [
-            { cardNumber: { contains: '_p1' } },
-            { cardNumber: { contains: '_p2' } },
-            { cardNumber: { contains: '_p3' } },
-          ],
-        }],
-      } : {}),
-    }
+    // 새 필터: 일러스트레이터 · 레귤레이션 · 진화 단계 · 정확한 세트(세트 도감) · 도감번호(#25)
+    const artist     = (req.query.artist as string | undefined)?.trim()
+    const regulation = (req.query.regulation as string | undefined)?.split(',').map(r => r.trim().toUpperCase()).filter(Boolean) ?? []
+    const stages     = (req.query.stage as string | undefined)?.split(',').map(r => r.trim()).filter(Boolean) ?? []
+    const setCode    = (req.query.setCode as string | undefined)?.trim()
+    const setLang    = isCardLang(req.query.setLang) ? req.query.setLang : undefined
+    const dexMatch   = q?.match(/^(?:no\.?|#)\s*(\d{1,4})$/i)
+    const dexId      = dexMatch ? Number(dexMatch[1]) : (req.query.dexId ? Number(req.query.dexId) : undefined)
 
-    const orderBy: object[] =
+    const speciesHits = q && !dexMatch && /[가-힣]/.test(q)
+      ? (await prisma.pokemonSpecies.findMany({ where: { nameKo: { contains: cleanQ || q } }, select: { dexId: true }, take: 20 })).map(s => s.dexId)
+      : []
+
+    // 조건은 AND 배열로 합친다 (OR 키가 여러 개면 뒤의 것이 앞을 덮어쓰던 문제 방지)
+    const and: Prisma.CardWhereInput[] = []
+    if (q && !dexMatch) {
+      and.push({ OR: [
+        ...(speciesHits.length ? [{ dexIds: { hasSome: speciesHits } }] : []),
+        // 괄호 제거한 텍스트로 일반 검색 (cleanQ가 있을 때만)
+        ...(cleanQ ? buildTextOR(cleanQ) : []),
+        // [XXX] 안의 텍스트를 카드번호로 직접 검색
+        ...bracketNumbers.map(n => ({ cardNumber: { contains: n, mode: 'insensitive' as const } })),
+        // 원본 q 전체로도 검색 (괄호 없이 입력한 경우 대비)
+        ...(bracketNumbers.length === 0 ? [] : buildTextOR(q)),
+      ] })
+    }
+    if (tcgType) and.push({ tcgType })
+    if (rarities.length > 0) and.push({ OR: rarities.map(r => ({ rarity: { contains: r, mode: 'insensitive' as const } })) })
+    else if (rarity) and.push({ rarity: { contains: rarity, mode: 'insensitive' as const } })
+    if (setName)   and.push({ setName: { contains: setName, mode: 'insensitive' as const } })
+    if (setCode)   and.push({ setCode: { equals: setCode, mode: 'insensitive' as const } })
+    if (setLang)   and.push(cardLangWhere(setLang))
+    if (supertype) and.push({ supertype: { contains: supertype, mode: 'insensitive' as const } })
+    if (cardType)  and.push({ cardTypes: { contains: cardType, mode: 'insensitive' as const } })
+    if (hpMin !== undefined) and.push({ hp: { gte: hpMin } })
+    if (hpMax !== undefined) and.push({ hp: { lte: hpMax } })
+    if (artist)    and.push({ artist: { contains: artist, mode: 'insensitive' as const } })
+    if (regulation.length) and.push({ regulationMark: { in: regulation } })
+    if (stages.length) and.push({ stage: { in: stages } })
+    if (dexId !== undefined && Number.isInteger(dexId)) and.push({ dexIds: { has: dexId } })
+    if (Object.keys(langFilter).length) and.push(langFilter)
+    if (parallel) and.push({ OR: [
+      { cardNumber: { contains: '_p1' } },
+      { cardNumber: { contains: '_p2' } },
+      { cardNumber: { contains: '_p3' } },
+    ] })
+    const where: Prisma.CardWhereInput = and.length ? { AND: and } : {}
+
+    const orderBy: Prisma.CardOrderByWithRelationInput[] =
       sort === 'newest'
         ? [{ createdAt: 'desc' }]
         : sort === 'popular'
@@ -98,6 +114,10 @@ export async function searchCards(req: Request, res: Response) {
         ? [{ hp: { sort: 'desc', nulls: 'last' } }]
         : sort === 'hp_asc'
         ? [{ hp: { sort: 'asc', nulls: 'last' } }]
+        : sort === 'price_desc'
+        ? [{ snkrdunkPrice: { sort: 'desc', nulls: 'last' } }, { name: 'asc' }]
+        : sort === 'price_asc'
+        ? [{ snkrdunkPrice: { sort: 'asc', nulls: 'last' } }, { name: 'asc' }]
         : /* name (default) */
           [{ nameKo: { sort: 'asc', nulls: 'last' } }, { name: 'asc' }]
 
@@ -109,6 +129,7 @@ export async function searchCards(req: Request, res: Response) {
           tcgType: true, setName: true, setCode: true,
           cardNumber: true, rarity: true, imageUrl: true,
           supertype: true, subtypes: true, cardTypes: true, hp: true,
+          stage: true, regulationMark: true, dexIds: true, snkrdunkPrice: true,
           _count: { select: { listings: true } },
           listings: {
             where: { status: 'ACTIVE', listingType: 'BUY_NOW', buyNowPrice: { not: null } },
@@ -158,7 +179,7 @@ export async function getCardMeta(req: Request, res: Response) {
       ...langFilter,
     }
 
-    const [sets, rarities, supertypes] = await prisma.$transaction([
+    const [sets, rarities, supertypes, regulations, stages, artists] = await prisma.$transaction([
       prisma.card.groupBy({
         by: ['setName'],
         where,
@@ -179,12 +200,27 @@ export async function getCardMeta(req: Request, res: Response) {
         _count: { _all: true },
         orderBy: { _count: { supertype: 'desc' } },
       }),
+      prisma.card.groupBy({
+        by: ['regulationMark'], where: { ...where, regulationMark: { not: null } },
+        _count: { _all: true }, orderBy: { regulationMark: 'desc' },
+      }),
+      prisma.card.groupBy({
+        by: ['stage'], where: { ...where, stage: { not: null } },
+        _count: { _all: true }, orderBy: { _count: { stage: 'desc' } }, take: 20,
+      }),
+      prisma.card.groupBy({
+        by: ['artist'], where: { ...where, artist: { not: null } },
+        _count: { _all: true }, orderBy: { _count: { artist: 'desc' } }, take: 80,
+      }),
     ])
 
     res.json({
       sets:       sets.map(s => ({ name: s.setName, count: (s._count as { _all: number })._all })),
       rarities:   rarities.map(r => ({ name: r.rarity, count: (r._count as { _all: number })._all })),
       supertypes: supertypes.map(s => ({ name: s.supertype!, count: (s._count as { _all: number })._all })),
+      regulations: regulations.map(r => ({ name: r.regulationMark!, count: (r._count as { _all: number })._all })),
+      stages:     stages.map(r => ({ name: r.stage!, count: (r._count as { _all: number })._all })),
+      artists:    artists.map(r => ({ name: r.artist!, count: (r._count as { _all: number })._all })),
     })
   } catch (err) {
     console.error('[getCardMeta]', err)
@@ -277,6 +313,8 @@ export async function getCard(req: Request, res: Response) {
         supertype: true, subtypes: true, cardTypes: true, hp: true,
         attacks: true, abilities: true, weaknesses: true, resistances: true,
         retreatCost: true, artist: true, flavorText: true,
+        stage: true, evolvesFrom: true, dexIds: true, regulationMark: true, externalId: true,
+        stats: true, textKo: true, textKoSource: true,
         snkrdunkPrice: true, snkrdunkListings: true, snkrdunkUpdatedAt: true,
         createdAt: true,
         _count: {
@@ -323,7 +361,23 @@ export async function getCard(req: Request, res: Response) {
       },
     } : null
 
-    res.json({ ...card, marketStats })
+    const { externalId, ...cardOut } = card
+    const lang = cardLangOf(externalId)
+    const set = card.setCode
+      ? await prisma.cardSet.findUnique({
+          where: { tcgType_lang_code: { tcgType: card.tcgType, lang, code: card.setCode } },
+          select: { name: true, series: true, releaseDate: true, logoUrl: true, symbolUrl: true, officialCount: true, totalCount: true },
+        })
+      : null
+
+    const species = card.dexIds.length
+      ? await prisma.pokemonSpecies.findMany({
+          where: { dexId: { in: card.dexIds } },
+          select: { dexId: true, nameKo: true, genusKo: true, flavorKo: true, heightDm: true, weightHg: true, types: true, generation: true },
+        })
+      : []
+
+    res.json({ ...cardOut, lang, set, species, marketStats })
   } catch (err) {
     console.error('[getCard]', err)
     res.status(500).json({ message: '카드 조회 중 오류가 발생했습니다.' })
@@ -339,7 +393,7 @@ export async function getCardVariants(req: Request, res: Response) {
 
     const card = await prisma.card.findUnique({
       where: { id },
-      select: { cardNumber: true, tcgType: true },
+      select: { cardNumber: true, tcgType: true, setCode: true },
     })
 
     if (!card || !card.cardNumber) { res.json([]); return }
@@ -351,6 +405,8 @@ export async function getCardVariants(req: Request, res: Response) {
       where: {
         tcgType: card.tcgType,
         id: { not: id },
+        // 포켓몬 등은 번호가 세트마다 반복되므로 같은 세트로 한정
+        ...(card.setCode ? { setCode: { equals: card.setCode, mode: 'insensitive' as const } } : {}),
         OR: [
           { cardNumber: baseNum },
           { cardNumber: { startsWith: `${baseNum}_` } },
@@ -553,5 +609,89 @@ export async function getCardPriceReference(req: Request, res: Response) {
   } catch (err) {
     console.error('[getCardPriceReference]', err)
     res.status(500).json({ message: '서버 오류가 발생했습니다.' })
+  }
+}
+
+// ── GET /cards/:id/related ── 버전·언어판 / 진화 라인 / 같은 포켓몬 ─────────────
+
+const relatedSelect = {
+  id: true, name: true, nameKo: true, nameJa: true, setName: true, setCode: true, cardNumber: true,
+  rarity: true, imageUrl: true, stage: true, snkrdunkPrice: true, externalId: true,
+  _count: { select: { listings: { where: { status: 'ACTIVE' as const } } } },
+} satisfies Prisma.CardSelect
+type RelatedRow = Prisma.CardGetPayload<{ select: typeof relatedSelect }>
+const brief = ({ externalId, _count, ...c }: RelatedRow) => ({ ...c, lang: cardLangOf(externalId), activeListings: _count.listings })
+
+export async function getCardRelated(req: Request, res: Response) {
+  try {
+    const id = String(req.params.id)
+    const card = await prisma.card.findUnique({
+      where: { id },
+      select: { id: true, name: true, tcgType: true, setCode: true, cardNumber: true, externalId: true, evolvesFrom: true, dexIds: true },
+    })
+    if (!card) { res.status(404).json({ message: '카드를 찾을 수 없습니다.' }); return }
+    const lang = cardLangOf(card.externalId)
+    const sameLang = cardLangWhere(lang)
+
+    // 1) 같은 세트·같은 번호의 다른 버전(패러렐)과 다른 언어판
+    const versions: RelatedRow[] = card.setCode && card.cardNumber
+      ? await (() => {
+          const base = card.cardNumber!.replace(/_p\d+$/i, '')
+          const nums = new Set([base, base.replace(/^0+(?=\d)/, ''), base.padStart(3, '0')])
+          return prisma.card.findMany({
+            where: {
+              tcgType: card.tcgType, id: { not: id },
+              setCode: { equals: card.setCode!, mode: 'insensitive' },
+              OR: [{ cardNumber: { in: [...nums] } }, { cardNumber: { startsWith: `${base}_` } }],
+            },
+            select: relatedSelect, take: 20,
+          })
+        })()
+      : []
+
+    // 2) 진화 라인 (같은 언어판 이름 기준, 같은 세트 카드 우선)
+    const pickByName = async (name: string) =>
+      (await prisma.card.findFirst({ where: { AND: [{ tcgType: card.tcgType, name, setCode: card.setCode }, sameLang] }, select: relatedSelect }))
+      ?? prisma.card.findFirst({
+        where: { AND: [{ tcgType: card.tcgType, name }, sameLang] },
+        select: relatedSelect, orderBy: [{ snkrdunkPrice: { sort: 'desc', nulls: 'last' } }, { createdAt: 'desc' }],
+      })
+    const ancestors: Array<{ name: string; card: ReturnType<typeof brief> | null }> = []
+    let prevName = card.evolvesFrom
+    for (let depth = 0; prevName && depth < 2; depth++) {
+      const found = await pickByName(prevName)
+      ancestors.unshift({ name: prevName, card: found ? brief(found) : null })
+      prevName = found ? (await prisma.card.findUnique({ where: { id: found.id }, select: { evolvesFrom: true } }))?.evolvesFrom ?? null : null
+    }
+    const descendantsOf = async (name: string) => {
+      const names = await prisma.card.groupBy({ by: ['name'], where: { AND: [{ tcgType: card.tcgType, evolvesFrom: name }, sameLang] }, orderBy: { name: 'asc' }, take: 8 })
+      return Promise.all(names.map(async n => {
+        const c = await pickByName(n.name)
+        return { name: n.name, card: c ? brief(c) : null }
+      }))
+    }
+    const children = await descendantsOf(card.name)
+    const descendants = await Promise.all(children.map(async ch => ({ ...ch, children: await descendantsOf(ch.name) })))
+
+    // 3) 같은 포켓몬(도감번호)의 다른 카드 — 같은 언어판 우선, 시세 높은 순
+    let samePokemon: RelatedRow[] = []
+    let samePokemonTotal = 0
+    if (card.dexIds.length) {
+      const where: Prisma.CardWhereInput = { AND: [{ tcgType: card.tcgType, id: { not: id }, dexIds: { hasSome: card.dexIds } }, sameLang] }
+      ;[samePokemon, samePokemonTotal] = await Promise.all([
+        prisma.card.findMany({ where, select: relatedSelect, orderBy: [{ snkrdunkPrice: { sort: 'desc', nulls: 'last' } }, { createdAt: 'desc' }], take: 18 }),
+        prisma.card.count({ where }),
+      ])
+    }
+
+    res.json({
+      lang,
+      versions: versions.map(brief).sort((a, b) => (a.lang === lang ? 0 : 1) - (b.lang === lang ? 0 : 1)),
+      evolution: { ancestors, current: card.name, descendants },
+      samePokemon: { total: samePokemonTotal, cards: samePokemon.map(brief) },
+    })
+  } catch (err) {
+    console.error('[getCardRelated]', err)
+    res.status(500).json({ message: '관련 카드를 불러오지 못했습니다.' })
   }
 }

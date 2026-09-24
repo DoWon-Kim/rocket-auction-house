@@ -13,6 +13,8 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { connectSocket, reconnectWithToken } from '@/lib/socket'
 import { resolveImageSrc } from '@/lib/utils'
+import { useCart } from '@/lib/shop'
+import { ShoppingCart } from 'lucide-react'
 
 interface SiteMenu {
   key: string
@@ -36,6 +38,8 @@ export default function Navbar() {
   const router = useRouter()
   const user = useAuthStore(s => s.user)
   const clearAuth = useAuthStore(s => s.clearAuth)
+  const { data: cart } = useCart()
+  const cartCount = cart?.items.length ?? 0
   const [search, setSearch] = useState('')
   const [mobileOpen, setMobileOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
@@ -264,6 +268,18 @@ export default function Navbar() {
                   {(unread ?? 0) > 0 && (
                     <span className="absolute -top-0.5 -right-0.5 bg-accent text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center leading-none shadow-[0_0_8px_rgba(139,92,246,0.5)]">
                       {unread! > 9 ? '9+' : unread}
+                    </span>
+                  )}
+                </Link>
+
+                {/* 장바구니 */}
+                <Link href="/shop/cart"
+                  className="relative h-9 w-9 flex items-center justify-center text-white/60 hover:text-white hover:bg-surface rounded-full transition-colors duration-150"
+                  title="장바구니">
+                  <ShoppingCart size={17} />
+                  {cartCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 bg-accent text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center leading-none">
+                      {cartCount > 9 ? '9+' : cartCount}
                     </span>
                   )}
                 </Link>

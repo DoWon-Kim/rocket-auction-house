@@ -42,7 +42,9 @@ import {
 } from '../controllers/admin.controller'
 import { authenticate, optionalAuth, requireAdmin, requireSuperAdmin } from '../middleware/auth'
 import { requireSection } from '../middleware/permissions'
-import { searchCards, getCardMeta, getCardRank, getCard, getCardVariants, getCardListings, getCardPriceHistory, getCardPriceReference } from '../controllers/card.controller'
+import { searchCards, getCardMeta, getCardRank, getCard, getCardVariants, getCardListings, getCardPriceHistory, getCardPriceReference, getCardRelated } from '../controllers/card.controller'
+import { listSets, getSet } from '../controllers/set.controller'
+import { listPokedex, getPokedexEntry } from '../controllers/pokedex.controller'
 import { proxyImage } from '../controllers/imageProxy.controller'
 import { upload } from '../middleware/upload'
 import { uploadImage } from '../controllers/upload.controller'
@@ -65,13 +67,19 @@ import {
   mergeLanguageDuplicates,
   importAll,
   importSnkrdunk,
+  importCardDetails,
+  importKoreanDex,
 } from '../controllers/import.controller'
 import { authLimiter, paymentLimiter, uploadLimiter, apiLimiter } from '../middleware/rateLimit'
 import {
-  getShopItems, getShopItem, buyShopItem, getMyShopOrders,
+  buyShopItem, getMyShopOrders,
   adminGetShopItems, adminCreateShopItem, adminUpdateShopItem, adminDeleteShopItem, adminRestockShopItem, adminToggleSoldOut,
   adminGetShopStats, adminGetShopOrders, adminUpdateShopOrderShipping,
 } from '../controllers/shop.controller'
+import {
+  getShopHome, listShopItems, getShopItemDetail, listShopReviews, getCart, addToCart, updateCartItem, removeCartItems,
+  checkout, listMyPurchases, getMyPurchase, getLastAddress, createShopReview, adminGetShopSettings, adminUpdateShopSettings,
+} from '../controllers/shopMall.controller'
 import { getOrCreateRoom, getMyRooms, getRoomMessages, getUnreadCount } from '../controllers/chat.controller'
 import { shipItem, confirmReceipt, adminReleaseEscrow, getCarriers } from '../controllers/escrow.controller'
 import { getMenus, toggleMenu, updateMenuOrder } from '../controllers/menu.controller'
@@ -138,6 +146,11 @@ router.get('/cards/:id', getCard)
 router.get('/cards/:id/variants', getCardVariants)
 router.get('/cards/:id/price-history', getCardPriceHistory)
 router.get('/cards/:id/price-reference', getCardPriceReference)
+router.get('/cards/:id/related', getCardRelated)
+router.get('/sets', listSets)
+router.get('/sets/:tcgType/:lang/:code', getSet)
+router.get('/pokedex', listPokedex)
+router.get('/pokedex/:dexId', getPokedexEntry)
 router.get('/cards/:id/listings', getCardListings)
 
 // 이미지 프록시 (외부 이미지 핫링크 차단 우회)
@@ -163,10 +176,25 @@ router.post('/listings/:id/offer', authenticate, makeOffer)
 router.patch('/offers/:offerId/respond', authenticate, respondToOffer)
 
 // 샵 (관리자 판매 TCG 박스)
-router.get('/shop', getShopItems)
-router.get('/shop/:id', getShopItem)
+// 쇼핑몰 (정적 경로를 /shop/:id 보다 먼저)
+router.get('/shop', listShopItems)
+router.get('/shop/home', getShopHome)
+router.get('/shop/cart',                authenticate, getCart)
+router.post('/shop/cart',               authenticate, addToCart)
+router.delete('/shop/cart',             authenticate, removeCartItems)
+router.patch('/shop/cart/:shopItemId',  authenticate, updateCartItem)
+router.delete('/shop/cart/:shopItemId', authenticate, removeCartItems)
+router.post('/shop/checkout',           authenticate, apiLimiter, checkout)
+router.get('/shop/purchases',           authenticate, listMyPurchases)
+router.get('/shop/purchases/:orderNo',  authenticate, getMyPurchase)
+router.get('/shop/last-address',        authenticate, getLastAddress)
+router.post('/shop/orders/:orderId/review', authenticate, createShopReview)
+router.get('/shop/:id', getShopItemDetail)
+router.get('/shop/:id/reviews', listShopReviews)
 router.post('/shop/:id/buy', authenticate, buyShopItem)
 router.get('/my/shop-orders', authenticate, getMyShopOrders)
+router.get('/admin/shop/settings',   authenticate, requireSection('shop'), adminGetShopSettings)
+router.patch('/admin/shop/settings', authenticate, requireSection('shop'), adminUpdateShopSettings)
 router.get('/admin/shop/stats',                    authenticate, requireSection('shop'), adminGetShopStats)
 router.get('/admin/shop/orders',                   authenticate, requireSection('shop'), adminGetShopOrders)
 router.patch('/admin/shop/orders/:id/shipping',    authenticate, requireSection('shop'), adminUpdateShopOrderShipping)
@@ -385,5 +413,7 @@ router.post('/admin/import/merge-duplicates', authenticate, requireSuperAdmin, m
 router.post('/admin/import/yugioh-all',    authenticate, requireSuperAdmin, importYugiohAll)
 router.post('/admin/import/all',           authenticate, requireSuperAdmin, importAll)
 router.get('/admin/import/snkrdunk',       authenticate, requireSuperAdmin, importSnkrdunk)
+router.get('/admin/import/card-details',   authenticate, requireSuperAdmin, importCardDetails)
+router.get('/admin/import/korean-dex',     authenticate, requireSuperAdmin, importKoreanDex)
 
 export default router

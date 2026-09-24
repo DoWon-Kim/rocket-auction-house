@@ -36,6 +36,7 @@ interface ShopItem {
   id: string; name: string; description: string | null
   tcgType: string; category: string; price: number; stock: number
   imageUrl: string | null; isActive: boolean; isSoldOut: boolean; createdAt: string
+  originalPrice: number | null; images: string[]; isFeatured: boolean; soldCount: number
   _count?: { orders: number }
 }
 interface DayData   { date: string; revenue: number; orders: number }
@@ -45,7 +46,46 @@ interface ShopOrder { id: string; quantity: number; unitPrice: number; totalPric
 interface OrdersResponse { orders: ShopOrder[]; total: number; page: number; totalPages: number }
 interface NaverItem { productId: string; title: string; image: string; lprice: number; hprice: number; mallName: string; brand: string; category: string }
 
-const EMPTY_FORM = { name: '', description: '', tcgType: 'POKEMON', category: 'BOOSTER_BOX', price: '', stock: '', imageUrl: '' }
+const EMPTY_FORM = { name: '', description: '', tcgType: 'POKEMON', category: 'BOOSTER_BOX', price: '', stock: '', imageUrl: '', originalPrice: '', images: [] as string[], isFeatured: false }
+
+// 폼 → API 본문 (숫자 변환 · 빈 값 정리)
+const toPayload = (form: typeof EMPTY_FORM) => ({
+  ...form,
+  price: Number(form.price), stock: Number(form.stock),
+  originalPrice: form.originalPrice ? Number(form.originalPrice) : null,
+  imageUrl: form.imageUrl || undefined,
+})
+
+// ── 배송비 정책 ──────────────────────────────────────────────────────────────
+function ShippingSettings() {
+  const qc = useQueryClient()
+  const { data } = useQuery<{ fee: number; freeOver: number }>({ queryKey: ['admin-shop-settings'], queryFn: () => api.get('/admin/shop/settings').then(r => r.data) })
+  const [edit, setEdit] = useState<{ fee: string; freeOver: string } | null>(null)
+  const save = useMutation({
+    mutationFn: () => api.patch('/admin/shop/settings', { fee: Number(edit!.fee), freeOver: Number(edit!.freeOver) }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-shop-settings'] }); setEdit(null) },
+  })
+  if (!data) return null
+  const field = 'w-28 bg-sunken border border-line rounded-lg px-2.5 py-1.5 text-sm text-fg focus:outline-none focus:border-accent/40'
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3 text-sm">
+      <span className="font-semibold text-fg">배송비 정책</span>
+      {edit ? (
+        <>
+          <label className="flex items-center gap-1.5 text-muted">기본 <input type="number" min={0} value={edit.fee} onChange={e => setEdit({ ...edit, fee: e.target.value })} className={field} />P</label>
+          <label className="flex items-center gap-1.5 text-muted"><input type="number" min={0} value={edit.freeOver} onChange={e => setEdit({ ...edit, freeOver: e.target.value })} className={field} />P 이상 무료 <span className="text-[11px] text-subtle">(0 = 무료 없음)</span></label>
+          <button onClick={() => save.mutate()} disabled={save.isPending} className="h-8 px-3 rounded-lg bg-accent text-xs font-semibold text-white disabled:opacity-50">저장</button>
+          <button onClick={() => setEdit(null)} className="h-8 px-3 rounded-lg border border-line text-xs text-muted">취소</button>
+        </>
+      ) : (
+        <>
+          <span className="text-muted">기본 {data.fee.toLocaleString()}P · {data.freeOver > 0 ? `${data.freeOver.toLocaleString()}P 이상 무료` : '무료배송 없음'}</span>
+          <button onClick={() => setEdit({ fee: String(data.fee), freeOver: String(data.freeOver) })} className="h-8 px-3 rounded-lg border border-line text-xs text-fg-2 hover:bg-surface-2">변경</button>
+        </>
+      )}
+    </div>
+  )
+}
 
 // ─── 토스트 ────────────────────────────────────────────────────────────────────
 
@@ -158,7 +198,7 @@ function ItemFormModal({ initial, onSave, onCancel, title }: {
     if (!Number(form.price) || Number(form.price) < 1) { setError('올바른 가격을 입력하세요.'); return }
     if (Number(form.stock) < 0) { setError('재고는 0 이상이어야 합니다.'); return }
     setLoading(true)
-    try { await onSave({ ...form, price: Number(form.price) as unknown as string, stock: Number(form.stock) as unknown as string }) }
+    try { await onSave(form) }
     catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } }
       setError(e.response?.data?.message ?? '저장 실패')
@@ -241,6 +281,18 @@ function ItemFormModal({ initial, onSave, onCancel, title }: {
               <input type="number" value={form.stock} onChange={set('stock')} min={0} placeholder="0" className={field} required />
             </div>
 
+            {/* 정가 (할인 표시) */}
+            <div className="space-y-1">
+              <label className="text-xs text-muted-2 uppercase tracking-wider font-semibold">정가 (P) <span className="normal-case font-normal text-subtle">할인 표시용</span></label>
+              <input type="number" value={form.originalPrice} onChange={set('originalPrice')} min={0} placeholder="판매가보다 높으면 할인율 표시" className={field} />
+            </div>
+
+            {/* 추천 상품 */}
+            <label className="flex items-center gap-2 self-end pb-2.5 text-sm text-fg-2 cursor-pointer">
+              <input type="checkbox" checked={form.isFeatured} onChange={e => setForm(f => ({ ...f, isFeatured: e.target.checked }))} />
+              샵 메인 배너에 추천
+            </label>
+
             {/* 상품 설명 */}
             <div className="col-span-2 space-y-1">
               <label className="text-xs text-muted-2 uppercase tracking-wider font-semibold">상품 설명</label>
@@ -252,10 +304,29 @@ function ItemFormModal({ initial, onSave, onCancel, title }: {
 
           {/* 이미지 업로드 */}
           <ImageUpload
-            label="상품 이미지"
+            label="대표 이미지"
             value={form.imageUrl}
             onChange={url => setForm(f => ({ ...f, imageUrl: url }))}
           />
+
+          {/* 추가 이미지 (상세 갤러리) */}
+          <div className="space-y-2">
+            {form.images.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {form.images.map((u, i) => (
+                  <div key={u + i} className="relative w-16 h-16 rounded-lg border border-line bg-surface overflow-hidden">
+                    <Image src={u} alt="" fill sizes="64px" className="object-contain" />
+                    <button type="button" onClick={() => setForm(f => ({ ...f, images: f.images.filter((_, n) => n !== i) }))} aria-label="이미지 삭제"
+                      className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-bg/80 text-fg flex items-center justify-center"><X size={11} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {form.images.length < 10 && (
+              <ImageUpload label={`추가 이미지 ${form.images.length}/10 (상세 페이지 갤러리)`} value=""
+                onChange={url => url && setForm(f => ({ ...f, images: [...f.images, url] }))} />
+            )}
+          </div>
         </form>
 
         {/* 푸터 */}
@@ -616,14 +687,14 @@ function ItemsTab({ triggerCreate, onCreateHandled }: { triggerCreate: boolean; 
   })
 
   async function handleCreate(form: typeof EMPTY_FORM) {
-    await api.post('/admin/shop', { ...form, price: Number(form.price), stock: Number(form.stock), imageUrl: form.imageUrl || undefined })
+    await api.post('/admin/shop', toPayload(form))
     qc.invalidateQueries({ queryKey: ['admin-shop'] })
     setCreating(false)
     showToast('상품이 등록됐습니다.')
   }
   async function handleEdit(form: typeof EMPTY_FORM) {
     if (!editing) return
-    await api.patch(`/admin/shop/${editing.id}`, { ...form, price: Number(form.price), imageUrl: form.imageUrl || undefined })
+    await api.patch(`/admin/shop/${editing.id}`, toPayload(form))
     qc.invalidateQueries({ queryKey: ['admin-shop'] })
     setEditing(null)
     showToast('상품이 수정됐습니다.')
@@ -638,6 +709,8 @@ function ItemsTab({ triggerCreate, onCreateHandled }: { triggerCreate: boolean; 
 
   return (
     <>
+      <ShippingSettings />
+
       {/* 검색 + 필터 바 */}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="relative flex-1 min-w-48">
@@ -690,11 +763,13 @@ function ItemsTab({ triggerCreate, onCreateHandled }: { triggerCreate: boolean; 
                   <span className="font-semibold text-sm text-fg truncate">{item.name}</span>
                   {!item.isActive && <span className="text-[10px] bg-line text-muted border border-line-strong px-1.5 py-0.5 rounded-md font-semibold">비활성</span>}
                   {item.isSoldOut && <span className="text-[10px] bg-red-950/40 text-red-400 border border-red-800/40 px-1.5 py-0.5 rounded-md font-semibold">품절</span>}
+                  {item.isFeatured && <span className="text-[10px] bg-accent/15 text-accent-soft border border-accent-line px-1.5 py-0.5 rounded-md font-semibold">메인 추천</span>}
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted flex-wrap">
                   <Badge>{TCG_LABELS[item.tcgType] ?? item.tcgType}</Badge>
                   <span className="text-subtle">{CATEGORY_LABELS[item.category]}</span>
                   <span className="text-accent-2 font-bold tabular-nums">{item.price.toLocaleString()}P</span>
+                  {item.originalPrice != null && item.originalPrice > item.price && <span className="text-subtle line-through tabular-nums">{item.originalPrice.toLocaleString()}P</span>}
                   <span className={`font-semibold tabular-nums ${
                     item.stock === 0 ? 'text-red-400' :
                     item.stock <= 3  ? 'text-orange-400' :
@@ -761,7 +836,7 @@ function ItemsTab({ triggerCreate, onCreateHandled }: { triggerCreate: boolean; 
       {editing && (
         <ItemFormModal
           title={`수정: ${editing.name}`}
-          initial={{ name: editing.name, description: editing.description ?? '', tcgType: editing.tcgType, category: editing.category, price: String(editing.price), stock: String(editing.stock), imageUrl: editing.imageUrl ?? '' }}
+          initial={{ name: editing.name, description: editing.description ?? '', tcgType: editing.tcgType, category: editing.category, price: String(editing.price), stock: String(editing.stock), imageUrl: editing.imageUrl ?? '', originalPrice: editing.originalPrice ? String(editing.originalPrice) : '', images: editing.images ?? [], isFeatured: editing.isFeatured }}
           onSave={handleEdit}
           onCancel={() => setEditing(null)}
         />

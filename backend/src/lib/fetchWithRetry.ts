@@ -25,13 +25,14 @@ interface CacheEntry {
 
 const cache = new Map<string, CacheEntry>()
 
-// 만료된 캐시 항목 정리 (30분마다)
-setInterval(() => {
+// 만료된 캐시 항목 정리 (30분마다) — 이 타이머 때문에 프로세스(테스트 등)가 종료를 못 하지 않도록 unref
+const cacheCleanup = setInterval(() => {
   const now = Date.now()
   for (const [key, entry] of cache) {
     if (entry.expiresAt < now) cache.delete(key)
   }
 }, 30 * 60 * 1000)
+cacheCleanup.unref?.()
 
 export async function fetchWithRetry<T = unknown>(
   url: string,

@@ -8,6 +8,8 @@ import { TCG_LABELS } from '@/lib/utils'
 import { Plus, Pencil, Trash2, X, Check, Download, ChevronDown, ChevronUp, Search, Loader2, Zap, AlertCircle, AlertTriangle } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
 import Badge from '@/components/ui/Badge'
+import { CardDetailSyncPanel } from '@/components/admin/CardDetailSyncPanel'
+import { KoreanDexPanel } from '@/components/admin/KoreanDexPanel'
 
 const TCG_TYPES = ['POKEMON', 'YUGIOH', 'MTG', 'DIGIMON', 'ONEPIECE', 'WEISS', 'OTHER'] as const
 type TcgType = typeof TCG_TYPES[number]
@@ -1554,6 +1556,8 @@ export default function AdminCardsPage() {
       )}
 
       <WorldClassImportPanel onImported={() => qc.invalidateQueries({ queryKey: ['admin', 'cards'] })} />
+      <KoreanDexPanel />
+      <CardDetailSyncPanel onDone={() => qc.invalidateQueries({ queryKey: ['admin', 'cards'] })} />
       <SnkrdunkImportPanel onImported={() => qc.invalidateQueries({ queryKey: ['admin', 'cards'] })} />
       <BulkImportPanel onImported={() => qc.invalidateQueries({ queryKey: ['admin', 'cards'] })} />
       <ImportPanel onImported={() => qc.invalidateQueries({ queryKey: ['admin', 'cards'] })} />
