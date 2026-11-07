@@ -4,6 +4,7 @@ import { ReportReason, DisputeStatus } from '@prisma/client'
 import { prisma } from '../lib/prisma'
 import { AuthRequest } from '../middleware/auth'
 import { notify } from '../lib/notify'
+import { removePurchasedItems } from '../lib/tradeCancel'
 
 const createDisputeSchema = z.object({
   transactionId: z.string().uuid(),
@@ -143,6 +144,10 @@ export async function adminResolveDispute(req: AuthRequest, res: Response) {
   if (!RESOLVABLE.includes(status)) {
     res.status(400).json({ message: '유효하지 않은 상태 전환입니다.' }); return
   }
+  // 이미 끝난 분쟁을 다시 처리하면 환불이 두 번 나갈 수 있음
+  if (['RESOLVED', 'REJECTED', 'REFUNDED'].includes(dispute.status)) {
+    res.status(409).json({ message: '이미 처리가 끝난 분쟁입니다.' }); return
+  }
 
   // 환불 시 finalPrice 조회 필요
   let finalPrice = 0
@@ -180,6 +185,12 @@ export async function adminResolveDispute(req: AuthRequest, res: Response) {
         where: { id: dispute.transactionId },
         data: { txStatus: 'CANCELLED', disputeStatus: 'REFUNDED' },
       })
+      // 아직 보관 중인 대금이면 환불로 닫아서, 자동 정산·관리자 환불이 또 나가지 않게
+      await t.transaction.updateMany({
+        where: { id: dispute.transactionId, escrowStatus: 'HELD' },
+        data: { escrowStatus: 'REFUNDED' },
+      })
+      await removePurchasedItems(t, dispute.transactionId)
     }
   })
 

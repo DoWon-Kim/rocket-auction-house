@@ -2,6 +2,7 @@ import { Response } from 'express'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { AuthRequest } from '../middleware/auth'
+import { removePurchasedItems } from '../lib/tradeCancel'
 
 const VALID_REASONS = ['FAKE_ITEM', 'NO_SHIPMENT', 'WRONG_ITEM', 'DAMAGED_ITEM', 'FRAUD', 'HARASSMENT', 'OTHER'] as const
 const VALID_STATUSES = ['PENDING', 'INVESTIGATING', 'RESOLVED', 'DISMISSED'] as const
@@ -188,6 +189,7 @@ export async function updateReport(req: AuthRequest, res: Response) {
           where: { id: report.transaction.buyerId },
           data: { balance: { increment: report.transaction.finalPrice + report.transaction.shippingFee } },
         }),
+        removePurchasedItems(prisma, report.transaction.id),
         prisma.report.update({
           where: { id },
           data: { status, adminNote: adminNote?.trim() || null, resolvedAt: new Date() },

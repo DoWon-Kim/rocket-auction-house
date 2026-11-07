@@ -419,7 +419,7 @@ model Listing {
   bids          Bid[]
   autoBids      AutoBid[]
   offers        Offer[]
-  transaction   Transaction?
+  transactions  Transaction[]
   chatRooms     ChatRoom[]
   reports       Report[]
 
@@ -569,7 +569,7 @@ enum OfferStatus {
 model Transaction {
   id               String            @id @default(uuid())
   listing          Listing           @relation(fields: [listingId], references: [id])
-  listingId        String            @unique
+  listingId        String            // 자동 취소 후 재판매되면 한 상품에 거래가 여러 건 생길 수 있음
   buyer            User              @relation("TransactionBuyer", fields: [buyerId], references: [id])
   buyerId          String
   seller           User              @relation("TransactionSeller", fields: [sellerId], references: [id])
@@ -609,6 +609,7 @@ model Transaction {
   reviews          Review[]
   dispute          Dispute?
 
+  @@index([listingId])
   @@index([buyerId])
   @@index([sellerId])
   @@index([completedAt])

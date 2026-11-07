@@ -6,6 +6,7 @@ import { prisma } from '../lib/prisma'
 import { AuthRequest } from '../middleware/auth'
 import { notify } from '../lib/notify'
 import { txAmount } from '../lib/marketTrade'
+import { removePurchasedItems } from '../lib/tradeCancel'
 import { postChatMessage } from '../lib/chatTrade'
 import { tradeFlags, shipDeadline, autoConfirmAt, TRADE_FILTERS, SHIP_DEADLINE_DAYS, kstDayStart, lastKstDays } from '../lib/adminOps'
 
@@ -309,6 +310,7 @@ export async function refundTrade(req: AuthRequest, res: Response) {
       const r = await t.transaction.updateMany({ where: { id: tx.id, escrowStatus: 'HELD' }, data: { txStatus: 'CANCELLED', escrowStatus: 'REFUNDED' } })
       if (r.count === 0) return false
       await t.user.update({ where: { id: tx.buyerId }, data: { balance: { increment: amount } } })
+      await removePurchasedItems(t, tx.id)
       return true
     })
     if (!done) return fail(res, 409, '보관 중인 대금이 없는 거래입니다. (이미 정산·환불됨)')
