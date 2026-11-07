@@ -9,12 +9,12 @@ import {
 } from 'lucide-react'
 import { NotificationBell } from '@/components/NotificationBell'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { connectSocket, reconnectWithToken } from '@/lib/socket'
 import { resolveImageSrc } from '@/lib/utils'
 import { useCart } from '@/lib/shop'
-import { ShoppingCart } from 'lucide-react'
+import { ShoppingCart, Store, PlusCircle } from 'lucide-react'
 
 interface SiteMenu {
   key: string
@@ -112,8 +112,18 @@ export default function Navbar() {
     queryFn: () => api.get<{ count: number }>('/chat/unread').then(r => r.data.count),
     enabled: !!user,
     staleTime: 10000,
-    refetchInterval: 15000,
+    refetchInterval: 60000,
   })
+
+  // 새 채팅·읽음이 생기면 안 읽은 수를 바로 갱신
+  const qc = useQueryClient()
+  useEffect(() => {
+    if (!user) return
+    const socket = connectSocket()
+    const refresh = () => qc.invalidateQueries({ queryKey: ['chat-unread'] })
+    socket.on('chat:room-updated', refresh)
+    return () => { socket.off('chat:room-updated', refresh) }
+  }, [user, qc])
 
   const { data: friendReqCount } = useQuery({
     queryKey: ['friend-req-count'],
@@ -272,6 +282,13 @@ export default function Navbar() {
                   )}
                 </Link>
 
+                {/* 찜한 상품 */}
+                <Link href="/likes"
+                  className="relative h-9 w-9 flex items-center justify-center text-white/60 hover:text-white hover:bg-surface rounded-full transition-colors duration-150"
+                  title="찜한 상품" aria-label="찜한 상품">
+                  <Heart size={17} />
+                </Link>
+
                 {/* 장바구니 */}
                 <Link href="/shop/cart"
                   className="relative h-9 w-9 flex items-center justify-center text-white/60 hover:text-white hover:bg-surface rounded-full transition-colors duration-150"
@@ -397,8 +414,17 @@ export default function Navbar() {
               <Link href="/notifications" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-white/70 hover:bg-surface hover:text-white rounded-xl transition-colors">
                 <Bell size={15} /> 알림
               </Link>
+              <Link href="/sell" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-accent-fg hover:bg-surface rounded-xl transition-colors">
+                <PlusCircle size={15} /> 판매하기
+              </Link>
+              <Link href={`/users/${user.id}`} onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-white/70 hover:bg-surface hover:text-white rounded-xl transition-colors">
+                <Store size={15} /> 내 상점
+              </Link>
+              <Link href="/likes" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-white/70 hover:bg-surface hover:text-white rounded-xl transition-colors">
+                <Heart size={15} /> 찜한 상품
+              </Link>
               <Link href="/wishlist" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-white/70 hover:bg-surface hover:text-white rounded-xl transition-colors">
-                <Heart size={15} /> 위시리스트
+                <Heart size={15} /> 관심 카드 (가격 알림)
               </Link>
               <Link href="/collection" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-white/70 hover:bg-surface hover:text-white rounded-xl transition-colors">
                 <Layers size={15} /> 컬렉션 트래커

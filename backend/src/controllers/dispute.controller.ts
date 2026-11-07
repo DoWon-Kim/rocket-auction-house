@@ -149,9 +149,9 @@ export async function adminResolveDispute(req: AuthRequest, res: Response) {
   if (status === 'REFUNDED') {
     const txRecord = await prisma.transaction.findUnique({
       where: { id: dispute.transactionId },
-      select: { finalPrice: true },
+      select: { finalPrice: true, shippingFee: true },
     })
-    finalPrice = txRecord?.finalPrice ?? 0
+    finalPrice = txRecord ? txRecord.finalPrice + txRecord.shippingFee : 0
   }
 
   await prisma.$transaction(async (t) => {

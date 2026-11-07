@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -15,6 +15,7 @@ const SECTIONS = [
   { key: 'oripas',     label: '오리파 관리' },
   { key: 'shipping',   label: '배송 관리' },
   { key: 'withdrawal', label: '환전 관리' },
+  { key: 'trades',     label: '거래 관제' },
 ]
 
 interface SubAdmin {

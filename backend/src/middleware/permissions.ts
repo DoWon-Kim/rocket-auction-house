@@ -3,7 +3,7 @@ import { prisma } from '../lib/prisma'
 import { AuthRequest } from './auth'
 
 // 중간 관리자에게 부여 가능한 섹션 목록
-export const GRANTABLE_SECTIONS = ['posts', 'cards', 'shop', 'oripas', 'shipping', 'withdrawal'] as const
+export const GRANTABLE_SECTIONS = ['posts', 'cards', 'shop', 'oripas', 'shipping', 'withdrawal', 'trades'] as const
 
 // SUPER_ADMIN은 무조건 통과, ADMIN은 DB에서 권한 확인
 export function requireSection(section: string) {

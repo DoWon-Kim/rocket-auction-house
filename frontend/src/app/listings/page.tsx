@@ -1,549 +1,208 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
-import { useSearchParams, useRouter } from 'next/navigation'
-import { api } from '@/lib/api'
-import ListingCard from '@/components/ListingCard'
-import SkeletonCard from '@/components/SkeletonCard'
-import SellForm from '@/components/SellForm'
-import { TCG_LABELS, CONDITION_LABELS, resolveImageSrc } from '@/lib/utils'
-import { Suspense, useState } from 'react'
-import {
-  SlidersHorizontal, X, PlusCircle, LayoutGrid,
-  ChevronLeft, ChevronRight, TrendingUp, Zap, Clock,
-  ShieldCheck, Tag, Gavel, Flame, BarChart2,
-} from 'lucide-react'
-import { useAuthStore } from '@/lib/store'
-import Image from 'next/image'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { createPortal } from 'react-dom'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
+import { Search, X, SlidersHorizontal, Plus, BarChart2, Truck, Handshake, ShieldCheck, Tag, Gavel, Loader2, ChevronDown } from 'lucide-react'
+import { api } from '@/lib/api'
+import { useAuthStore } from '@/lib/store'
+import { TCG_LABELS, CONDITION_LABELS } from '@/lib/utils'
+import { MarketItemCard } from '@/components/market/MarketItemCard'
+import { RecentlyViewed } from '@/components/market/RecentlyViewed'
+import type { MarketListing } from '@/lib/market'
 
-// ─── 상수 ─────────────────────────────────────────────────────────────────────
+const TCGS = ['POKEMON', 'ONEPIECE', 'YUGIOH', 'DIGIMON', 'MTG', 'WEISS', 'OTHER']
+const TYPES = [['BUY_NOW', '즉시구매', Tag], ['OFFER', '가격제안', Handshake], ['AUCTION', '경매', Gavel]] as const
+const SORTS = [['newest', '최신순'], ['price_asc', '낮은 가격순'], ['price_desc', '높은 가격순'], ['likes', '찜 많은순'], ['popular', '조회 많은순'], ['ending_soon', '마감 임박(경매)']] as const
+const PRICE_PRESETS = [['', '10000', '1만 이하'], ['10000', '50000', '1~5만'], ['50000', '100000', '5~10만'], ['100000', '500000', '10~50만'], ['500000', '', '50만 이상']] as const
+const CONDITIONS = ['MINT', 'NEAR_MINT', 'EXCELLENT', 'GOOD', 'LIGHT_PLAYED', 'PLAYED', 'POOR']
+const PAGE = 30
 
-const TCG_TYPES = ['POKEMON', 'YUGIOH', 'MTG', 'DIGIMON', 'ONEPIECE', 'WEISS', 'OTHER']
-const LISTING_TYPES = [
-  { value: '', label: '전체', icon: null },
-  { value: 'BUY_NOW', label: '즉시구매', icon: <Tag size={11} /> },
-  { value: 'AUCTION', label: '경매', icon: <Gavel size={11} /> },
-  { value: 'OFFER', label: '가격제안', icon: <Flame size={11} /> },
-]
-const SORT_OPTIONS = [
-  { value: 'newest',     label: '최신순' },
-  { value: 'price_asc',  label: '가격 낮은순' },
-  { value: 'price_desc', label: '가격 높은순' },
-  { value: 'ending_soon', label: '마감 임박' },
-  { value: 'popular',    label: '인기순' },
-  { value: 'bid_count',  label: '입찰 많은순' },
-]
-const CONDITIONS = [
-  { value: 'MINT',         label: 'MINT',      color: 'text-emerald-400', bg: 'bg-emerald-900/20 border-emerald-700/40' },
-  { value: 'NEAR_MINT',   label: 'NM',         color: 'text-green-400',   bg: 'bg-green-900/20 border-green-700/40' },
-  { value: 'EXCELLENT',   label: 'EX',         color: 'text-blue-400',    bg: 'bg-blue-900/20 border-blue-700/40' },
-  { value: 'GOOD',        label: 'GOOD',       color: 'text-yellow-400',  bg: 'bg-yellow-900/20 border-yellow-700/40' },
-  { value: 'LIGHT_PLAYED', label: 'LP',        color: 'text-orange-400',  bg: 'bg-orange-900/20 border-orange-700/40' },
-  { value: 'PLAYED',      label: 'PL',         color: 'text-red-400',     bg: 'bg-red-900/20 border-red-700/40' },
-  { value: 'POOR',        label: 'POOR',       color: 'text-zinc-400',    bg: 'bg-zinc-900/20 border-zinc-700/40' },
-]
-const GRADING_COMPANIES = ['PSA', 'BGS', 'CGC', 'SGC', 'HGA', 'ACE']
-
-const inputCls = 'w-32 bg-surface border border-line hover:border-line-strong focus:border-accent/40 rounded-full px-3 py-2 text-sm text-fg focus:outline-none transition-colors'
-
-// ─── 컴포넌트 ─────────────────────────────────────────────────────────────────
-
-function FilterPill({
-  active, onClick, children, className,
-}: { active: boolean; onClick: () => void; children: React.ReactNode; className?: string }) {
-  return (
-    <button onClick={onClick}
-      className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all duration-150 ${
-        active
-          ? 'bg-accent-tint text-accent-soft border-accent-line'
-          : `bg-transparent text-muted-2 border-line hover:border-line-strong hover:text-fg-3 ${className ?? ''}`
-      }`}>
-      {children}
-    </button>
-  )
-}
-
-// ─── 시장 요약 바 ──────────────────────────────────────────────────────────────
-
-interface MarketSummary {
-  activeCount: number
-  activeAuctions: number
-  tx24h: { count: number; volume: number; avgPrice: number | null }
-  tx7d: { count: number; volume: number }
-  topCards: { cardId: string; name: string; imageUrl: string | null; tcgType: string; rarity: string; txCount: number; avgPrice: number | null }[]
-  recentDeals: { id: string; finalPrice: number; completedAt: string; cardName: string; cardImage: string | null; tcgType: string; listingType: string }[]
-}
-
-function MarketStatBar() {
-  const { data } = useQuery<MarketSummary>({
-    queryKey: ['market-summary'],
-    queryFn: () => api.get('/listings/market-summary').then(r => r.data),
-    staleTime: 60_000,
-  })
-
-  const stats = [
-    {
-      icon: <BarChart2 size={14} className="text-accent-fg" />,
-      label: '활성 리스팅',
-      value: data ? data.activeCount.toLocaleString() : '—',
-    },
-    {
-      icon: <Gavel size={14} className="text-accent-2" />,
-      label: '진행 중 경매',
-      value: data ? data.activeAuctions.toLocaleString() : '—',
-    },
-    {
-      icon: <TrendingUp size={14} className="text-emerald-400" />,
-      label: '24h 체결',
-      value: data ? `${data.tx24h.count.toLocaleString()}건` : '—',
-    },
-    {
-      icon: <Zap size={14} className="text-blue-400" />,
-      label: '24h 거래액',
-      value: data && data.tx24h.volume > 0 ? `${(data.tx24h.volume / 10000).toFixed(1)}만P` : '—',
-    },
-    {
-      icon: <ShieldCheck size={14} className="text-purple-400" />,
-      label: '7일 체결',
-      value: data ? `${data.tx7d.count.toLocaleString()}건` : '—',
-    },
-  ]
-
-  return (
-    <div className="bg-sunken border border-line rounded-2xl px-5 py-4 space-y-4">
-      {/* 숫자 지표 */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        {stats.map(s => (
-          <div key={s.label} className="flex items-center gap-2">
-            {s.icon}
-            <div>
-              <p className="text-xs font-bold text-fg tabular-nums leading-none">{s.value}</p>
-              <p className="text-[10px] text-subtle mt-0.5">{s.label}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* 최근 체결 & 인기 카드 */}
-      {data && (data.recentDeals.length > 0 || data.topCards.length > 0) && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-line">
-          {/* 최근 체결 */}
-          {data.recentDeals.length > 0 && (
-            <div>
-              <p className="text-[10px] text-subtle uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5">
-                <Clock size={10} /> 최근 체결
-              </p>
-              <div className="space-y-1.5">
-                {data.recentDeals.slice(0, 3).map(deal => (
-                  <div key={deal.id} className="flex items-center gap-2">
-                    {deal.cardImage
-                      ? <div className="relative w-6 h-9 shrink-0 rounded overflow-hidden bg-bg">
-                          <Image src={deal.cardImage} alt={deal.cardName} fill className="object-contain" sizes="24px" />
-                        </div>
-                      : <div className="w-6 h-9 shrink-0 rounded bg-surface-2 flex items-center justify-center text-[8px]">🃏</div>
-                    }
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[11px] text-fg-2 truncate">{deal.cardName}</p>
-                      <p className="text-[10px] text-subtle">{deal.listingType === 'AUCTION' ? '경매' : deal.listingType === 'BUY_NOW' ? '즉구' : '제안'}</p>
-                    </div>
-                    <p className="text-[11px] font-bold text-accent-2 tabular-nums shrink-0">{deal.finalPrice.toLocaleString()}P</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 인기 카드 */}
-          {data.topCards.length > 0 && (
-            <div>
-              <p className="text-[10px] text-subtle uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5">
-                <TrendingUp size={10} /> 7일 인기 카드
-              </p>
-              <div className="space-y-1.5">
-                {data.topCards.slice(0, 3).map((card, idx) => (
-                  <Link key={card.cardId} href={`/cards/${card.cardId}`} className="flex items-center gap-2 group">
-                    <span className="text-[10px] font-bold text-subtle w-4 text-right shrink-0">#{idx + 1}</span>
-                    {card.imageUrl
-                      ? <div className="relative w-6 h-9 shrink-0 rounded overflow-hidden bg-bg">
-                          <Image src={resolveImageSrc(card.imageUrl)!} alt={card.name ?? ''} fill className="object-contain" sizes="24px" />
-                        </div>
-                      : <div className="w-6 h-9 shrink-0 rounded bg-surface-2 flex items-center justify-center text-[8px]">🃏</div>
-                    }
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[11px] text-fg-2 truncate group-hover:text-white transition-colors">{card.name}</p>
-                      <p className="text-[10px] text-subtle">{card.txCount}건 {card.avgPrice ? `· 평균 ${card.avgPrice.toLocaleString()}P` : ''}</p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── 메인 컨텐츠 ──────────────────────────────────────────────────────────────
+interface Page { listings: MarketListing[]; total: number; page: number; limit: number; likedIds: string[] }
+interface Summary { activeCount: number; activeAuctions: number; tx24h: { count: number; volume: number } }
 
 function ListingsContent() {
-  const searchParams = useSearchParams()
+  const params = useSearchParams()
   const router = useRouter()
   const user = useAuthStore(s => s.user)
-  const [showFilter, setShowFilter] = useState(false)
-  const [minPriceInput, setMinPriceInput] = useState(searchParams.get('minPrice') ?? '')
-  const [maxPriceInput, setMaxPriceInput] = useState(searchParams.get('maxPrice') ?? '')
+  const get = (k: string) => params.get(k) ?? ''
+  const [q, setQ] = useState(get('q'))
+  const [sheet, setSheet] = useState(false)
+  const sentinel = useRef<HTMLDivElement>(null)
 
-  const tab         = searchParams.get('tab') ?? 'browse'
-  const type        = searchParams.get('type') ?? ''
-  const tcgType     = searchParams.get('tcgType') ?? ''
-  const cardName    = searchParams.get('cardName') ?? ''
-  const sort        = searchParams.get('sort') ?? 'newest'
-  const minPrice    = searchParams.get('minPrice') ?? ''
-  const maxPrice    = searchParams.get('maxPrice') ?? ''
-  const condition   = searchParams.get('condition') ?? ''
-  const grading     = searchParams.get('grading') ?? ''
-  const hasGrading  = searchParams.get('hasGrading') ?? ''
-  const page        = Number(searchParams.get('page') ?? '1')
+  // 예전 판매 등록 주소 호환
+  useEffect(() => { if (params.get('tab') === 'sell') router.replace(`/sell${params.get('cardId') ? `?cardId=${params.get('cardId')}` : ''}`) }, [params, router])
 
-  function setTab(t: string) {
-    const params = new URLSearchParams()
-    if (t !== 'browse') params.set('tab', t)
-    router.push(`/listings${params.size > 0 ? `?${params.toString()}` : ''}`)
+  const setParams = (next: Record<string, string>) => {
+    const p = new URLSearchParams(params.toString())
+    for (const [k, v] of Object.entries(next)) { if (v) p.set(k, v); else p.delete(k) }
+    router.replace(`/listings${p.size ? `?${p}` : ''}`, { scroll: false })
   }
+  const toggle = (k: string, v: string) => setParams({ [k]: get(k) === v ? '' : v })
 
-  function setParam(key: string, value: string) {
-    const params = new URLSearchParams(searchParams.toString())
-    if (value) { params.set(key, value) } else { params.delete(key) }
-    params.delete('page')
-    router.push(`/listings?${params.toString()}`)
+  const filters = {
+    cardName: get('q'), tcgType: get('tcgType'), type: get('type'), sort: get('sort') || 'newest',
+    shipping: get('shipping'), negotiable: get('negotiable'), hasGrading: get('hasGrading'),
+    condition: get('condition'), minPrice: get('minPrice'), maxPrice: get('maxPrice'),
   }
+  const activeCount = ['tcgType', 'type', 'shipping', 'negotiable', 'hasGrading', 'condition', 'minPrice', 'maxPrice', 'q'].filter(k => get(k)).length
 
-  function toggleParam(key: string, value: string, current: string) {
-    setParam(key, current === value ? '' : value)
-  }
-
-  function applyPriceFilter() {
-    const params = new URLSearchParams(searchParams.toString())
-    if (minPriceInput) { params.set('minPrice', minPriceInput) } else { params.delete('minPrice') }
-    if (maxPriceInput) { params.set('maxPrice', maxPriceInput) } else { params.delete('maxPrice') }
-    params.delete('page')
-    router.push(`/listings?${params.toString()}`)
-  }
-
-  function clearAllFilters() {
-    setMinPriceInput('')
-    setMaxPriceInput('')
-    router.push('/listings')
-  }
-
-  const hasFilters = !!(type || tcgType || cardName || minPrice || maxPrice || condition || grading || hasGrading)
-
-  const { data, isLoading } = useQuery({
-    queryKey: ['listings', { type, tcgType, cardName, sort, minPrice, maxPrice, condition, grading, hasGrading, page }],
-    queryFn: () =>
-      api.get('/listings', {
-        params: {
-          type:        type || undefined,
-          tcgType:     tcgType || undefined,
-          cardName:    cardName || undefined,
-          sort:        sort || undefined,
-          minPrice:    minPrice || undefined,
-          maxPrice:    maxPrice || undefined,
-          condition:   condition || undefined,
-          gradingCompany: grading || undefined,
-          hasGrading:  hasGrading || undefined,
-          page,
-        },
-      }).then(r => r.data),
-    enabled: tab === 'browse',
-    staleTime: 30_000,
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useInfiniteQuery<Page>({
+    queryKey: ['listings', filters],
+    queryFn: ({ pageParam }) => api.get('/listings', { params: { ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)), page: pageParam, limit: PAGE } }).then(r => r.data),
+    initialPageParam: 1,
+    getNextPageParam: last => (last.page * last.limit < last.total ? last.page + 1 : undefined),
   })
+  const listings = data?.pages.flatMap(p => p.listings) ?? []
+  const liked = new Set(data?.pages.flatMap(p => p.likedIds ?? []))
+  const total = data?.pages[0]?.total ?? 0
+  const { data: summary } = useQuery<Summary>({ queryKey: ['market-summary'], queryFn: () => api.get('/listings/market-summary').then(r => r.data), staleTime: 60_000 })
 
-  const totalPages = data ? Math.ceil(data.total / data.limit) : 0
+  // 끝까지 내리면 자동으로 더 불러오기
+  useEffect(() => {
+    const el = sentinel.current
+    if (!el || !hasNextPage) return
+    const io = new IntersectionObserver(e => { if (e[0].isIntersecting && !isFetchingNextPage) fetchNextPage() }, { rootMargin: '600px' })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
+
+  const chip = (on: boolean) => `shrink-0 h-9 px-3.5 rounded-full text-sm font-medium border inline-flex items-center gap-1.5 transition-colors ${on ? 'bg-fg text-bg border-fg' : 'border-line text-fg-2 hover:border-line-strong'}`
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-start sm:items-center gap-4 flex-col sm:flex-row">
-        <div>
-          <h1 className="text-[26px] sm:text-3xl font-bold tracking-tight text-fg">마켓플레이스</h1>
-          {tab === 'browse' && data && (
-            <p className="text-xs text-subtle mt-0.5">총 {data.total.toLocaleString()}개 리스팅</p>
-          )}
+    <div className="space-y-4 pb-20 lg:pb-0">
+      {/* 머리 · 검색 */}
+      <div className="flex items-center gap-3">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-fg">마켓</h1>
+          <p className="text-xs text-muted">{isLoading ? '불러오는 중…' : `판매중인 상품 ${total.toLocaleString()}개`}
+            {summary && <span className="hidden sm:inline"> · 24시간 거래 {summary.tx24h.count}건 · 진행 중 경매 {summary.activeAuctions}개</span>}</p>
         </div>
-
-        <div className="flex items-center gap-2 ml-auto">
-          {/* Market 링크 */}
-          <Link href="/market"
-            className="flex items-center gap-1.5 h-9 px-3 rounded-full text-xs font-medium bg-surface border border-line text-muted-2 hover:border-accent/30 hover:text-accent-fg transition-all">
-            <BarChart2 size={12} /> 시장 분석
-          </Link>
-
-          {/* Tab switcher */}
-          <div className="flex items-center gap-1 bg-surface border border-line rounded-full p-1">
-            <button onClick={() => setTab('browse')}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-150 ${
-                tab === 'browse'
-                  ? 'bg-accent-tint text-accent-soft shadow-[0_0_12px_rgba(139,92,246,0.15)]'
-                  : 'text-muted-2 hover:text-fg-3'
-              }`}>
-              <LayoutGrid size={13} /> 둘러보기
-            </button>
-            {user && (
-              <button onClick={() => setTab('sell')}
-                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-150 ${
-                  tab === 'sell'
-                    ? 'bg-accent-tint text-accent-soft shadow-[0_0_12px_rgba(139,92,246,0.15)]'
-                    : 'text-muted-2 hover:text-fg-3'
-                }`}>
-                <PlusCircle size={13} /> 판매 등록
-              </button>
-            )}
-          </div>
+        <div className="ml-auto flex items-center gap-2">
+          <Link href="/market" className="hidden sm:inline-flex h-10 px-3.5 rounded-full border border-line text-sm text-fg-2 items-center gap-1.5 hover:border-line-strong"><BarChart2 size={15} />시장 분석</Link>
+          <Link href="/sell" className="hidden lg:inline-flex h-10 px-4 rounded-full bg-accent text-sm font-bold text-white items-center gap-1.5 hover:bg-accent-strong"><Plus size={16} />판매하기</Link>
         </div>
       </div>
 
-      {/* Sell form tab */}
-      {tab === 'sell' && user && (
-        <div className="bg-surface border border-line rounded-2xl p-6">
-          <SellForm onSuccess={id => router.push(`/listings/${id}`)} />
+      <form onSubmit={e => { e.preventDefault(); setParams({ q: q.trim() }) }} className="relative">
+        <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-subtle" />
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="어떤 카드를 찾고 있나요? (이름·번호·세트·상품 제목)" aria-label="마켓 검색"
+          className="w-full h-12 pl-11 pr-10 rounded-2xl bg-surface border border-line text-[15px] text-fg placeholder:text-subtle focus:outline-none focus:border-accent/60" />
+        {q && <button type="button" onClick={() => { setQ(''); setParams({ q: '' }) }} aria-label="검색어 지우기" className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full text-subtle hover:text-fg flex items-center justify-center"><X size={16} /></button>}
+      </form>
+
+      {/* TCG */}
+      <div className="flex gap-2 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <button onClick={() => setParams({ tcgType: '' })} className={chip(!get('tcgType'))}>전체</button>
+        {TCGS.map(t => <button key={t} onClick={() => toggle('tcgType', t)} className={chip(get('tcgType') === t)}>{TCG_LABELS[t]}</button>)}
+      </div>
+
+      {/* 빠른 필터 · 정렬 */}
+      <div className="flex items-center gap-2 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <button onClick={() => setSheet(true)} className={`${chip(activeCount > 0)} !gap-1`}><SlidersHorizontal size={14} />필터{activeCount > 0 && <span className="ml-0.5 w-5 h-5 rounded-full bg-accent text-white text-[11px] flex items-center justify-center">{activeCount}</span>}</button>
+        {TYPES.map(([v, label, Icon]) => <button key={v} onClick={() => toggle('type', v)} className={chip(get('type') === v)}><Icon size={14} />{label}</button>)}
+        <button onClick={() => toggle('shipping', 'free')} className={chip(get('shipping') === 'free')}><Truck size={14} />배송비 포함</button>
+        <button onClick={() => toggle('negotiable', '1')} className={chip(get('negotiable') === '1')}><Handshake size={14} />제안 가능</button>
+        <button onClick={() => toggle('hasGrading', 'true')} className={chip(get('hasGrading') === 'true')}><ShieldCheck size={14} />그레이딩</button>
+        <label className="relative shrink-0 ml-auto">
+          <select value={filters.sort} onChange={e => setParams({ sort: e.target.value === 'newest' ? '' : e.target.value })} aria-label="정렬"
+            className="h-9 pl-3.5 pr-8 rounded-full border border-line bg-surface text-sm text-fg-2 appearance-none cursor-pointer focus:outline-none">
+            {SORTS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+          </select>
+          <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+        </label>
+      </div>
+
+      {activeCount > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          {get('q') && <span className="px-2.5 py-1 rounded-full bg-surface-2 text-fg-2">‘{get('q')}’</span>}
+          {get('condition') && <span className="px-2.5 py-1 rounded-full bg-surface-2 text-fg-2">{CONDITION_LABELS[get('condition')]}</span>}
+          {(get('minPrice') || get('maxPrice')) && <span className="px-2.5 py-1 rounded-full bg-surface-2 text-fg-2">{get('minPrice') ? `${Number(get('minPrice')).toLocaleString()}P` : ''} ~ {get('maxPrice') ? `${Number(get('maxPrice')).toLocaleString()}P` : ''}</span>}
+          <button onClick={() => { setQ(''); router.replace('/listings', { scroll: false }) }} className="px-2.5 py-1 rounded-full text-muted hover:text-fg underline">모두 지우기</button>
         </div>
       )}
 
-      {/* Browse tab */}
-      {tab === 'browse' && (
+      {!activeCount && <RecentlyViewed />}
+
+      {/* 상품 */}
+      {isLoading ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-4 gap-y-6">
+          {Array.from({ length: 10 }).map((_, i) => <div key={i} className="animate-pulse space-y-2"><div className="aspect-square rounded-2xl bg-surface" /><div className="h-3.5 w-3/4 rounded bg-surface" /><div className="h-4 w-1/2 rounded bg-surface" /></div>)}
+        </div>
+      ) : listings.length === 0 ? (
+        <div className="text-center py-20 space-y-3">
+          <p className="text-4xl opacity-30">🔍</p>
+          <p className="text-fg-2 font-semibold">{activeCount ? '조건에 맞는 상품이 없어요' : '아직 등록된 상품이 없어요'}</p>
+          <p className="text-sm text-muted">{activeCount ? '필터를 줄이거나 다른 이름으로 검색해보세요.' : '첫 번째 판매자가 되어보세요!'}</p>
+          <div className="flex justify-center gap-2 pt-1">
+            {activeCount > 0 && <button onClick={() => { setQ(''); router.replace('/listings') }} className="h-10 px-4 rounded-full border border-line text-sm text-fg-2">필터 초기화</button>}
+            <Link href="/sell" className="h-10 px-4 rounded-full bg-accent text-sm font-bold text-white inline-flex items-center gap-1"><Plus size={15} />판매하기</Link>
+          </div>
+        </div>
+      ) : (
         <>
-          {/* 시장 현황 바 */}
-          <MarketStatBar />
-
-          {/* 거래 유형 Quick Filter */}
-          <div className="flex gap-1.5 flex-wrap">
-            {LISTING_TYPES.map(t => (
-              <FilterPill key={t.value} active={type === t.value} onClick={() => setParam('type', t.value)}>
-                {t.icon}{t.label}
-              </FilterPill>
-            ))}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-4 gap-y-6">
+            {listings.map(l => <MarketItemCard key={l.id} listing={l} liked={liked.has(l.id)} showLike={l.sellerId !== user?.id} />)}
           </div>
-
-          {/* Filter toolbar */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <select value={sort} onChange={e => setParam('sort', e.target.value)}
-              className="h-9 px-3 bg-surface border border-line hover:border-line-strong rounded-full text-sm text-fg-3 focus:outline-none transition-colors cursor-pointer">
-              {SORT_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-            </select>
-
-            <button onClick={() => setShowFilter(v => !v)}
-              className={`h-9 flex items-center gap-1.5 px-3 rounded-full text-sm border transition-all duration-150 ${
-                showFilter || hasFilters
-                  ? 'bg-accent-tint border-accent-line text-accent-soft'
-                  : 'bg-surface border-line text-muted-2 hover:border-line-strong hover:text-fg-3'
-              }`}>
-              <SlidersHorizontal size={13} />
-              필터
-              {hasFilters && <span className="w-1.5 h-1.5 rounded-full bg-accent" />}
-            </button>
-
-            {hasFilters && (
-              <button onClick={clearAllFilters}
-                className="h-9 w-9 flex items-center justify-center text-subtle hover:text-fg-2 bg-surface border border-line hover:border-line-strong rounded-full transition-colors"
-                title="필터 초기화">
-                <X size={14} />
-              </button>
-            )}
-
-            {/* 활성 필터 칩 */}
-            {cardName && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-line rounded-full text-xs text-muted-2">
-                <span>&ldquo;{cardName}&rdquo;</span>
-                <button onClick={() => setParam('cardName', '')} className="text-subtle hover:text-fg-3">
-                  <X size={12} />
-                </button>
-              </div>
-            )}
-            {condition && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-line rounded-full text-xs text-accent-soft">
-                {CONDITION_LABELS[condition as keyof typeof CONDITION_LABELS] ?? condition}
-                <button onClick={() => setParam('condition', '')} className="text-subtle hover:text-fg-3">
-                  <X size={12} />
-                </button>
-              </div>
-            )}
-            {grading && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-line rounded-full text-xs text-accent-soft">
-                {grading} 그레이딩
-                <button onClick={() => setParam('grading', '')} className="text-subtle hover:text-fg-3">
-                  <X size={12} />
-                </button>
-              </div>
-            )}
-            {hasGrading === 'true' && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-line rounded-full text-xs text-accent-soft">
-                <ShieldCheck size={11} /> 그레이딩 카드만
-                <button onClick={() => setParam('hasGrading', '')} className="text-subtle hover:text-fg-3">
-                  <X size={12} />
-                </button>
-              </div>
-            )}
+          <div ref={sentinel} className="flex justify-center py-6">
+            {isFetchingNextPage ? <Loader2 className="animate-spin text-muted" /> : hasNextPage ? <button onClick={() => fetchNextPage()} className="h-10 px-5 rounded-full border border-line text-sm text-fg-2">더 보기</button> : <p className="text-xs text-subtle">마지막 상품이에요</p>}
           </div>
-
-          {/* Expanded filter panel */}
-          {showFilter && (
-            <div className="bg-surface border border-line rounded-2xl p-5 space-y-5">
-              {/* TCG 종류 */}
-              <div>
-                <p className="text-[10px] text-subtle mb-3 uppercase tracking-[0.15em] font-semibold">TCG 종류</p>
-                <div className="flex gap-1.5 flex-wrap">
-                  <FilterPill active={!tcgType} onClick={() => setParam('tcgType', '')}>전체</FilterPill>
-                  {TCG_TYPES.map(t => (
-                    <FilterPill key={t} active={tcgType === t} onClick={() => setParam('tcgType', t)}>
-                      {TCG_LABELS[t]}
-                    </FilterPill>
-                  ))}
-                </div>
-              </div>
-
-              {/* 카드 컨디션 */}
-              <div>
-                <p className="text-[10px] text-subtle mb-3 uppercase tracking-[0.15em] font-semibold">카드 상태</p>
-                <div className="flex gap-1.5 flex-wrap">
-                  {CONDITIONS.map(c => (
-                    <button
-                      key={c.value}
-                      onClick={() => toggleParam('condition', c.value, condition)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
-                        condition === c.value ? c.bg + ' ' + c.color : 'border-line text-muted-2 hover:border-line-strong'
-                      }`}
-                    >
-                      {c.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* 그레이딩 */}
-              <div>
-                <p className="text-[10px] text-subtle mb-3 uppercase tracking-[0.15em] font-semibold">그레이딩</p>
-                <div className="flex gap-1.5 flex-wrap">
-                  <button
-                    onClick={() => toggleParam('hasGrading', 'true', hasGrading)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-                      hasGrading === 'true'
-                        ? 'bg-accent-tint text-accent-soft border-accent-line'
-                        : 'border-line text-muted-2 hover:border-line-strong'
-                    }`}
-                  >
-                    <ShieldCheck size={11} /> 그레이딩 카드만
-                  </button>
-                  {GRADING_COMPANIES.map(g => (
-                    <FilterPill key={g} active={grading === g} onClick={() => toggleParam('grading', g, grading)}>
-                      {g}
-                    </FilterPill>
-                  ))}
-                </div>
-              </div>
-
-              {/* 가격 범위 */}
-              <div>
-                <p className="text-[10px] text-subtle mb-3 uppercase tracking-[0.15em] font-semibold">가격 범위</p>
-                <div className="flex items-center gap-2">
-                  <input type="number" value={minPriceInput} onChange={e => setMinPriceInput(e.target.value)}
-                    placeholder="최소 (P)" className={inputCls} />
-                  <span className="text-subtle">–</span>
-                  <input type="number" value={maxPriceInput} onChange={e => setMaxPriceInput(e.target.value)}
-                    placeholder="최대 (P)" className={inputCls} />
-                  <button onClick={applyPriceFilter}
-                    className="h-9 px-4 bg-accent hover:bg-accent-strong text-white rounded-full text-xs font-semibold transition-colors">
-                    적용
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Grid */}
-          {isLoading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {Array.from({ length: 10 }).map((_, i) => (
-                <SkeletonCard key={i} />
-              ))}
-            </div>
-          ) : data?.listings?.length === 0 ? (
-            <div className="text-center py-28">
-              <p className="text-5xl mb-4 opacity-20">🃏</p>
-              <p className="text-subtle text-sm">조건에 맞는 카드가 없습니다.</p>
-              {hasFilters && (
-                <button onClick={clearAllFilters} className="mt-3 text-accent-fg hover:underline text-sm">
-                  필터 초기화
-                </button>
-              )}
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {data?.listings?.map((listing: Parameters<typeof ListingCard>[0]['listing']) => (
-                  <ListingCard key={listing.id} listing={listing} />
-                ))}
-              </div>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex justify-center items-center gap-1 pt-4">
-                  <button
-                    onClick={() => { const p = new URLSearchParams(searchParams.toString()); p.set('page', String(page - 1)); router.push(`/listings?${p}`) }}
-                    disabled={page === 1}
-                    className="h-9 w-9 flex items-center justify-center rounded-full bg-surface border border-line text-muted-2 hover:border-line-strong hover:text-fg-2 disabled:opacity-25 disabled:cursor-not-allowed transition-colors">
-                    <ChevronLeft size={15} />
-                  </button>
-
-                  {Array.from({ length: totalPages }, (_, i) => i + 1)
-                    .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
-                    .reduce<(number | '...')[]>((acc, p, idx, arr) => {
-                      if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('...')
-                      acc.push(p)
-                      return acc
-                    }, [])
-                    .map((p, i) =>
-                      p === '...' ? (
-                        <span key={`e-${i}`} className="h-9 w-9 flex items-center justify-center text-subtle text-sm">…</span>
-                      ) : (
-                        <button key={p}
-                          onClick={() => { const ps = new URLSearchParams(searchParams.toString()); ps.set('page', String(p)); router.push(`/listings?${ps}`) }}
-                          className={`h-9 w-9 flex items-center justify-center rounded-full text-sm font-medium transition-all ${
-                            p === page
-                              ? 'bg-accent-tint text-accent-soft border border-accent-line shadow-[0_0_10px_rgba(139,92,246,0.12)]'
-                              : 'bg-surface border border-line text-muted-2 hover:border-line-strong hover:text-fg-2'
-                          }`}>
-                          {p}
-                        </button>
-                      )
-                    )}
-
-                  <button
-                    onClick={() => { const p = new URLSearchParams(searchParams.toString()); p.set('page', String(page + 1)); router.push(`/listings?${p}`) }}
-                    disabled={page === totalPages}
-                    className="h-9 w-9 flex items-center justify-center rounded-full bg-surface border border-line text-muted-2 hover:border-line-strong hover:text-fg-2 disabled:opacity-25 disabled:cursor-not-allowed transition-colors">
-                    <ChevronRight size={15} />
-                  </button>
-                </div>
-              )}
-            </>
-          )}
         </>
       )}
+
+      {/* 모바일: 판매하기 */}
+      <Link href="/sell" className="lg:hidden fixed bottom-5 right-5 z-40 h-14 pl-5 pr-6 rounded-full bg-gradient-to-r from-accent to-accent-strong text-white font-bold shadow-[0_10px_30px_-6px_rgba(139,92,246,0.7)] inline-flex items-center gap-1.5"><Plus size={20} />판매하기</Link>
+
+      {sheet && <FilterSheet get={get} onClose={() => setSheet(false)} onApply={next => { setParams(next); setSheet(false) }} />}
     </div>
+  )
+}
+
+// 상태·가격 필터 (모바일: 아래에서 올라오는 시트)
+function FilterSheet({ get, onClose, onApply }: { get: (k: string) => string; onClose: () => void; onApply: (next: Record<string, string>) => void }) {
+  const [condition, setCondition] = useState(get('condition'))
+  const [minPrice, setMin] = useState(get('minPrice'))
+  const [maxPrice, setMax] = useState(get('maxPrice'))
+  const pill = (on: boolean) => `h-10 px-4 rounded-full text-sm border ${on ? 'bg-fg text-bg border-fg font-semibold' : 'border-line text-fg-2'}`
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+  return createPortal(
+    <div className="fixed inset-0 z-[100] bg-black/60 flex items-end sm:items-center justify-center" onClick={onClose} role="dialog" aria-modal="true" aria-label="필터">
+      <div className="w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl border border-line bg-bg p-5 space-y-5 max-h-[85dvh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center"><h2 className="text-lg font-bold text-fg">필터</h2><button onClick={onClose} aria-label="닫기" className="ml-auto text-muted hover:text-fg"><X size={20} /></button></div>
+        <div className="space-y-2">
+          <p className="text-sm font-semibold text-fg-2">카드 상태</p>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => setCondition('')} className={pill(!condition)}>전체</button>
+            {CONDITIONS.map(c => <button key={c} onClick={() => setCondition(condition === c ? '' : c)} className={pill(condition === c)}>{CONDITION_LABELS[c]}</button>)}
+          </div>
+        </div>
+        <div className="space-y-2">
+          <p className="text-sm font-semibold text-fg-2">가격</p>
+          <div className="flex flex-wrap gap-2">
+            {PRICE_PRESETS.map(([a, b, label]) => <button key={label} onClick={() => { setMin(a); setMax(b) }} className={pill(minPrice === a && maxPrice === b)}>{label}</button>)}
+          </div>
+          <div className="flex items-center gap-2 pt-1">
+            <input inputMode="numeric" value={minPrice} onChange={e => setMin(e.target.value.replace(/\D/g, ''))} placeholder="최소" aria-label="최소 가격" className="flex-1 min-w-0 h-11 rounded-xl bg-sunken border border-line px-3 text-sm text-fg" />
+            <span className="text-muted">~</span>
+            <input inputMode="numeric" value={maxPrice} onChange={e => setMax(e.target.value.replace(/\D/g, ''))} placeholder="최대" aria-label="최대 가격" className="flex-1 min-w-0 h-11 rounded-xl bg-sunken border border-line px-3 text-sm text-fg" />
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={() => { setCondition(''); setMin(''); setMax('') }} className="h-12 px-5 rounded-2xl border border-line text-sm text-fg-2">초기화</button>
+          <button onClick={() => onApply({ condition, minPrice, maxPrice })} className="flex-1 h-12 rounded-2xl bg-accent text-white font-bold">적용하기</button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   )
 }
 
 export default function ListingsPage() {
-  return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center py-32">
-        <div className="w-8 h-8 rounded-full border-2 border-line border-t-accent animate-spin" />
-      </div>
-    }>
-      <ListingsContent />
-    </Suspense>
-  )
+  return <Suspense fallback={<div className="h-96 rounded-3xl bg-surface animate-pulse" />}><ListingsContent /></Suspense>
 }

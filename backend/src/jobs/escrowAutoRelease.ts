@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma'
+import { txAmount } from '../lib/marketTrade'
 import { notify } from '../lib/notify'
 
 const AUTO_CONFIRM_DAYS = 3
@@ -17,7 +18,7 @@ export async function runEscrowAutoRelease() {
         escrowStatus: 'HELD',
         shippedAt: { lt: cutoff },
       },
-      select: { id: true, sellerId: true, finalPrice: true },
+      select: { id: true, sellerId: true, finalPrice: true, shippingFee: true },
     })
 
     for (const tx of stale) {
@@ -34,7 +35,7 @@ export async function runEscrowAutoRelease() {
           }),
           prisma.user.update({
             where: { id: tx.sellerId },
-            data: { balance: { increment: tx.finalPrice } },
+            data: { balance: { increment: txAmount(tx) } },
           }),
         ])
         console.log(`[EscrowAutoRelease] tx=${tx.id} 자동 구매 확정 (${tx.finalPrice}P)`)
@@ -42,7 +43,7 @@ export async function runEscrowAutoRelease() {
           userId: tx.sellerId,
           type: 'TRANSACTION_COMPLETED',
           title: '거래가 자동 완료되었습니다',
-          body: `${tx.finalPrice.toLocaleString()}P가 잔액에 정산되었습니다.`,
+          body: `${txAmount(tx).toLocaleString()}P가 잔액에 정산되었습니다.`,
           link: '/my?tab=sales',
         })
       } catch (txErr) {

@@ -79,11 +79,15 @@ export default function SellForm({ onSuccess }: SellFormProps) {
   const [instantBuyPrice, setInstantBuyPrice] = useState('')
   const [autoExtendMinutes, setAutoExtendMinutes] = useState('0')
   const [minOfferPrice, setMinOfferPrice] = useState('')
+  const [title, setTitle] = useState('')
+  const [shipIncluded, setShipIncluded] = useState(true)
+  const [shippingFee, setShippingFee] = useState('3500')
+  const [negotiable, setNegotiable] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []).slice(0, 5 - imageUrls.length)
+    const files = Array.from(e.target.files ?? []).slice(0, 10 - imageUrls.length)
     if (!files.length) return
     setUploadingImages(true)
     try {
@@ -128,6 +132,9 @@ export default function SellForm({ onSuccess }: SellFormProps) {
         instantBuyPrice: listingType === 'AUCTION' && instantBuyPrice ? Number(instantBuyPrice) : undefined,
         autoExtendMinutes: listingType === 'AUCTION' && Number(autoExtendMinutes) > 0 ? Number(autoExtendMinutes) : undefined,
         minOfferPrice: listingType === 'OFFER' ? Number(minOfferPrice) : undefined,
+        title: title.trim() || undefined,
+        shippingFee: shipIncluded ? 0 : Number(shippingFee) || 0,
+        negotiable: listingType === 'BUY_NOW' ? negotiable : undefined,
       })
     },
     onSuccess: res => {
@@ -296,6 +303,10 @@ export default function SellForm({ onSuccess }: SellFormProps) {
             <div>
               <label className={labelCls}>판매 가격 (P) *</label>
               <input type="number" min="1" value={buyNowPrice} onChange={e => setBuyNowPrice(e.target.value)} placeholder="ex) 50000" className={inputCls} />
+              <label className="mt-2 flex items-center gap-2 text-sm text-fg-2 cursor-pointer">
+                <input type="checkbox" checked={negotiable} onChange={e => setNegotiable(e.target.checked)} />
+                가격 제안 받기 <span className="text-xs text-subtle">(구매자가 채팅으로 가격을 제안할 수 있어요)</span>
+              </label>
               {selectedCard && (
                 <div className="mt-2.5">
                   <PriceReferencePanel cardId={selectedCard.id} mode="BUY_NOW" value={Number(buyNowPrice)} graded={!!gradingCompany}
@@ -378,7 +389,23 @@ export default function SellForm({ onSuccess }: SellFormProps) {
             )}
           </div>
           <div>
-            <label className={labelCls}>카드 사진 <span className="text-gray-500 font-normal">(선택, 최대 5장)</span></label>
+            <label className={labelCls}>상품 제목 <span className="text-gray-500 font-normal">(선택 · 비우면 카드 이름)</span></label>
+            <input type="text" value={title} onChange={e => setTitle(e.target.value)} maxLength={60}
+              placeholder={selectedCard ? `예: ${selectedCard.nameKo ?? selectedCard.name} 미개봉급, 슬리브 보관` : '예: 미개봉급, 슬리브 보관'} className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>배송비</label>
+            <div className="flex items-center gap-4 text-sm text-fg-2">
+              <label className="flex items-center gap-1.5 cursor-pointer"><input type="radio" checked={shipIncluded} onChange={() => setShipIncluded(true)} />배송비 포함</label>
+              <label className="flex items-center gap-1.5 cursor-pointer"><input type="radio" checked={!shipIncluded} onChange={() => setShipIncluded(false)} />별도</label>
+              {!shipIncluded && (
+                <input type="number" min="0" value={shippingFee} onChange={e => setShippingFee(e.target.value)} className={`${inputCls} max-w-32`} aria-label="배송비" />
+              )}
+            </div>
+            <p className="text-xs text-subtle mt-1">모든 거래는 안전결제(택배)로 진행돼요. 구매자가 결제하면 3일 안에 발송해주세요.</p>
+          </div>
+          <div>
+            <label className={labelCls}>카드 사진 <span className="text-gray-500 font-normal">(선택, 최대 10장 · 첫 장이 대표 사진)</span></label>
             <div className="flex flex-wrap gap-2">
               {imageUrls.map((url, i) => (
                 <div key={url} className="relative w-20 h-28 rounded-lg overflow-hidden border border-line group">
@@ -389,7 +416,7 @@ export default function SellForm({ onSuccess }: SellFormProps) {
                   </button>
                 </div>
               ))}
-              {imageUrls.length < 5 && (
+              {imageUrls.length < 10 && (
                 <button onClick={() => fileInputRef.current?.click()} disabled={uploadingImages}
                   className="w-20 h-28 rounded-lg border-2 border-dashed border-line-strong hover:border-accent/60 flex flex-col items-center justify-center gap-1 text-subtle hover:text-accent-fg transition-colors disabled:opacity-50">
                   {uploadingImages ? <Loader2 size={18} className="animate-spin" /> : <ImagePlus size={18} />}
@@ -433,7 +460,9 @@ export default function SellForm({ onSuccess }: SellFormProps) {
                 { label: '카드 상태', value: CONDITION_LABELS[condition] },
                 { label: '그레이딩', value: gradingCompany ? `${gradingCompany}${gradingGrade ? ` ${gradingGrade}` : ''}` : 'None' },
                 { label: '수량', value: `${quantity}장` },
-                { label: '가격', value: displayPrice() },
+                ...(title.trim() ? [{ label: '제목', value: title.trim() }] : []),
+                { label: '가격', value: displayPrice() + (listingType === 'BUY_NOW' && negotiable ? ' (제안 가능)' : '') },
+                { label: '배송비', value: shipIncluded ? '포함' : `${(Number(shippingFee) || 0).toLocaleString()}P` },
                 ...(refRow ? [refRow] : []),
                 ...(listingType === 'AUCTION' ? [{ label: '경매 기간', value: auctionEndDisplay() }] : []),
                 ...(listingType === 'AUCTION' && instantBuyPrice ? [{ label: '즉시낙찰가', value: `${Number(instantBuyPrice).toLocaleString()}P` }] : []),

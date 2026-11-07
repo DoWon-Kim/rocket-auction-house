@@ -171,7 +171,7 @@ export async function updateReport(req: AuthRequest, res: Response) {
 
     const report = await prisma.report.findUnique({
       where: { id },
-      include: { transaction: { select: { id: true, buyerId: true, finalPrice: true, escrowStatus: true, txStatus: true } } },
+      include: { transaction: { select: { id: true, buyerId: true, finalPrice: true, shippingFee: true, escrowStatus: true, txStatus: true } } },
     })
     if (!report) { res.status(404).json({ message: '신고를 찾을 수 없습니다.' }); return }
 
@@ -186,7 +186,7 @@ export async function updateReport(req: AuthRequest, res: Response) {
         }),
         prisma.user.update({
           where: { id: report.transaction.buyerId },
-          data: { balance: { increment: report.transaction.finalPrice } },
+          data: { balance: { increment: report.transaction.finalPrice + report.transaction.shippingFee } },
         }),
         prisma.report.update({
           where: { id },

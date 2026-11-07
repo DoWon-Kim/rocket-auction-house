@@ -5,7 +5,10 @@ import { prisma } from '../lib/prisma'
 import { AuthRequest } from '../middleware/auth'
 import { getIo } from '../lib/socketio'
 import { notify } from '../lib/notify'
-import { detectAbnormalBidding, analyzeUserRisk, issueWarning } from '../lib/fraudDetection'
+import { detectAbnormalBidding, issueWarning } from '../lib/fraudDetection'
+import { acceptsOffers } from '../lib/marketTrade'
+import { ensureChatRoom, postChatMessage } from '../lib/chatTrade'
+import { notifyFollowersOfListing } from './market.controller'
 
 const GRADING_COMPANIES = ['PSA', 'BGS', 'CGC', 'SGC', 'HGA', 'ACE', '기타'] as const
 
@@ -15,7 +18,10 @@ const createListingSchema = z.object({
   condition: z.enum(['MINT', 'NEAR_MINT', 'EXCELLENT', 'GOOD', 'LIGHT_PLAYED', 'PLAYED', 'POOR']),
   quantity: z.number().int().min(1).default(1),
   description: z.string().optional(),
-  imageUrls: z.array(z.string().url()).max(5).optional(),
+  imageUrls: z.array(z.string().url()).max(10).optional(),
+  title: z.string().trim().max(60).optional(),
+  shippingFee: z.number().int().min(0).max(100000).default(0),
+  negotiable: z.boolean().default(false),
   buyNowPrice: z.number().int().min(1).optional(),
   startingPrice: z.number().int().min(1).optional(),
   auctionEndsAt: z.string().datetime().optional(),
@@ -44,45 +50,52 @@ export async function getListings(req: AuthRequest, res: Response) {
     const page = Number.isFinite(rawPage) && rawPage > 0 ? Math.floor(rawPage) : 1
     const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(Math.floor(rawLimit), 100) : 20
 
-    const where: Prisma.ListingWhereInput = { status: 'ACTIVE' }
+    // 판매 상태: 기본은 판매중+예약중, 상점에서는 판매완료도 조회
+    const statusParam = req.query.status as string | undefined
+    const where: Prisma.ListingWhereInput = {
+      status: statusParam === 'sold' ? 'SOLD'
+        : statusParam === 'reserved' ? 'RESERVED'
+        : statusParam === 'active' ? 'ACTIVE'
+        : statusParam === 'all' ? { in: ['ACTIVE', 'RESERVED', 'SOLD'] }
+        : { in: ['ACTIVE', 'RESERVED'] },
+    }
     if (type) where.listingType = type as Prisma.EnumListingTypeFilter | undefined
     if (sellerId) where.sellerId = sellerId
     if (condition) where.condition = condition as Prisma.EnumCardConditionFilter | undefined
     if (hasGrading === 'true') where.gradingCompany = { not: null }
     if (gradingCompany) where.gradingCompany = gradingCompany
 
-    if (tcgType || cardName) {
-      where.card = {
-        ...(tcgType ? { tcgType: tcgType as Prisma.EnumTcgTypeFilter | undefined } : {}),
-        ...(cardName ? {
-          OR: [
-            { name:       { contains: cardName, mode: 'insensitive' } },
-            { nameKo:     { contains: cardName, mode: 'insensitive' } },
-            { nameJa:     { contains: cardName, mode: 'insensitive' } },
-            { cardNumber: { contains: cardName, mode: 'insensitive' } },
-            { setCode:    { contains: cardName, mode: 'insensitive' } },
-          ],
-        } : {}),
-      }
+    // 조건은 AND 로 쌓는다 (검색어·가격대가 각자 OR 를 쓰므로)
+    const and: Prisma.ListingWhereInput[] = []
+    if (tcgType) and.push({ card: { tcgType: tcgType as Prisma.EnumTcgTypeFilter | undefined } })
+    if (cardName) {
+      const q = cardName.trim()
+      and.push({
+        OR: [
+          { title: { contains: q, mode: 'insensitive' } },
+          { card: { OR: [
+            { name:       { contains: q, mode: 'insensitive' } },
+            { nameKo:     { contains: q, mode: 'insensitive' } },
+            { nameJa:     { contains: q, mode: 'insensitive' } },
+            { cardNumber: { contains: q, mode: 'insensitive' } },
+            { setCode:    { contains: q, mode: 'insensitive' } },
+            { setName:    { contains: q, mode: 'insensitive' } },
+          ] } },
+        ],
+      })
     }
+    if (req.query.shipping === 'free') and.push({ shippingFee: 0 })
+    if (req.query.negotiable === '1') and.push({ OR: [{ listingType: 'OFFER' }, { negotiable: true }] })
     if (minPrice || maxPrice) {
       const priceRange: Prisma.IntNullableFilter = {}
       if (minPrice) priceRange.gte = Number(minPrice)
       if (maxPrice) priceRange.lte = Number(maxPrice)
-      if (type === 'BUY_NOW') {
-        where.buyNowPrice = priceRange
-      } else if (type === 'AUCTION') {
-        where.currentPrice = priceRange
-      } else if (type === 'OFFER') {
-        where.minOfferPrice = priceRange
-      } else {
-        where.OR = [
-          { buyNowPrice: priceRange },
-          { currentPrice: priceRange },
-          { minOfferPrice: priceRange },
-        ]
-      }
+      if (type === 'BUY_NOW') and.push({ buyNowPrice: priceRange })
+      else if (type === 'AUCTION') and.push({ currentPrice: priceRange })
+      else if (type === 'OFFER') and.push({ minOfferPrice: priceRange })
+      else and.push({ OR: [{ buyNowPrice: priceRange }, { currentPrice: priceRange }, { minOfferPrice: priceRange }] })
     }
+    if (and.length) where.AND = and
 
     const orderBy = ((): Prisma.ListingOrderByWithRelationInput | Prisma.ListingOrderByWithRelationInput[] => {
       if (sort === 'price_asc' || sort === 'price_desc') {
@@ -93,8 +106,10 @@ export async function getListings(req: AuthRequest, res: Response) {
       }
       if (sort === 'ending_soon') return { auctionEndsAt: 'asc' as const }
       if (sort === 'popular')     return { viewCount: 'desc' as const }
+      if (sort === 'likes')       return [{ likeCount: 'desc' as const }, { bumpedAt: 'desc' as const }]
       if (sort === 'bid_count')   return [{ bids: { _count: 'desc' as const } }, { createdAt: 'desc' as const }]
-      return { createdAt: 'desc' as const }
+      // 최신순 = 등록/끌올 시각
+      return { bumpedAt: 'desc' as const }
     })()
 
     const skip = (page - 1) * limit
@@ -104,7 +119,7 @@ export async function getListings(req: AuthRequest, res: Response) {
         include: {
           card: { select: { id: true, name: true, nameKo: true, imageUrl: true, rarity: true, tcgType: true, setName: true, setCode: true, cardNumber: true, cardTypes: true, supertype: true } },
           seller: { select: { id: true, nickname: true, avatarUrl: true, avgRating: true, reviewCount: true } },
-          _count: { select: { bids: true, offers: true } },
+          _count: { select: { bids: true, offers: true, chatRooms: true } },
         },
         orderBy,
         skip,
@@ -113,7 +128,11 @@ export async function getListings(req: AuthRequest, res: Response) {
       prisma.listing.count({ where }),
     ])
 
-    res.json({ listings, total, page, limit })
+    const likedIds = req.userId && listings.length
+      ? (await prisma.listingLike.findMany({ where: { userId: req.userId, listingId: { in: listings.map(l => l.id) } }, select: { listingId: true } })).map(l => l.listingId)
+      : []
+
+    res.json({ listings, total, page, limit, likedIds })
   } catch (err) {
     console.error('[getListings]', err)
     res.status(500).json({ message: '서버 오류가 발생했습니다.' })
@@ -129,7 +148,9 @@ export async function getListing(req: AuthRequest, res: Response) {
         where: { id: listingId },
         include: {
           card: true,
-          seller: { select: { id: true, nickname: true, avatarUrl: true, avgRating: true, reviewCount: true } },
+          seller: { select: { id: true, nickname: true, avatarUrl: true, avgRating: true, reviewCount: true, shopIntro: true, createdAt: true, _count: { select: { followers: true, listings: { where: { status: 'ACTIVE' } } } } } },
+          reservedFor: { select: { id: true, nickname: true } },
+          _count: { select: { chatRooms: true } },
           bids: {
             include: { bidder: { select: { id: true, nickname: true } } },
             orderBy: { amount: 'desc' },
@@ -138,6 +159,10 @@ export async function getListing(req: AuthRequest, res: Response) {
           offers: req.userId
             ? { where: { buyerId: req.userId }, orderBy: { createdAt: 'desc' } }
             : undefined,
+          // 판매자가 볼 때: 채팅한 구매자 목록 (예약 대상 선택)
+          chatRooms: req.userId
+            ? { where: { OR: [{ sellerId: req.userId }, { buyerId: req.userId }] }, select: { id: true, buyerId: true, lastMessageAt: true, buyer: { select: { id: true, nickname: true, avatarUrl: true } } }, orderBy: { lastMessageAt: { sort: 'desc', nulls: 'last' } } }
+            : false,
         },
       }),
     ])
@@ -178,8 +203,13 @@ export async function getListing(req: AuthRequest, res: Response) {
       _count: true,
     })
 
+    const liked = req.userId
+      ? !!(await prisma.listingLike.findUnique({ where: { userId_listingId: { userId: req.userId, listingId } } }))
+      : false
+
     res.json({
       ...listing,
+      liked,
       sellerStats: {
         totalSales,
         completedSales,
@@ -245,9 +275,15 @@ export async function createListing(req: AuthRequest, res: Response) {
         minOfferPrice: data.minOfferPrice,
         gradingCompany: data.gradingCompany ?? null,
         gradingGrade: data.gradingCompany ? (data.gradingGrade ?? null) : null,
+        title: data.title || null,
+        shippingFee: data.shippingFee,
+        negotiable: data.listingType === 'BUY_NOW' ? data.negotiable : false,
       },
       include: { card: true },
     })
+
+    notifyFollowersOfListing(req.userId!, listing.id, listing.title ?? listing.card.nameKo ?? listing.card.name,
+      data.buyNowPrice ?? data.startingPrice ?? data.minOfferPrice)
 
     // 위시리스트 가격 알림 — 비동기
     ;(async () => {
@@ -282,83 +318,6 @@ export async function createListing(req: AuthRequest, res: Response) {
     res.status(201).json(listing)
   } catch (err) {
     console.error('[createListing]', err)
-    res.status(500).json({ message: '서버 오류가 발생했습니다.' })
-  }
-}
-
-export async function buyNow(req: AuthRequest, res: Response) {
-  try {
-    // 계정 정지 / 고위험 유저 차단
-    const buyer = await prisma.user.findUnique({
-      where: { id: req.userId! },
-      select: { isSuspended: true },
-    })
-    if (buyer?.isSuspended) {
-      res.status(403).json({ message: '계정이 정지되어 구매할 수 없습니다.' }); return
-    }
-    const risk = await analyzeUserRisk(req.userId!)
-    if (risk.risk === 'HIGH') {
-      await issueWarning(req.userId!, `고위험 구매 시도: ${risk.reasons.join(', ')}`)
-      res.status(403).json({ message: '계정 위험도가 높아 일시적으로 구매가 제한됩니다. 고객센터에 문의해 주세요.' }); return
-    }
-
-    // 사전 빠른 유효성 검사 (트랜잭션 밖에서)
-    const listing = await prisma.listing.findUnique({ where: { id: String(req.params['id']) } })
-    if (!listing || listing.listingType !== 'BUY_NOW' || listing.status !== 'ACTIVE') {
-      res.status(400).json({ message: '구매할 수 없는 리스팅입니다.' }); return
-    }
-    if (listing.sellerId === req.userId) {
-      res.status(400).json({ message: '본인 리스팅은 구매할 수 없습니다.' }); return
-    }
-
-    const price = listing.buyNowPrice!
-
-    // 모든 작업을 단일 트랜잭션으로 — 실패 시 자동 롤백 (잔액 포함)
-    await prisma.$transaction(async (tx) => {
-      // 잔액 차감 + 충분한지 원자적 확인
-      const deducted = await tx.user.updateMany({
-        where: { id: req.userId!, balance: { gte: price } },
-        data: { balance: { decrement: price } },
-      })
-      if (deducted.count === 0) {
-        throw Object.assign(new Error('INSUFFICIENT_BALANCE'), { status: 400, message: '잔액이 부족합니다.' })
-      }
-
-      // 리스팅 상태 변경 — ACTIVE인 경우만 (동시 구매 방지)
-      const updated = await tx.listing.updateMany({
-        where: { id: listing.id, status: 'ACTIVE' },
-        data: { status: 'SOLD' },
-      })
-      if (updated.count === 0) {
-        throw Object.assign(new Error('ALREADY_SOLD'), { status: 400, message: '이미 판매된 리스팅입니다.' })
-      }
-
-      const txRecord = await tx.transaction.create({
-        data: {
-          listingId: listing.id, buyerId: req.userId!, sellerId: listing.sellerId,
-          finalPrice: price, escrowStatus: 'HELD',
-        },
-      })
-      await tx.inventoryItem.create({
-        data: {
-          userId: req.userId!, cardId: listing.cardId, quantity: listing.quantity,
-          source: 'PURCHASE', sourceId: txRecord.id,
-          condition: listing.condition, gradingCompany: listing.gradingCompany,
-          gradingGrade: listing.gradingGrade, imageUrls: listing.imageUrls,
-        },
-      })
-      await tx.chatRoom.upsert({
-        where: { listingId_buyerId: { listingId: listing.id, buyerId: req.userId! } },
-        create: { listingId: listing.id, buyerId: req.userId!, sellerId: listing.sellerId, transactionId: txRecord.id },
-        update: { transactionId: txRecord.id },
-      })
-    })
-
-    res.json({ message: '구매가 완료되었습니다. 물품 수령 후 수령 확인을 눌러주세요.' })
-  } catch (err) {
-    const e = err as { status?: number; message?: string }
-    if (e.status === 400) { res.status(400).json({ message: e.message }); return }
-    console.error('[buyNow]', err)
     res.status(500).json({ message: '서버 오류가 발생했습니다.' })
   }
 }
@@ -701,8 +660,12 @@ export async function makeOffer(req: AuthRequest, res: Response) {
 
   try {
     const listing = await prisma.listing.findUnique({ where: { id: String(req.params['id']) } })
-    if (!listing || listing.listingType !== 'OFFER' || listing.status !== 'ACTIVE') {
-      res.status(400).json({ message: '제안할 수 없는 리스팅입니다.' })
+    if (!listing || !acceptsOffers(listing)) {
+      res.status(400).json({ message: listing?.status === 'RESERVED' ? '예약중인 상품에는 제안할 수 없습니다.' : '가격 제안을 받지 않는 상품입니다.' })
+      return
+    }
+    if (!Number.isInteger(amount) || amount < 1 || (listing.buyNowPrice && amount >= listing.buyNowPrice)) {
+      res.status(400).json({ message: listing.buyNowPrice ? `판매가(${listing.buyNowPrice.toLocaleString()}P)보다 낮은 금액을 제안해주세요.` : '제안 금액을 확인해주세요.' })
       return
     }
     if (listing.sellerId === req.userId) {
@@ -714,20 +677,31 @@ export async function makeOffer(req: AuthRequest, res: Response) {
       return
     }
 
-    const [offer, buyer] = await Promise.all([
+    const pending = await prisma.offer.findFirst({ where: { listingId: listing.id, buyerId: req.userId!, status: 'PENDING' } })
+    if (pending) {
+      res.status(409).json({ message: '이미 응답을 기다리는 제안이 있어요. 판매자 응답 후 다시 제안해주세요.' })
+      return
+    }
+
+    const [offer, buyer, room] = await Promise.all([
       prisma.offer.create({ data: { listingId: listing.id, buyerId: req.userId!, amount, message } }),
       prisma.user.findUnique({ where: { id: req.userId! }, select: { nickname: true } }),
+      ensureChatRoom(prisma, listing.id, req.userId!, listing.sellerId),
     ])
+    await postChatMessage({
+      roomId: room.id, senderId: req.userId!, type: 'OFFER', offerId: offer.id,
+      content: `${amount.toLocaleString()}P에 구매하고 싶어요${message ? `\n${message}` : ''}`,
+    }).catch(e => console.error('[offer chat]', e))
 
     notify({
       userId: listing.sellerId,
       type: 'OFFER_RECEIVED',
       title: '새 제안이 도착했습니다',
       body: `${buyer?.nickname ?? '구매자'}님이 ${amount.toLocaleString()}P를 제안했습니다.`,
-      link: `/listings/${listing.id}`,
+      link: `/chat/${room.id}`,
     }).catch(e => console.error('[notify OFFER_RECEIVED]', e))
 
-    res.status(201).json(offer)
+    res.status(201).json({ ...offer, roomId: room.id })
   } catch (err) {
     console.error('[makeOffer]', err)
     res.status(500).json({ message: '서버 오류가 발생했습니다.' })
@@ -752,57 +726,50 @@ export async function respondToOffer(req: AuthRequest, res: Response) {
       return
     }
 
+    if (action !== 'ACCEPTED' && action !== 'DECLINED') {
+      res.status(400).json({ message: '잘못된 요청입니다.' })
+      return
+    }
+
+    let roomId: string | null = null
     if (action === 'ACCEPTED') {
-      const fullListing = await prisma.listing.findUnique({ where: { id: offer.listingId } })
-      if (!fullListing) {
-        res.status(404).json({ message: '리스팅을 찾을 수 없습니다.' })
-        return
-      }
-      await prisma.$transaction(async (tx) => {
-        const balanceUpdated = await tx.user.updateMany({
-          where: { id: offer.buyerId, balance: { gte: offer.amount } },
-          data: { balance: { decrement: offer.amount } },
+      const reserved = await prisma.$transaction(async (tx) => {
+        const r = await tx.listing.updateMany({
+          where: { id: offer.listingId, status: 'ACTIVE' },
+          data: { status: 'RESERVED', reservedForId: offer.buyerId, reservedPrice: offer.amount, reservedAt: new Date() },
         })
-        if (balanceUpdated.count === 0) {
-          throw Object.assign(new Error('BALANCE'), { status: 400, message: '구매자의 잔액이 부족합니다.' })
-        }
-        await tx.offer.update({ where: { id: String(offerId) }, data: { status: 'ACCEPTED' } })
+        if (r.count === 0) return false
+        await tx.offer.update({ where: { id: offer.id }, data: { status: 'ACCEPTED' } })
         await tx.offer.updateMany({
-          where: { listingId: offer.listingId, id: { not: String(offerId) }, status: 'PENDING' },
+          where: { listingId: offer.listingId, id: { not: offer.id }, status: 'PENDING' },
           data: { status: 'DECLINED' },
         })
-        await tx.listing.update({ where: { id: offer.listingId }, data: { status: 'SOLD' } })
-        const txRecord = await tx.transaction.create({
-          data: {
-            listingId: offer.listingId, buyerId: offer.buyerId, sellerId: req.userId!,
-            finalPrice: offer.amount, escrowStatus: 'HELD',
-          },
-        })
-        await tx.inventoryItem.create({
-          data: {
-            userId: offer.buyerId, cardId: fullListing.cardId, quantity: fullListing.quantity,
-            source: 'PURCHASE', sourceId: txRecord.id,
-            condition: fullListing.condition, gradingCompany: fullListing.gradingCompany,
-            gradingGrade: fullListing.gradingGrade, imageUrls: fullListing.imageUrls,
-          },
-        })
-        await tx.chatRoom.upsert({
-          where: { listingId_buyerId: { listingId: offer.listingId, buyerId: offer.buyerId } },
-          create: { listingId: offer.listingId, buyerId: offer.buyerId, sellerId: req.userId!, transactionId: txRecord.id },
-          update: { transactionId: txRecord.id },
-        })
+        return true
       })
+      if (!reserved) {
+        res.status(409).json({ message: '이미 예약중이거나 판매가 끝난 상품입니다.' })
+        return
+      }
     } else {
-      await prisma.offer.update({ where: { id: String(offerId) }, data: { status: 'DECLINED' } })
+      await prisma.offer.update({ where: { id: offer.id }, data: { status: 'DECLINED' } })
     }
+
+    const room = await ensureChatRoom(prisma, offer.listingId, offer.buyerId, req.userId!)
+    roomId = room.id
+    await postChatMessage({
+      roomId, senderId: req.userId!, type: 'SYSTEM',
+      content: action === 'ACCEPTED'
+        ? `판매자가 ${offer.amount.toLocaleString()}P 제안을 수락했어요. 예약중으로 바뀌었습니다 — 안전결제로 구매를 진행해주세요.`
+        : `판매자가 ${offer.amount.toLocaleString()}P 제안을 거절했어요.`,
+    }).catch(e => console.error('[offer respond chat]', e))
 
     if (action === 'ACCEPTED') {
       notify({
         userId: offer.buyerId,
         type: 'OFFER_ACCEPTED',
         title: '제안이 수락되었습니다',
-        body: `${offer.amount.toLocaleString()}P 제안이 수락되었습니다. 거래를 진행해 주세요.`,
-        link: '/my?tab=purchases',
+        body: `${offer.amount.toLocaleString()}P 제안이 수락되었습니다. 안전결제를 진행해 주세요.`,
+        link: `/chat/${roomId}`,
       }).catch(e => console.error('[notify OFFER_ACCEPTED]', e))
     } else {
       notify({
@@ -810,7 +777,7 @@ export async function respondToOffer(req: AuthRequest, res: Response) {
         type: 'OFFER_REJECTED',
         title: '제안이 거절되었습니다',
         body: `${offer.amount.toLocaleString()}P 제안이 거절되었습니다.`,
-        link: '/my?tab=offers-sent',
+        link: `/chat/${roomId}`,
       }).catch(e => console.error('[notify OFFER_REJECTED]', e))
     }
 

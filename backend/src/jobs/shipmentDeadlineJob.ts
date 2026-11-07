@@ -1,3 +1,4 @@
+import { txAmount } from '../lib/marketTrade'
 import { prisma } from '../lib/prisma'
 
 const DEADLINE_DAYS = 3  // 발송 기한 (결제 후 N일)
@@ -17,7 +18,7 @@ export async function runShipmentDeadlineJob() {
         escrowStatus: 'HELD',
         completedAt: { lt: cutoff },
       },
-      select: { id: true, buyerId: true, sellerId: true, finalPrice: true },
+      select: { id: true, buyerId: true, sellerId: true, finalPrice: true, shippingFee: true },
     })
 
     for (const tx of stale) {
@@ -33,12 +34,12 @@ export async function runShipmentDeadlineJob() {
           // 구매자 전액 환불
           prisma.user.update({
             where: { id: tx.buyerId },
-            data: { balance: { increment: tx.finalPrice } },
+            data: { balance: { increment: txAmount(tx) } },
           }),
           // 리스팅 상태 다시 ACTIVE로 복구 (재판매 가능)
           prisma.listing.updateMany({
             where: { transaction: { id: tx.id } },
-            data: { status: 'ACTIVE' },
+            data: { status: 'ACTIVE', reservedForId: null, reservedPrice: null, reservedAt: null },
           }),
         ])
         console.log(`[ShipmentDeadline] tx=${tx.id} 미발송 자동 취소 → ${tx.buyerId} 환불 ${tx.finalPrice}P`)

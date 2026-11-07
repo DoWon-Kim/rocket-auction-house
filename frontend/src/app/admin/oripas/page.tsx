@@ -1,203 +1,94 @@
 'use client'
 
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
+import Image from 'next/image'
+import { useRouter } from 'next/navigation'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { Plus, Ticket, X, Loader2, ChevronRight } from 'lucide-react'
 import { api } from '@/lib/api'
-import { Plus, Pencil, Power, X, Check, ChevronRight } from 'lucide-react'
-import Badge from '@/components/ui/Badge'
+import { TCG_LABELS } from '@/lib/utils'
+import { ImageUpload } from '@/components/ImageUpload'
+import { ORIPA_STATUS } from '@/lib/oripa'
 
-interface Oripa {
-  id: string
-  title: string
-  description?: string
-  imageUrl?: string
-  pricePerDraw: number
-  totalSlots: number
-  remainSlots: number
-  isActive: boolean
-  _count: { purchases: number }
+interface Row {
+  id: string; title: string; imageUrl: string | null; status: 'DRAFT' | 'LIVE' | 'PAUSED' | 'SOLD_OUT'
+  pricePerDraw: number; totalSlots: number; remainSlots: number; createdAt: string; earned: number
+  _count: { items: number; purchases: number }
 }
-
-type OripaFormState = { title: string; description: string; imageUrl: string; pricePerDraw: string; totalSlots: string }
-const emptyForm: OripaFormState = { title: '', description: '', imageUrl: '', pricePerDraw: '', totalSlots: '' }
-
-const inputCls = 'w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500'
-const labelCls = 'block text-xs text-gray-400 mb-1'
-
-// OripaForm을 최상위에 정의 — 내부 정의 시 매 렌더마다 새 컴포넌트로 인식되어 포커스가 해제됨
-function OripaForm({
-  form,
-  setForm,
-  onSubmit,
-  onCancel,
-  loading,
-}: {
-  form: OripaFormState
-  setForm: React.Dispatch<React.SetStateAction<OripaFormState>>
-  onSubmit: () => void
-  onCancel: () => void
-  loading: boolean
-}) {
-  return (
-    <div className="grid grid-cols-2 gap-3">
-      <div className="col-span-2">
-        <label className={labelCls}>제목 *</label>
-        <input className={inputCls} value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} placeholder="오리파 이름" />
-      </div>
-      <div>
-        <label className={labelCls}>1회 가격 (P) *</label>
-        <input type="number" className={inputCls} value={form.pricePerDraw} onChange={(e) => setForm((p) => ({ ...p, pricePerDraw: e.target.value }))} placeholder="500" />
-      </div>
-      <div>
-        <label className={labelCls}>전체 슬롯 수 *</label>
-        <input type="number" className={inputCls} value={form.totalSlots} onChange={(e) => setForm((p) => ({ ...p, totalSlots: e.target.value }))} placeholder="100" />
-      </div>
-      <div className="col-span-2">
-        <label className={labelCls}>이미지 URL</label>
-        <input className={inputCls} value={form.imageUrl} onChange={(e) => setForm((p) => ({ ...p, imageUrl: e.target.value }))} placeholder="https://..." />
-      </div>
-      <div className="col-span-2">
-        <label className={labelCls}>설명</label>
-        <textarea className={inputCls} rows={2} value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} />
-      </div>
-      <div className="col-span-2 flex gap-2">
-        <button onClick={onSubmit} disabled={loading || !form.title || !form.pricePerDraw || !form.totalSlots}
-          className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1">
-          <Check size={14} /> {loading ? '저장 중...' : '저장'}
-        </button>
-        <button onClick={onCancel} className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-1">
-          <X size={14} /> 취소
-        </button>
-      </div>
-    </div>
-  )
-}
+const EMPTY = { title: '', description: '', imageUrl: '', tcgType: 'POKEMON', pricePerDraw: '1000', totalSlots: '100', maxPerDraw: '10' }
 
 export default function AdminOripasPage() {
-  const qc = useQueryClient()
-  const [showForm, setShowForm] = useState(false)
-  const [editOripa, setEditOripa] = useState<Oripa | null>(null)
-  const [form, setForm] = useState<OripaFormState>(emptyForm)
-  const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
-
-  const { data: oripas, isLoading } = useQuery<Oripa[]>({
-    queryKey: ['admin', 'oripas'],
-    queryFn: () => api.get('/admin/oripas').then((r) => r.data),
+  const router = useRouter()
+  const [creating, setCreating] = useState(false)
+  const [f, setF] = useState(EMPTY)
+  const [error, setError] = useState('')
+  const { data, isLoading } = useQuery<Row[]>({ queryKey: ['admin', 'oripas'], queryFn: () => api.get('/admin/oripas').then(r => r.data) })
+  const create = useMutation({
+    mutationFn: () => api.post<{ id: string }>('/admin/oripas', {
+      title: f.title.trim(), description: f.description.trim() || null, imageUrl: f.imageUrl || null, tcgType: f.tcgType,
+      pricePerDraw: Number(f.pricePerDraw), totalSlots: Number(f.totalSlots), maxPerDraw: Number(f.maxPerDraw),
+    }).then(r => r.data),
+    onSuccess: d => router.push(`/admin/oripas/${d.id}`),
+    onError: (e: unknown) => setError((e as { response?: { data?: { message?: string } } }).response?.data?.message ?? '생성에 실패했어요.'),
   })
-
-  const createMut = useMutation({
-    mutationFn: (body: OripaFormState) => api.post('/admin/oripas', {
-      title: body.title, description: body.description || undefined,
-      imageUrl: body.imageUrl || undefined,
-      pricePerDraw: Number(body.pricePerDraw), totalSlots: Number(body.totalSlots),
-    }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin', 'oripas'] }); setShowForm(false); setForm(emptyForm); setMsg({ type: 'ok', text: '오리파가 등록되었습니다.' }) },
-    onError: (e: unknown) => { const err = e as { response?: { data?: { message?: string } } }; setMsg({ type: 'err', text: err.response?.data?.message ?? '오류가 발생했습니다.' }) },
-  })
-
-  const updateMut = useMutation({
-    mutationFn: ({ id, body }: { id: string; body: OripaFormState }) => api.patch(`/admin/oripas/${id}`, {
-      title: body.title, description: body.description || undefined,
-      imageUrl: body.imageUrl || undefined,
-      pricePerDraw: Number(body.pricePerDraw), totalSlots: Number(body.totalSlots),
-    }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin', 'oripas'] }); setEditOripa(null); setMsg({ type: 'ok', text: '수정되었습니다.' }) },
-    onError: (e: unknown) => { const err = e as { response?: { data?: { message?: string } } }; setMsg({ type: 'err', text: err.response?.data?.message ?? '오류가 발생했습니다.' }) },
-  })
-
-  const toggleMut = useMutation({
-    mutationFn: (id: string) => api.patch(`/admin/oripas/${id}/toggle`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'oripas'] }),
-  })
-
-  function openEdit(o: Oripa) {
-    setEditOripa(o)
-    setShowForm(false)
-    setForm({ title: o.title, description: o.description ?? '', imageUrl: o.imageUrl ?? '', pricePerDraw: String(o.pricePerDraw), totalSlots: String(o.totalSlots) })
-  }
+  const field = 'w-full h-10 bg-sunken border border-line rounded-xl px-3 text-sm text-fg focus:outline-none focus:border-accent/50'
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <h1 className="text-[26px] sm:text-3xl font-bold tracking-tight">오리파 관리</h1>
-        <button onClick={() => { setShowForm(true); setEditOripa(null); setForm(emptyForm) }}
-          className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-          <Plus size={16} /> 오리파 생성
-        </button>
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <h1 className="text-xl font-bold text-fg flex items-center gap-2"><Ticket size={19} className="text-accent-fg" />오리파 관리</h1>
+        <button onClick={() => { setF(EMPTY); setCreating(true) }} className="ml-auto h-9 px-3.5 rounded-xl bg-accent text-sm font-semibold text-white inline-flex items-center gap-1.5"><Plus size={15} />새 오리파</button>
       </div>
+      <p className="text-xs text-muted">준비 중에 상품을 구성하고 <b>판매 시작</b>을 누르면 티켓 순서가 봉인돼요. 봉인 뒤에는 상품 구성·가격·티켓 수를 바꿀 수 없어요.</p>
 
-      {msg && (
-        <div className={`px-4 py-2 rounded-lg text-sm flex items-center justify-between ${msg.type === 'ok' ? 'bg-emerald-900/30 border border-emerald-700 text-emerald-300' : 'bg-red-900/30 border border-red-700 text-red-300'}`}>
-          {msg.text}
-          <button onClick={() => setMsg(null)}><X size={14} /></button>
-        </div>
-      )}
-
-      {/* 생성 폼 */}
-      {showForm && (
-        <div className="bg-gray-900 border border-indigo-500/50 rounded-xl p-5">
-          <h2 className="font-semibold mb-4">새 오리파 생성</h2>
-          <OripaForm
-            form={form}
-            setForm={setForm}
-            onSubmit={() => createMut.mutate(form)}
-            onCancel={() => { setShowForm(false); setEditOripa(null) }}
-            loading={createMut.isPending}
-          />
-        </div>
-      )}
-
-      {/* 수정 폼 */}
-      {editOripa && (
-        <div className="bg-gray-900 border border-yellow-500/50 rounded-xl p-5">
-          <h2 className="font-semibold mb-4">오리파 수정: {editOripa.title}</h2>
-          <OripaForm
-            form={form}
-            setForm={setForm}
-            onSubmit={() => updateMut.mutate({ id: editOripa.id, body: form })}
-            onCancel={() => { setShowForm(false); setEditOripa(null) }}
-            loading={updateMut.isPending}
-          />
-        </div>
-      )}
-
-      {/* 오리파 목록 */}
-      <div className="space-y-3">
-        {isLoading ? (
-          Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="bg-gray-900 border border-gray-800 rounded-xl h-20 animate-pulse" />
-          ))
-        ) : oripas?.length === 0 ? (
-          <div className="text-center py-16 text-gray-600 bg-gray-900 border border-gray-800 rounded-xl">오리파가 없습니다.</div>
-        ) : oripas?.map((o) => (
-          <div key={o.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex items-center gap-4">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="font-semibold">{o.title}</span>
-                <Badge variant={o.isActive ? 'green' : 'default'}>{o.isActive ? '활성' : '비활성'}</Badge>
-              </div>
-              <div className="flex items-center gap-4 text-xs text-gray-500">
-                <span>{o.pricePerDraw.toLocaleString()}P / 1회</span>
-                <span>슬롯 {o.remainSlots}/{o.totalSlots}</span>
-                <span>참여 {o._count.purchases}명</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-1 shrink-0">
-              <button onClick={() => openEdit(o)} className="p-2 text-gray-400 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-lg transition-colors">
-                <Pencil size={15} />
-              </button>
-              <button onClick={() => toggleMut.mutate(o.id)} title={o.isActive ? '비활성화' : '활성화'}
-                className={`p-2 rounded-lg transition-colors ${o.isActive ? 'text-emerald-400 hover:bg-emerald-400/10' : 'text-gray-500 hover:bg-gray-700'}`}>
-                <Power size={15} />
-              </button>
-              <Link href={`/admin/oripas/${o.id}`} className="p-2 text-gray-400 hover:text-yellow-400 hover:bg-yellow-400/10 rounded-lg transition-colors" title="아이템 관리">
-                <ChevronRight size={15} />
+      {isLoading ? <div className="h-40 rounded-2xl bg-surface animate-pulse" /> : !data?.length ? (
+        <p className="py-16 text-center text-sm text-subtle">오리파가 없어요.</p>
+      ) : (
+        <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+          {data.map(o => {
+            const pct = o.totalSlots ? ((o.totalSlots - o.remainSlots) / o.totalSlots) * 100 : 0
+            const st = ORIPA_STATUS[o.status]
+            return (
+              <Link key={o.id} href={`/admin/oripas/${o.id}`} className="rounded-2xl border border-line bg-surface p-4 hover:border-line-strong space-y-3">
+                <div className="flex items-center gap-3">
+                  <span className="relative w-12 h-12 shrink-0 rounded-xl overflow-hidden bg-sunken border border-line">{o.imageUrl ? <Image src={o.imageUrl} alt="" fill sizes="48px" className="object-cover" /> : <Ticket size={18} className="m-auto mt-3.5 text-subtle" />}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-fg truncate">{o.title}</p>
+                    <p className="text-xs text-muted">상품 {o._count.items}종 · {o.pricePerDraw.toLocaleString()}P</p>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${st.cls}`}>{st.label}</span>
+                  <ChevronRight size={16} className="text-subtle" />
+                </div>
+                <div>
+                  <div className="h-1.5 rounded-full bg-sunken overflow-hidden"><div className="h-full bg-gradient-to-r from-amber-400 to-fuchsia-500" style={{ width: `${pct}%` }} /></div>
+                  <div className="flex justify-between text-[11px] text-muted mt-1 tabular-nums"><span>{(o.totalSlots - o.remainSlots).toLocaleString()} / {o.totalSlots.toLocaleString()}장</span><span>매출 {o.earned.toLocaleString()}P</span></div>
+                </div>
               </Link>
+            )
+          })}
+        </div>
+      )}
+
+      {creating && (
+        <div className="fixed inset-0 z-[100] bg-black/70 flex items-center justify-center p-4" onClick={() => setCreating(false)} role="dialog" aria-modal="true" aria-label="새 오리파">
+          <div className="w-full max-w-lg rounded-2xl border border-line bg-bg p-5 space-y-3 max-h-[90dvh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center"><h2 className="font-bold text-fg">새 오리파</h2><button onClick={() => setCreating(false)} aria-label="닫기" className="ml-auto text-muted hover:text-fg"><X size={18} /></button></div>
+            <label className="block space-y-1"><span className="text-xs text-muted">제목</span><input className={field} value={f.title} maxLength={60} onChange={e => setF({ ...f, title: e.target.value })} placeholder="예: 151 레전드 오리파" /></label>
+            <label className="block space-y-1"><span className="text-xs text-muted">설명</span><textarea className={`${field} h-20 py-2`} value={f.description} onChange={e => setF({ ...f, description: e.target.value })} /></label>
+            <ImageUpload label="대표 이미지 (없으면 최상위 상품 사진)" value={f.imageUrl} onChange={url => setF({ ...f, imageUrl: url })} />
+            <div className="grid grid-cols-2 gap-2">
+              <label className="space-y-1"><span className="text-xs text-muted">TCG</span>
+                <select className={field} value={f.tcgType} onChange={e => setF({ ...f, tcgType: e.target.value })}>{Object.entries(TCG_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+              <label className="space-y-1"><span className="text-xs text-muted">1회 가격 (P)</span><input type="number" min={1} className={field} value={f.pricePerDraw} onChange={e => setF({ ...f, pricePerDraw: e.target.value })} /></label>
+              <label className="space-y-1"><span className="text-xs text-muted">전체 티켓 수</span><input type="number" min={1} className={field} value={f.totalSlots} onChange={e => setF({ ...f, totalSlots: e.target.value })} /></label>
+              <label className="space-y-1"><span className="text-xs text-muted">한 번에 최대</span><input type="number" min={1} max={100} className={field} value={f.maxPerDraw} onChange={e => setF({ ...f, maxPerDraw: e.target.value })} /></label>
             </div>
+            {error && <p className="text-xs text-rose-300">{error}</p>}
+            <button onClick={() => create.mutate()} disabled={!f.title.trim() || create.isPending} className="w-full h-10 rounded-xl bg-accent text-sm font-semibold text-white disabled:opacity-40 inline-flex items-center justify-center gap-1.5">{create.isPending && <Loader2 size={14} className="animate-spin" />}만들고 상품 구성하기</button>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
     </div>
   )
 }

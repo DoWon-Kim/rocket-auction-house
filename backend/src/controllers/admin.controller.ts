@@ -21,7 +21,7 @@ export async function getStats(_req: Request, res: Response) {
       prisma.user.count(),
       prisma.listing.count({ where: { status: 'ACTIVE' } }),
       prisma.transaction.count(),
-      prisma.oripa.count({ where: { isActive: true } }),
+      prisma.oripa.count({ where: { status: 'LIVE' } }),
       prisma.user.count({ where: { createdAt: { gte: today } } }),
       prisma.user.count({ where: { createdAt: { gte: weekAgo } } }),
       prisma.transaction.count({ where: { completedAt: { gte: today },    txStatus: { in: ['COMPLETED', 'AUTO_COMPLETED'] } } }),
@@ -181,133 +181,6 @@ export async function deleteAllCards(_req: Request, res: Response) {
   }
 }
 
-const oripaSchema = z.object({
-  title: z.string().min(1),
-  description: z.string().optional(),
-  imageUrl: z.string().url().optional().or(z.literal('')),
-  pricePerDraw: z.number().int().min(1),
-  totalSlots: z.number().int().min(1),
-})
-
-const oripaItemSchema = z.object({
-  cardId: z.string().uuid(),
-  quantity: z.number().int().min(1),
-  grade: z.number().int().min(1).max(3),
-  weight: z.number().int().min(0).optional(),
-  isLastOne: z.boolean().optional(),
-})
-
-export async function getOripas(req: Request, res: Response) {
-  try {
-    const oripas = await prisma.oripa.findMany({
-      include: {
-        items: { include: { card: { select: { id: true, name: true, rarity: true, imageUrl: true } } } },
-        _count: { select: { purchases: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
-    res.json(oripas)
-  } catch (err) {
-    console.error('[getOripas]', err)
-    res.status(500).json({ message: '서버 오류가 발생했습니다.' })
-  }
-}
-
-export async function createOripa(req: Request, res: Response) {
-  const result = oripaSchema.safeParse(req.body)
-  if (!result.success) {
-    res.status(400).json({ message: '입력값 오류', errors: result.error.flatten() })
-    return
-  }
-  try {
-    const data = result.data
-    const oripa = await prisma.oripa.create({
-      data: {
-        ...data,
-        imageUrl: data.imageUrl || undefined,
-        remainSlots: data.totalSlots,
-      },
-    })
-    res.status(201).json(oripa)
-  } catch (err) {
-    console.error('[createOripa]', err)
-    res.status(500).json({ message: '서버 오류가 발생했습니다.' })
-  }
-}
-
-export async function updateOripa(req: Request, res: Response) {
-  const result = oripaSchema.partial().safeParse(req.body)
-  if (!result.success) {
-    res.status(400).json({ message: '입력값 오류', errors: result.error.flatten() })
-    return
-  }
-  try {
-    const data = result.data
-    // totalSlots 변경 시 remainSlots 동기화
-    let syncedData: Record<string, unknown> = { ...data }
-    if (data.totalSlots !== undefined) {
-      const current = await prisma.oripa.findUnique({
-        where: { id: String(req.params['id']) },
-        select: { totalSlots: true, remainSlots: true },
-      })
-      if (current) {
-        const slotDiff = data.totalSlots - current.totalSlots
-        syncedData = { ...data, remainSlots: Math.max(0, current.remainSlots + slotDiff) }
-      }
-    }
-    const oripa = await prisma.oripa.update({
-      where: { id: String(req.params['id']) },
-      data: syncedData,
-    })
-    res.json(oripa)
-  } catch (err) {
-    console.error('[updateOripa]', err)
-    res.status(500).json({ message: '서버 오류가 발생했습니다.' })
-  }
-}
-
-export async function toggleOripa(req: Request, res: Response) {
-  try {
-    const oripa = await prisma.oripa.findUnique({ where: { id: String(req.params['id']) } })
-    if (!oripa) { res.status(404).json({ message: '오리파를 찾을 수 없습니다.' }); return }
-    const updated = await prisma.oripa.update({
-      where: { id: String(req.params['id']) },
-      data: { isActive: !oripa.isActive },
-    })
-    res.json(updated)
-  } catch (err) {
-    console.error('[toggleOripa]', err)
-    res.status(500).json({ message: '서버 오류가 발생했습니다.' })
-  }
-}
-
-export async function addOripaItem(req: Request, res: Response) {
-  const result = oripaItemSchema.safeParse(req.body)
-  if (!result.success) {
-    res.status(400).json({ message: '입력값 오류', errors: result.error.flatten() })
-    return
-  }
-  try {
-    const item = await prisma.oripaItem.create({
-      data: { oripaId: String(req.params['id']), ...result.data },
-      include: { card: true },
-    })
-    res.status(201).json(item)
-  } catch (err) {
-    console.error('[addOripaItem]', err)
-    res.status(500).json({ message: '서버 오류가 발생했습니다.' })
-  }
-}
-
-export async function removeOripaItem(req: Request, res: Response) {
-  try {
-    await prisma.oripaItem.delete({ where: { id: String(req.params['itemId']) } })
-    res.json({ message: '삭제되었습니다.' })
-  } catch (err) {
-    console.error('[removeOripaItem]', err)
-    res.status(500).json({ message: '서버 오류가 발생했습니다.' })
-  }
-}
 
 export async function getUsers(req: Request, res: Response) {
   try {
@@ -431,7 +304,7 @@ export async function setUserRole(req: AuthRequest, res: Response) {
 
 export async function getMyPermissions(req: AuthRequest, res: Response) {
   if (req.userRole === 'SUPER_ADMIN') {
-    return res.json({ sections: ['dashboard', 'permissions', 'menus', 'posts', 'cards', 'shop', 'oripas', 'users', 'shipping', 'withdrawal'] })
+    return res.json({ sections: ['dashboard', 'permissions', 'menus', 'posts', 'cards', 'shop', 'oripas', 'users', 'shipping', 'withdrawal', 'trades'] })
   }
   try {
     const perms = await prisma.adminPermission.findMany({

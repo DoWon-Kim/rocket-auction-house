@@ -23,7 +23,8 @@ export async function getMyListings(req: AuthRequest, res: Response) {
         where,
         include: {
           card: true,
-          _count: { select: { bids: true, offers: true } },
+          reservedFor: { select: { id: true, nickname: true } },
+          _count: { select: { bids: true, offers: true, chatRooms: true } },
         },
         orderBy: { createdAt: 'desc' },
         skip,
@@ -45,12 +46,13 @@ export async function cancelListing(req: AuthRequest, res: Response) {
       res.status(403).json({ message: '권한이 없습니다.' })
       return
     }
-    if (listing.status !== 'ACTIVE') {
+    if (listing.status !== 'ACTIVE' && listing.status !== 'RESERVED') {
       res.status(400).json({ message: '취소할 수 없는 리스팅입니다.' })
       return
     }
     await prisma.$transaction([
-      prisma.listing.update({ where: { id: listing.id }, data: { status: 'CANCELLED' } }),
+      prisma.listing.update({ where: { id: listing.id }, data: { status: 'CANCELLED', reservedForId: null, reservedPrice: null, reservedAt: null } }),
+      prisma.offer.updateMany({ where: { listingId: listing.id, status: 'PENDING' }, data: { status: 'DECLINED' } }),
       // 경매 리스팅이었다면 보류 중인 입찰 기록 처리 (isWinning = false)
       ...(listing.listingType === 'AUCTION'
         ? [prisma.bid.updateMany({ where: { listingId: listing.id }, data: { isWinning: false } })]

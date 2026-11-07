@@ -6,10 +6,11 @@ import { useAuthStore, useAuthHydrated } from '@/lib/store'
 import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import { LayoutDashboard, CreditCard, Package, Users, ChevronRight, Truck, Banknote, Store, Bell, MenuIcon, Shield, Settings, ShieldAlert, Link2 } from 'lucide-react'
+import { LayoutDashboard, CreditCard, Package, Users, ChevronRight, Truck, Banknote, Store, Bell, MenuIcon, Shield, Settings, ShieldAlert, Link2, ArrowLeftRight } from 'lucide-react'
 
 const ALL_NAV = [
   { href: '/admin',             label: '대시보드',    icon: <LayoutDashboard size={16} />, section: 'dashboard' },
+  { href: '/admin/trades',      label: '거래 관제',   icon: <ArrowLeftRight size={16} />,  section: 'trades' },
   { href: '/admin/permissions', label: '권한 관리',   icon: <Shield size={16} />,          section: 'permissions', superOnly: true },
   { href: '/admin/settings',    label: '사이트 설정', icon: <Settings size={16} />,        section: 'settings',    superOnly: true },
   { href: '/admin/menus',       label: '메뉴 관리',   icon: <MenuIcon size={16} />,        section: 'menus',       superOnly: true },

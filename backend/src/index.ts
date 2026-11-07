@@ -21,6 +21,7 @@ import { Server, Socket } from 'socket.io'
 import jwt from 'jsonwebtoken'
 import router from './routes'
 import { initIo } from './lib/socketio'
+import { registerChatHandlers } from './lib/chatSocket'
 import { startAuctionExpiryJob } from './jobs/auctionExpiry'
 import { startEscrowAutoReleaseJob } from './jobs/escrowAutoRelease'
 import { startShipmentDeadlineJob } from './jobs/shipmentDeadlineJob'
@@ -93,8 +94,9 @@ io.use((socket: Socket, next) => {
   const token = socket.handshake.auth.token as string | undefined
   if (!token) { next(new Error('unauthorized')); return }
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string }
+    const payload = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string; role?: string }
     socket.data.userId = payload.userId
+    socket.data.role = payload.role
     next()
   } catch {
     next(new Error('unauthorized'))
@@ -108,56 +110,11 @@ io.on('connection', (socket: Socket) => {
   // 리스팅 실시간 업데이트용 (경매 등)
   socket.on('join:listing', (listingId: string) => socket.join(`listing:${listingId}`))
   socket.on('leave:listing', (listingId: string) => socket.leave(`listing:${listingId}`))
+  socket.on('oripa:join', (oripaId: string) => { if (typeof oripaId === 'string') socket.join(`oripa:${oripaId}`) })
+  socket.on('oripa:leave', (oripaId: string) => { if (typeof oripaId === 'string') socket.leave(`oripa:${oripaId}`) })
 
-  // 채팅방 입장
-  socket.on('chat:join', async (roomId: string) => {
-    try {
-      const room = await prisma.chatRoom.findUnique({ where: { id: roomId }, select: { buyerId: true, sellerId: true } })
-      if (!room || (room.buyerId !== userId && room.sellerId !== userId)) return
-      socket.join(`chat:${roomId}`)
-    } catch (err) {
-      console.error('[socket chat:join]', err)
-    }
-  })
-
-  // 메시지 전송
-  socket.on('chat:send', async ({ roomId, content }: { roomId: string; content: string }) => {
-    try {
-      if (!content?.trim() || content.length > 1000) return
-      const room = await prisma.chatRoom.findUnique({ where: { id: roomId }, select: { buyerId: true, sellerId: true } })
-      if (!room || (room.buyerId !== userId && room.sellerId !== userId)) return
-
-      const msg = await prisma.chatMessage.create({
-        data: { roomId, senderId: userId, content: content.trim() },
-        select: {
-          id: true, content: true, createdAt: true, readAt: true,
-          sender: { select: { id: true, nickname: true, avatarUrl: true } },
-        },
-      })
-      await prisma.chatRoom.update({ where: { id: roomId }, data: { lastMessageAt: new Date() } })
-
-      io.to(`chat:${roomId}`).emit('chat:message', msg)
-    } catch (err) {
-      console.error('[socket chat:send]', err)
-      socket.emit('chat:error', { roomId: (err as { roomId?: string }).roomId, message: '메시지 전송에 실패했습니다.' })
-    }
-  })
-
-  // 읽음 처리
-  socket.on('chat:read', async (roomId: string) => {
-    try {
-      const room = await prisma.chatRoom.findUnique({ where: { id: roomId }, select: { buyerId: true, sellerId: true } })
-      if (!room || (room.buyerId !== userId && room.sellerId !== userId)) return
-
-      await prisma.chatMessage.updateMany({
-        where: { roomId, senderId: { not: userId }, readAt: null },
-        data: { readAt: new Date() },
-      })
-      socket.to(`chat:${roomId}`).emit('chat:read', { roomId, userId })
-    } catch (err) {
-      console.error('[socket chat:read]', err)
-    }
-  })
+  // 중고거래 채팅 (입장·전송·사진·읽음·입력 중·삭제·접속 상태)
+  registerChatHandlers(io, socket)
 
   // ── DM (친구 1:1) ─────────────────────────────────────────────────────────
 
@@ -208,6 +165,13 @@ io.on('connection', (socket: Socket) => {
 
   // 개인 알림용 룸 입장 (친구 요청 알림)
   socket.join(`user:${userId}`)
+
+  // 관리자: 대시보드 실시간 신호 방 (토큰의 역할을 DB로 한 번 더 확인)
+  if (socket.data.role === 'ADMIN' || socket.data.role === 'SUPER_ADMIN') {
+    prisma.user.findUnique({ where: { id: userId }, select: { role: true } })
+      .then(u => { if (u && (u.role === 'ADMIN' || u.role === 'SUPER_ADMIN')) socket.join('admins') })
+      .catch(err => console.error('[socket admins join]', err))
+  }
 })
 
 // ── 경매 만료 잡 ──────────────────────────────────────────────────────────────

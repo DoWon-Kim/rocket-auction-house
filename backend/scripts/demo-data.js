@@ -45,9 +45,20 @@ async function clean() {
     prisma.comment.deleteMany({ where: { authorId: { in: userIds }, replies: { none: {} } } }),
     prisma.comment.deleteMany({ where: { authorId: { in: userIds } } }),
     prisma.post.deleteMany({ where: { authorId: { in: userIds } } }),
+    prisma.oripaPurchase.deleteMany({ where: { OR: [{ userId: { in: userIds } }, { oripa: { title: { startsWith: DEMO_SHOP_PREFIX } } }] } }),
+    prisma.oripa.deleteMany({ where: { title: { startsWith: DEMO_SHOP_PREFIX } } }),
+    prisma.oripaItem.deleteMany({ where: { cardId: { in: cardIds } } }),
     prisma.bid.deleteMany({ where: { listingId: { in: listingIds } } }),
     prisma.autoBid.deleteMany({ where: { listingId: { in: listingIds } } }),
     prisma.offer.deleteMany({ where: { listingId: { in: listingIds } } }),
+    // 데모 계정으로 거래해 본 기록 (채팅·안전결제·후기·보관함)
+    prisma.chatMessage.deleteMany({ where: { room: { listingId: { in: listingIds } } } }),
+    prisma.chatRoom.deleteMany({ where: { listingId: { in: listingIds } } }),
+    prisma.review.deleteMany({ where: { transaction: { listingId: { in: listingIds } } } }),
+    prisma.dispute.deleteMany({ where: { transaction: { listingId: { in: listingIds } } } }),
+    prisma.report.deleteMany({ where: { OR: [{ listingId: { in: listingIds } }, { transaction: { listingId: { in: listingIds } } }] } }),
+    prisma.inventoryItem.deleteMany({ where: { OR: [{ userId: { in: userIds } }, { cardId: { in: cardIds } }] } }),
+    prisma.transaction.deleteMany({ where: { listingId: { in: listingIds } } }),
     prisma.listing.deleteMany({ where: { id: { in: listingIds } } }),
     prisma.card.deleteMany({ where: { id: { in: cardIds } } }),
     prisma.refreshToken.deleteMany({ where: { userId: { in: userIds } } }),
@@ -55,6 +66,34 @@ async function clean() {
     prisma.user.deleteMany({ where: { id: { in: userIds } } }),
   ])
   console.log(`삭제: 유저 ${userIds.length}, 카드 ${cardIds.length}, 리스팅 ${listingIds.length}, 샵 상품 ${shopIds.length}`)
+}
+
+// 데모 오리파: 50장 · 최상위상 리자몽 1장 · 라스트원상 거북왕 (백엔드 src/lib/oripaFair.ts 와 같은 방식으로 봉인)
+async function createDemoOripa(cards) {
+  const crypto = require('crypto')
+  const sha = x => crypto.createHash('sha256').update(x).digest('hex')
+  const oripa = await prisma.oripa.create({ data: {
+    title: DEMO_SHOP_PREFIX + '레전드 베이스셋 오리파', description: '초판 베이스셋 레전드 카드가 들어 있는 데모 오리파예요.\n마지막 1장을 뽑으면 라스트원상 거북왕까지!',
+    tcgType: 'POKEMON', pricePerDraw: 25000, totalSlots: 50, remainSlots: 50, maxPerDraw: 10, status: 'DRAFT',
+  } })
+  const defs = [
+    { cardId: cards[0].id, grade: 4, quantity: 1, label: '1등 · 리자몽 초판', exchangeValue: 600000 },
+    { cardId: cards[1].id, grade: 3, quantity: 2, exchangeValue: 60000 },
+    { cardId: cards[2].id, grade: 3, quantity: 2, exchangeValue: 40000 },
+    { cardId: cards[3].id, grade: 2, quantity: 5, exchangeValue: 15000 },
+    { prizeType: 'POINT', pointAmount: 1000, grade: 1, quantity: 40 },
+    { cardId: cards[1].id, grade: 4, quantity: 1, label: '라스트원상 · 거북왕', exchangeValue: 100000, isLastOne: true },
+  ]
+  const items = []
+  for (const [k, d] of defs.entries()) items.push(await prisma.oripaItem.create({ data: { oripaId: oripa.id, prizeType: d.prizeType ?? 'CARD', sortOrder: k, remaining: d.quantity, ...d } }))
+  const tickets = items.filter(i => !i.isLastOne).sort((a, b) => (a.id < b.id ? -1 : 1)).flatMap(i => Array(i.quantity).fill(i.id))
+  const seed = crypto.randomBytes(32).toString('hex')
+  for (let i = tickets.length - 1; i > 0; i--) {
+    const j = parseInt(sha(`${seed}:${i}`).slice(0, 12), 16) % (i + 1)
+    ;[tickets[i], tickets[j]] = [tickets[j], tickets[i]]
+  }
+  await prisma.oripa.update({ where: { id: oripa.id }, data: { status: 'LIVE', serverSeed: seed, seedHash: sha(seed), ticketOrder: tickets, startedAt: new Date() } })
+  console.log(`데모 오리파: /oripas/${oripa.id}`)
 }
 
 // 샵 데모 상품 (이미지는 DB에 있는 카드 이미지를 빌려 씀)
@@ -115,6 +154,7 @@ async function create() {
   await prisma.bid.create({ data: { listingId: auction.id, bidderId: buyer.id, amount: 182_000, isWinning: true } })
   await prisma.listing.create({ data: { sellerId: seller.id, cardId: cards[2].id, listingType: 'OFFER', condition: 'GOOD', minOfferPrice: 90_000 } })
   await prisma.listing.create({ data: { sellerId: seller.id, cardId: cards[3].id, listingType: 'BUY_NOW', condition: 'MINT', buyNowPrice: 35_000 } })
+  await createDemoOripa(cards)
 
   // ── 커뮤니티(카페) 데모 글
   const img = n => `https://images.pokemontcg.io/base1/${n}_hires.png`

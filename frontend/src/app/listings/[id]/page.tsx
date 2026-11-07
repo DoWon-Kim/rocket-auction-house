@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
@@ -13,13 +13,16 @@ import {
   Clock, Gavel, Tag, Handshake, ChevronLeft, ChevronRight,
   Zap, ShieldAlert, Flame, MessageCircle, ShieldCheck, AlertCircle, Check, Flag,
   Star, Reply, TrendingUp, TrendingDown, Minus, BarChart2, ArrowRight, Bot, Expand,
-  Share2, Eye,
+  Share2, Eye, Heart, Truck, CalendarCheck,
 } from 'lucide-react'
 import Link from 'next/link'
 import type { Socket } from 'socket.io-client'
 import { RatingBadge } from '@/components/StarRating'
 import { PriceHistoryChart } from '@/components/PriceHistoryChart'
-import { WishlistButton } from '@/components/WishlistButton'
+import { LikeButton } from '@/components/market/LikeButton'
+import { SellerControls } from '@/components/market/SellerControls'
+import { SellerShopPanel } from '@/components/market/SellerShopPanel'
+import { listingTitle, listingThumb, listingPrice, pushRecent, timeAgo, shippingLabel } from '@/lib/market'
 
 /* ─── Countdown hook ──────────────────────────── */
 function useCountdown(endsAt: Date | null | undefined) {
@@ -437,9 +440,9 @@ function ChatButton({ listingId }: { listingId: string }) {
   }
   return (
     <button onClick={openChat} disabled={loading}
-      className="w-full h-12 flex items-center justify-center gap-2 bg-white/[0.03] hover:bg-white/[0.06] border border-line-strong disabled:opacity-50 text-fg-2 hover:text-fg rounded-full text-sm font-medium transition-colors">
+      className="flex-1 h-12 flex items-center justify-center gap-2 bg-white/[0.03] hover:bg-white/[0.06] border border-line-strong disabled:opacity-50 text-fg-2 hover:text-fg rounded-full text-sm font-medium transition-colors">
       <MessageCircle size={15} />
-      {loading ? '채팅방 여는 중...' : '판매자와 채팅'}
+      {loading ? '채팅방 여는 중...' : '채팅하기'}
     </button>
   )
 }
@@ -530,14 +533,13 @@ export default function ListingDetailPage() {
     }
   }, [id, invalidate])
 
-  const buyMut = useMutation({
-    mutationFn: () => api.post(`/listings/${id}/buy`),
-    onSuccess: () => { setActionMsg({ type: 'ok', text: '구매가 완료되었습니다! 마이페이지에서 확인하세요.' }); invalidate() },
-    onError: (e: unknown) => {
-      const err = e as { response?: { data?: { message?: string } } }
-      setActionMsg({ type: 'err', text: err.response?.data?.message ?? '구매에 실패했습니다.' })
-    },
-  })
+  const [showOffer, setShowOffer] = useState(false)
+  const goCheckout = () => { if (!user) { router.push('/login'); return } router.push(`/listings/${id}/checkout`) }
+
+  // 최근 본 상품 기록
+  useEffect(() => {
+    if (listing?.id) pushRecent({ id: listing.id, title: listingTitle(listing), thumb: listingThumb(listing), price: listingPrice(listing) })
+  }, [listing])
 
   const bidMut = useMutation({
     mutationFn: (amount: number) => api.post(`/listings/${id}/bid`, { amount }),
@@ -601,7 +603,7 @@ export default function ListingDetailPage() {
 
   const offerMut = useMutation({
     mutationFn: () => api.post(`/listings/${id}/offer`, { amount: Number(offerAmount), message: offerMessage }),
-    onSuccess: () => { setActionMsg({ type: 'ok', text: '가격 제안이 완료되었습니다!' }); setOfferAmount(''); setOfferMessage(''); invalidate() },
+    onSuccess: (res) => { setOfferAmount(''); setOfferMessage(''); invalidate(); if (res.data.roomId) router.push(`/chat/${res.data.roomId}`); else setActionMsg({ type: 'ok', text: '가격 제안이 완료되었습니다!' }) },
     onError: (e: unknown) => {
       const err = e as { response?: { data?: { message?: string } } }
       setActionMsg({ type: 'err', text: err.response?.data?.message ?? '제안에 실패했습니다.' })
@@ -635,6 +637,9 @@ export default function ListingDetailPage() {
 
   const isSeller = user?.id === listing.sellerId
   const isActive = listing.status === 'ACTIVE'
+  const isReserved = listing.status === 'RESERVED'
+  const reservedForMe = isReserved && !!user && listing.reservedForId === user.id
+  const canOffer = isActive && !isSeller && (listing.listingType === 'OFFER' || (listing.listingType === 'BUY_NOW' && listing.negotiable))
   const currentPrice = livePrice ?? listing.currentPrice
   const endsAt = auctionEndsAt ?? (listing.auctionEndsAt ? new Date(listing.auctionEndsAt) : null)
   const auctionLive = endsAt && new Date() < endsAt && isActive
@@ -643,11 +648,11 @@ export default function ListingDetailPage() {
     ? listing.imageUrls
     : listing.card.imageUrl ? [listing.card.imageUrl] : []
 
-  const statusVariant = listing.status === 'SOLD' ? 'red' : listing.status === 'EXPIRED' ? 'default' : undefined
-  const statusLabel = listing.status === 'SOLD' ? '판매완료' : listing.status === 'EXPIRED' ? '유찰' : listing.status === 'CANCELLED' ? '취소됨' : null
+  const statusVariant = listing.status === 'SOLD' ? 'red' : listing.status === 'RESERVED' ? 'green' : listing.status === 'EXPIRED' || listing.status === 'CANCELLED' ? 'default' : undefined
+  const statusLabel = listing.status === 'SOLD' ? '판매완료' : listing.status === 'RESERVED' ? '예약중' : listing.status === 'EXPIRED' ? '유찰' : listing.status === 'CANCELLED' ? '판매중지' : null
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6 pb-24 lg:pb-0">
       {/* Breadcrumb */}
       <Link href="/listings"
         className="inline-flex items-center gap-1 h-8 pl-2 pr-3 rounded-full border border-line bg-surface/60 text-sm text-muted hover:text-fg hover:border-line-strong transition-colors group">
@@ -669,6 +674,9 @@ export default function ListingDetailPage() {
                 <p className="text-sm text-subtle mt-2">{listing.card.name}</p>
               </div>
             </div>
+          )}
+          {isReserved && (
+            <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full bg-emerald-500 text-white text-sm font-bold shadow-lg">예약중</div>
           )}
           {listing.status === 'SOLD' && (
             <div className="absolute inset-0 bg-bg/70 backdrop-blur-[2px] rounded-[28px] flex items-center justify-center">
@@ -699,10 +707,9 @@ export default function ListingDetailPage() {
             )}
             <div className="flex items-start gap-3 mb-0.5">
               <h1 className="text-3xl sm:text-[40px] font-extrabold tracking-[-0.03em] leading-[1.1] text-fg flex-1">
-                {listing.card.nameKo ?? listing.card.name}
+                {listingTitle(listing)}
               </h1>
               <div className="flex items-center gap-2 shrink-0 mt-1">
-                <WishlistButton cardId={listing.card.id} cardName={listing.card.nameKo ?? listing.card.name} />
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(window.location.href)
@@ -716,42 +723,70 @@ export default function ListingDetailPage() {
                 </button>
               </div>
             </div>
-            {listing.card.nameKo && listing.card.nameKo !== listing.card.name && (
+            {listing.title ? (
+              <Link href={`/cards/${listing.card.id}`} className="text-sm text-muted hover:text-accent-fg">{listing.card.nameKo ?? listing.card.name}{listing.card.nameKo && listing.card.nameKo !== listing.card.name ? ` · ${listing.card.name}` : ''}</Link>
+            ) : listing.card.nameKo && listing.card.nameKo !== listing.card.name && (
               <p className="text-sm text-subtle mb-1">{listing.card.name}</p>
             )}
             <p className="text-sm text-muted mt-1">
               {listing.card.setName}
               {listing.card.rarity && ` · ${rarityLabel(listing.card.rarity)}`}
             </p>
+            <p className="flex items-center gap-3 text-xs text-subtle mt-3">
+              <span className="flex items-center gap-1"><Heart size={12} />{listing.likeCount ?? 0}</span>
+              <span className="flex items-center gap-1"><Eye size={12} />{listing.viewCount ?? 0}</span>
+              <span className="flex items-center gap-1"><MessageCircle size={12} />{listing._count?.chatRooms ?? 0}</span>
+              <span className="flex items-center gap-1"><Clock size={12} />{timeAgo(listing.bumpedAt ?? listing.createdAt)}</span>
+            </p>
           </div>
 
           {/* ── Action panel ── */}
-          <div className="relative overflow-hidden rounded-3xl border border-line bg-gradient-to-br from-surface-2 via-surface to-surface p-6 space-y-5">
+          <div id="action-panel" className="relative overflow-hidden rounded-3xl border border-line bg-gradient-to-br from-surface-2 via-surface to-surface p-6 space-y-5 scroll-mt-24">
             <div className="absolute -top-20 -right-12 w-64 h-64 rounded-full bg-accent/15 blur-3xl pointer-events-none" />
 
             {/* BUY NOW */}
             {listing.listingType === 'BUY_NOW' && (
               <>
                 <div>
-                  <p className="relative text-xs text-muted mb-2">판매가</p>
+                  <p className="relative text-xs text-muted mb-2 flex items-center gap-2">
+                    판매가
+                    {listing.negotiable && <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300 text-[10px] font-semibold">가격 제안 가능</span>}
+                  </p>
                   <div className="flex items-center gap-2">
                     <span className="font-display text-[40px] font-semibold text-fg tabular-nums leading-none">{listing.buyNowPrice?.toLocaleString()}</span>
                     <span className="text-lg text-muted font-medium self-end mb-1">P</span>
                   </div>
+                  <p className="relative text-xs text-muted mt-2 flex items-center gap-1"><Truck size={12} />{shippingLabel(listing.shippingFee)}</p>
                 </div>
                 {!isSeller && isActive && (
                   <div className="space-y-2.5">
-                    <button onClick={() => { if (!user) { router.push('/login'); return } buyMut.mutate() }}
-                      disabled={buyMut.isPending}
-                      className="relative w-full h-13 py-3.5 flex items-center justify-center gap-2 bg-gradient-to-r from-accent to-accent-strong disabled:opacity-50 text-white font-semibold rounded-full transition-shadow shadow-[0_8px_28px_-6px_rgba(139,92,246,0.6)] hover:shadow-[0_8px_36px_-4px_rgba(139,92,246,0.8)]">
-                      {buyMut.isPending
-                        ? <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                        : <><Tag size={16} /> 즉시구매</>}
-                    </button>
-                    <ChatButton listingId={listing.id} />
+                    <div className="flex gap-2">
+                      <LikeButton listingId={listing.id} liked={listing.liked} count={listing.likeCount} variant="button" />
+                      <ChatButton listingId={listing.id} />
+                      <button onClick={goCheckout}
+                        className="flex-[1.4] h-12 flex items-center justify-center gap-2 bg-gradient-to-r from-accent to-accent-strong text-white font-semibold rounded-full shadow-[0_8px_28px_-6px_rgba(139,92,246,0.6)] hover:shadow-[0_8px_36px_-4px_rgba(139,92,246,0.8)] transition-shadow">
+                        <ShieldCheck size={16} /> 안전결제
+                      </button>
+                    </div>
+                    {canOffer && (
+                      <button onClick={() => { if (!user) { router.push('/login'); return } setShowOffer(v => !v) }}
+                        className="w-full h-10 rounded-full border border-emerald-400/30 text-emerald-300 text-sm font-medium hover:bg-emerald-500/10 inline-flex items-center justify-center gap-1.5">
+                        <Handshake size={14} /> 가격 제안하기
+                      </button>
+                    )}
+                    {showOffer && canOffer && (
+                      <div className="space-y-2">
+                        <input type="number" value={offerAmount} onChange={e => setOfferAmount(e.target.value)} placeholder={`${(listing.buyNowPrice ?? 0).toLocaleString()}P보다 낮은 금액`} className={inputCls} />
+                        <input type="text" value={offerMessage} onChange={e => setOfferMessage(e.target.value)} placeholder="판매자에게 한마디 (선택)" className={inputCls} />
+                        <button onClick={() => offerMut.mutate()} disabled={offerMut.isPending || !offerAmount}
+                          className="w-full h-11 rounded-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-white text-sm font-semibold">
+                          {offerMut.isPending ? '보내는 중…' : '채팅으로 제안 보내기'}
+                        </button>
+                      </div>
+                    )}
                     <div className="flex items-center justify-center gap-1.5 text-[10px] text-subtle">
                       <ShieldCheck size={11} className="text-emerald-500/60" />
-                      결제 완료 → 판매자 발송 → 수령 확인 → 포인트 정산
+                      안전결제 → 판매자 발송 → 구매 확정 → 판매자 정산
                     </div>
                   </div>
                 )}
@@ -935,17 +970,49 @@ export default function ListingDetailPage() {
                       placeholder="제안 금액 (P)" className={inputCls} />
                     <input type="text" value={offerMessage} onChange={e => setOfferMessage(e.target.value)}
                       placeholder="메시지 (선택)" className={inputCls} />
-                    <button onClick={() => { if (!user) { router.push('/login'); return } offerMut.mutate() }}
-                      disabled={offerMut.isPending || !offerAmount}
-                      className="w-full h-12 flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-white font-semibold rounded-full transition-colors shadow-[0_8px_28px_-8px_rgba(16,185,129,0.6)]">
-                      {offerMut.isPending
-                        ? <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                        : <><Handshake size={16} /> 가격 제안하기</>}
-                    </button>
-                    <ChatButton listingId={listing.id} />
+                    <div className="flex gap-2">
+                      <LikeButton listingId={listing.id} liked={listing.liked} count={listing.likeCount} variant="button" />
+                      <ChatButton listingId={listing.id} />
+                      <button onClick={() => { if (!user) { router.push('/login'); return } offerMut.mutate() }}
+                        disabled={offerMut.isPending || !offerAmount}
+                        className="flex-[1.4] h-12 flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-white font-semibold rounded-full transition-colors shadow-[0_8px_28px_-8px_rgba(16,185,129,0.6)]">
+                        {offerMut.isPending
+                          ? <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                          : <><Handshake size={16} /> 제안하기</>}
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-subtle text-center">판매자가 제안을 수락하면 예약되고, 채팅방에서 안전결제할 수 있어요.</p>
                   </div>
                 )}
               </>
+            )}
+
+            {/* 예약중 */}
+            {isReserved && !isSeller && (
+              reservedForMe ? (
+                <div className="space-y-2.5">
+                  <div className="flex items-start gap-2 rounded-xl bg-emerald-500/10 border border-emerald-400/30 px-4 py-3 text-sm text-emerald-300">
+                    <CalendarCheck size={15} className="shrink-0 mt-0.5" />
+                    <span>판매자가 나와 <b className="tabular-nums">{(listing.reservedPrice ?? listing.buyNowPrice)?.toLocaleString()}P</b>에 예약했어요. 안전결제로 구매를 완료해주세요.</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <ChatButton listingId={listing.id} />
+                    <button onClick={goCheckout} className="flex-[1.4] h-12 flex items-center justify-center gap-2 bg-gradient-to-r from-accent to-accent-strong text-white font-semibold rounded-full">
+                      <ShieldCheck size={16} /> 안전결제
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  <div className="flex items-center gap-2 rounded-xl bg-surface-2 border border-line px-4 py-3 text-sm text-muted">
+                    <CalendarCheck size={15} /> 다른 구매자와 거래 약속이 잡힌 상품이에요. 예약이 취소되면 다시 구매할 수 있어요.
+                  </div>
+                  <div className="flex gap-2">
+                    <LikeButton listingId={listing.id} liked={listing.liked} count={listing.likeCount} variant="button" />
+                    <ChatButton listingId={listing.id} />
+                  </div>
+                </div>
+              )
             )}
 
             {/* Result message */}
@@ -961,6 +1028,10 @@ export default function ListingDetailPage() {
             )}
           </div>
 
+          {isSeller && (
+            <SellerControls listing={{ ...listing, _count: { bids: listing.bids?.length ?? 0 } }} onChanged={invalidate} />
+          )}
+
           {/* Card info panel */}
           <div className="bg-surface/70 border border-line rounded-3xl px-5">
             <InfoRow label="컨디션">{CONDITION_LABELS[listing.condition]}</InfoRow>
@@ -973,6 +1044,8 @@ export default function ListingDetailPage() {
                 : <span className="text-subtle">None</span>}
             </InfoRow>
             <InfoRow label="수량">{listing.quantity}장</InfoRow>
+            <InfoRow label="배송비">{listing.shippingFee ? `${listing.shippingFee.toLocaleString()}P (별도)` : '포함'}</InfoRow>
+            <InfoRow label="거래 방식"><span className="flex items-center gap-1 justify-end"><ShieldCheck size={12} className="text-emerald-400" />안전결제 (택배)</span></InfoRow>
             <InfoRow label="판매자">
               <span className="flex items-center gap-2 flex-wrap">
                 <Link href={`/users/${listing.sellerId}`} className="hover:text-accent-fg transition-colors">
@@ -1022,39 +1095,8 @@ export default function ListingDetailPage() {
             />
           )}
 
-          {/* 판매자 신뢰 지표 */}
-          {listing.sellerStats && (
-            <div className="bg-surface/70 border border-line rounded-3xl p-5 space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-[10px] text-subtle uppercase tracking-wider font-semibold">판매자 신뢰도</p>
-                <RatingBadge avgRating={listing.seller.avgRating ?? null} reviewCount={listing.seller.reviewCount ?? 0} />
-              </div>
-              <div className="grid grid-cols-3 gap-3 text-center">
-                <div>
-                  <p className="font-display text-2xl font-semibold text-fg tabular-nums">{listing.sellerStats.totalSales}</p>
-                  <p className="text-[10px] text-subtle mt-0.5">총 거래</p>
-                </div>
-                <div>
-                  <p className="font-display text-2xl font-semibold text-emerald-400 tabular-nums">{listing.sellerStats.completedSales}</p>
-                  <p className="text-[10px] text-subtle mt-0.5">완료</p>
-                </div>
-                <div>
-                  <p className={`text-lg font-bold tabular-nums ${
-                    listing.sellerStats.completionRate === null ? 'text-subtle'
-                    : listing.sellerStats.completionRate >= 90 ? 'text-emerald-400'
-                    : listing.sellerStats.completionRate >= 70 ? 'text-yellow-400'
-                    : 'text-red-400'
-                  }`}>
-                    {listing.sellerStats.completionRate === null ? '—' : `${listing.sellerStats.completionRate}%`}
-                  </p>
-                  <p className="text-[10px] text-subtle mt-0.5">거래완료율</p>
-                </div>
-              </div>
-              {listing.sellerStats.totalSales === 0 && (
-                <p className="text-[10px] text-subtle text-center">첫 거래 판매자입니다. 거래 시 유의하세요.</p>
-              )}
-            </div>
-          )}
+          {/* 판매자 상점 */}
+          <SellerShopPanel seller={listing.seller} currentListingId={listing.id} stats={listing.sellerStats} />
 
           {/* 이 카드 체결 가격 히스토리 */}
           <PriceHistoryChart cardId={listing.card.id} />
@@ -1079,6 +1121,24 @@ export default function ListingDetailPage() {
           )}
         </div>
       </div>
+
+      {/* 모바일: 아래 고정 행동 바 (찜 · 채팅 · 결제/제안/입찰) */}
+      {!isSeller && (isActive || reservedForMe) && (
+        <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-line bg-bg/95 backdrop-blur px-4 py-3 flex items-center gap-2">
+          <LikeButton listingId={listing.id} liked={listing.liked} count={listing.likeCount} variant="button" />
+          <ChatButton listingId={listing.id} />
+          {listing.listingType === 'BUY_NOW' || reservedForMe ? (
+            <button onClick={goCheckout} className="flex-[1.3] h-12 rounded-full bg-gradient-to-r from-accent to-accent-strong text-white font-bold inline-flex items-center justify-center gap-1.5">
+              <ShieldCheck size={16} />{((reservedForMe ? listing.reservedPrice : null) ?? listing.buyNowPrice)?.toLocaleString()}P 결제
+            </button>
+          ) : (
+            <button onClick={() => document.getElementById('action-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+              className="flex-[1.3] h-12 rounded-full bg-gradient-to-r from-accent to-accent-strong text-white font-bold inline-flex items-center justify-center gap-1.5">
+              {listing.listingType === 'AUCTION' ? <><Gavel size={16} />입찰하기</> : <><Handshake size={16} />제안하기</>}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* 신고 모달 */}
       {reportOpen && (

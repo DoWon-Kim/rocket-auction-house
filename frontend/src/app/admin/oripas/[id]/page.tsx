@@ -1,243 +1,198 @@
 'use client'
 
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
+import { useParams, useRouter } from 'next/navigation'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ChevronLeft, Play, Pause, Trash2, Lock, Coins, Crown, Search, Loader2, ExternalLink, AlertTriangle, CheckCircle2, Pencil } from 'lucide-react'
 import { api } from '@/lib/api'
-import { ChevronLeft, Plus, Trash2, X, Check, Trophy } from 'lucide-react'
-import Badge from '@/components/ui/Badge'
+import { GRADE, gradeOf, LAST_ONE, prizeName, ORIPA_STATUS, type OripaPrize } from '@/lib/oripa'
 
-interface OripaItem {
-  id: string
-  quantity: number
-  grade: number
-  weight: number
-  isLastOne: boolean
-  card: { id: string; name: string; rarity: string; setName: string }
+interface AdminOripa {
+  id: string; title: string; description: string | null; imageUrl: string | null; tcgType: string
+  pricePerDraw: number; totalSlots: number; remainSlots: number; maxPerDraw: number
+  status: 'DRAFT' | 'LIVE' | 'PAUSED' | 'SOLD_OUT'; seedHash: string | null; serverSeed?: string; sealed?: boolean
+  items: (OripaPrize & { cardId: string | null; sortOrder: number })[]
+  readiness: { tickets: number; problems: string[]; ready: boolean }
+  economics: { value: number; revenue: number; rate: number; sold: number; earned: number }
+  _count: { purchases: number }
 }
+interface CardHit { id: string; name: string; nameKo: string | null; imageUrl: string | null; setName: string; rarity: string; snkrdunkPrice: number | null }
+const EMPTY_PRIZE = { prizeType: 'CARD' as 'CARD' | 'POINT', card: null as CardHit | null, pointAmount: '', label: '', grade: 1, quantity: '1', exchangeValue: '', isLastOne: false }
+const errMsg = (e: unknown, fb: string) => (e as { response?: { data?: { message?: string } } }).response?.data?.message ?? fb
 
-interface Card {
-  id: string
-  name: string
-  setName: string
-  rarity: string
-  tcgType: string
-}
-
-const gradeLabel = (g: number) => g === 3 ? '★★★ 최상위' : g === 2 ? '★★ 레어' : '★ 일반'
-const gradeVariant = (g: number): 'yellow' | 'indigo' | 'default' => g === 3 ? 'yellow' : g === 2 ? 'indigo' : 'default'
-
-export default function AdminOripaItemsPage() {
+export default function AdminOripaEditor() {
   const { id } = useParams<{ id: string }>()
+  const router = useRouter()
   const qc = useQueryClient()
-  const [showAdd, setShowAdd] = useState(false)
-  const [cardSearch, setCardSearch] = useState('')
-  const [selectedCard, setSelectedCard] = useState<Card | null>(null)
-  const [quantity, setQuantity] = useState('1')
-  const [grade, setGrade] = useState('1')
-  const [weight, setWeight] = useState('0')
-  const [isLastOne, setIsLastOne] = useState(false)
-  const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [prize, setPrize] = useState(EMPTY_PRIZE)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [q, setQ] = useState('')
+  const { data: o } = useQuery<AdminOripa>({ queryKey: ['admin', 'oripa', id], queryFn: () => api.get(`/admin/oripas/${id}`).then(r => r.data) })
+  const { data: cards } = useQuery<{ cards: CardHit[] }>({ queryKey: ['admin', 'card-search', q], queryFn: () => api.get('/admin/cards', { params: { q, limit: 8 } }).then(r => r.data), enabled: q.trim().length >= 1 })
 
-  const { data: oripa } = useQuery({
-    queryKey: ['admin', 'oripa', id],
-    queryFn: () => api.get(`/admin/oripas`).then((r) => (r.data as Array<{ id: string; title: string; items: OripaItem[] }>).find((o) => o.id === id)),
+  const apply = (d: AdminOripa, text?: string) => { qc.setQueryData(['admin', 'oripa', id], d); qc.invalidateQueries({ queryKey: ['admin', 'oripas'] }); if (text) setMsg({ ok: true, text }) }
+  const onErr = (fb: string) => (e: unknown) => setMsg({ ok: false, text: errMsg(e, fb) })
+  const body = () => ({
+    prizeType: prize.prizeType, cardId: prize.card?.id ?? null, pointAmount: prize.pointAmount ? Number(prize.pointAmount) : null,
+    label: prize.label.trim() || null, grade: prize.grade, quantity: Number(prize.quantity) || 1,
+    exchangeValue: prize.exchangeValue ? Number(prize.exchangeValue) : null, isLastOne: prize.isLastOne,
   })
-
-  const { data: cardResults } = useQuery({
-    queryKey: ['admin', 'cards', 'search', cardSearch],
-    queryFn: () => api.get('/admin/cards', { params: { q: cardSearch || undefined, limit: 10 } }).then((r) => r.data),
-    enabled: cardSearch.length > 0,
+  const save = useMutation({
+    mutationFn: () => (editingId ? api.patch(`/admin/oripas/${id}/items/${editingId}`, body()) : api.post(`/admin/oripas/${id}/items`, body())).then(r => r.data),
+    onSuccess: d => { apply(d, editingId ? '상품을 수정했어요.' : '상품을 추가했어요.'); setPrize(EMPTY_PRIZE); setEditingId(null); setQ('') },
+    onError: onErr('저장에 실패했어요.'),
   })
+  const del = useMutation({ mutationFn: (itemId: string) => api.delete(`/admin/oripas/${id}/items/${itemId}`).then(r => r.data), onSuccess: d => apply(d, '삭제했어요.'), onError: onErr('삭제 실패') })
+  const act = useMutation({ mutationFn: (a: 'start' | 'pause' | 'resume') => api.post(`/admin/oripas/${id}/${a}`).then(r => r.data), onSuccess: (d, a) => apply(d, a === 'start' ? '판매를 시작했어요. 티켓 순서가 봉인되었어요.' : a === 'pause' ? '일시중지했어요.' : '판매를 재개했어요.'), onError: onErr('처리 실패') })
+  const remove = useMutation({ mutationFn: () => api.delete(`/admin/oripas/${id}`), onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin', 'oripas'] }); router.push('/admin/oripas') }, onError: onErr('삭제 실패') })
 
-  const addMut = useMutation({
-    mutationFn: () => api.post(`/admin/oripas/${id}/items`, {
-      cardId: selectedCard!.id,
-      quantity: Number(quantity),
-      grade: Number(grade),
-      weight: Number(weight),
-      isLastOne,
-    }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin', 'oripa', id] })
-      qc.invalidateQueries({ queryKey: ['admin', 'oripas'] })
-      setShowAdd(false); setSelectedCard(null); setCardSearch('')
-      setQuantity('1'); setGrade('1'); setWeight('0'); setIsLastOne(false)
-      setMsg({ type: 'ok', text: '카드가 추가되었습니다.' })
-    },
-    onError: (e: unknown) => { const err = e as { response?: { data?: { message?: string } } }; setMsg({ type: 'err', text: err.response?.data?.message ?? '오류가 발생했습니다.' }) },
-  })
-
-  const removeMut = useMutation({
-    mutationFn: (itemId: string) => api.delete(`/admin/oripas/${id}/items/${itemId}`),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin', 'oripa', id] })
-      qc.invalidateQueries({ queryKey: ['admin', 'oripas'] })
-    },
-  })
-
-  const items: OripaItem[] = oripa?.items ?? []
+  if (!o) return <div className="h-96 rounded-2xl bg-surface animate-pulse" />
+  const draft = o.status === 'DRAFT'
+  const st = ORIPA_STATUS[o.status]
+  const e = o.economics
+  const field = 'h-9 bg-sunken border border-line rounded-lg px-2.5 text-sm text-fg focus:outline-none focus:border-accent/50'
+  const pickCard = (c: CardHit) => setPrize(p => ({ ...p, card: c, exchangeValue: p.exchangeValue || (c.snkrdunkPrice ? String(Math.round((c.snkrdunkPrice * 0.7) / 100) * 100) : '') }))
+  const startEdit = (i: AdminOripa['items'][number]) => {
+    setEditingId(i.id)
+    setPrize({ prizeType: i.prizeType, card: i.card ? { ...i.card, setName: i.card.setName ?? '', snkrdunkPrice: i.card.snkrdunkPrice ?? null } : null, pointAmount: i.pointAmount ? String(i.pointAmount) : '', label: i.label ?? '', grade: i.grade, quantity: String(i.quantity), exchangeValue: i.exchangeValue ? String(i.exchangeValue) : '', isLastOne: i.isLastOne })
+  }
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center gap-3">
-        <Link href="/admin/oripas" className="text-gray-400 hover:text-white transition-colors">
-          <ChevronLeft size={20} />
-        </Link>
-        <h1 className="text-[26px] sm:text-3xl font-bold tracking-tight">{oripa?.title ?? '...'} — 수록 카드</h1>
+    <div className="space-y-4">
+      <Link href="/admin/oripas" className="inline-flex items-center gap-1 text-sm text-muted hover:text-fg"><ChevronLeft size={15} />오리파 관리</Link>
+      <div className="flex flex-wrap items-center gap-2">
+        <h1 className="text-xl font-bold text-fg">{o.title}</h1>
+        <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${st.cls}`}>{st.label}</span>
+        <div className="ml-auto flex gap-2">
+          {o.status !== 'DRAFT' && <Link href={`/oripas/${o.id}`} target="_blank" className="h-9 px-3 rounded-lg border border-line text-sm text-fg-2 inline-flex items-center gap-1.5"><ExternalLink size={14} />화면 보기</Link>}
+          {draft && <button onClick={() => { if (confirm('판매를 시작할까요? 시작하면 상품 구성·가격·티켓 수를 바꿀 수 없어요.')) act.mutate('start') }} disabled={!o.readiness.ready || act.isPending} className="h-9 px-3.5 rounded-lg bg-emerald-500 text-sm font-semibold text-white disabled:opacity-40 inline-flex items-center gap-1.5"><Play size={14} />판매 시작</button>}
+          {o.status === 'LIVE' && <button onClick={() => act.mutate('pause')} className="h-9 px-3.5 rounded-lg border border-amber-400/40 text-sm text-amber-200 inline-flex items-center gap-1.5"><Pause size={14} />일시중지</button>}
+          {o.status === 'PAUSED' && <button onClick={() => act.mutate('resume')} className="h-9 px-3.5 rounded-lg bg-emerald-500 text-sm font-semibold text-white inline-flex items-center gap-1.5"><Play size={14} />재개</button>}
+          {draft && o._count.purchases === 0 && <button onClick={() => { if (confirm('이 오리파를 삭제할까요?')) remove.mutate() }} className="h-9 px-3 rounded-lg border border-line text-sm text-muted hover:text-rose-300 inline-flex items-center gap-1.5"><Trash2 size={14} />삭제</button>}
+        </div>
+      </div>
+      {msg && <p className={`text-sm ${msg.ok ? 'text-emerald-400' : 'text-rose-300'}`}>{msg.text}</p>}
+
+      {/* 준비 상태 · 수익 구조 */}
+      <div className="grid lg:grid-cols-3 gap-3">
+        <div className="rounded-2xl border border-line bg-surface p-4 space-y-2">
+          <p className="text-xs font-semibold text-muted">구성 점검</p>
+          <p className="text-sm text-fg tabular-nums">상품 수량 합계 <b className={!draft || o.readiness.tickets === o.remainSlots ? 'text-emerald-400' : 'text-amber-300'}>{o.readiness.tickets.toLocaleString()}</b> / 티켓 {(draft ? o.remainSlots : o.totalSlots).toLocaleString()}</p>
+          {draft ? (o.readiness.ready
+            ? <p className="text-xs text-emerald-400 flex items-center gap-1"><CheckCircle2 size={13} />판매를 시작할 수 있어요.</p>
+            : o.readiness.problems.map(p => <p key={p} className="text-xs text-amber-300 flex items-start gap-1"><AlertTriangle size={13} className="shrink-0 mt-px" />{p}</p>))
+            : <p className="text-xs text-muted flex items-center gap-1"><Lock size={12} />봉인됨 — 구성 변경 불가</p>}
+        </div>
+        <div className="rounded-2xl border border-line bg-surface p-4 space-y-1.5 text-sm">
+          <p className="text-xs font-semibold text-muted">수익 구조 (완판 기준)</p>
+          <p className="flex justify-between"><span className="text-muted">판매 총액</span><b className="tabular-nums">{e.revenue.toLocaleString()}P</b></p>
+          <p className="flex justify-between"><span className="text-muted">상품 가치 합계</span><b className="tabular-nums">{e.value.toLocaleString()}P</b></p>
+          <p className="flex justify-between"><span className="text-muted">환원율</span><b className={`tabular-nums ${e.rate > 1 ? 'text-rose-300' : e.rate > 0.85 ? 'text-amber-300' : 'text-emerald-400'}`}>{(e.rate * 100).toFixed(1)}%</b></p>
+          <p className="text-[11px] text-subtle">가치 = 카드 교환가 또는 포인트 지급액 × 수량</p>
+        </div>
+        <div className="rounded-2xl border border-line bg-surface p-4 space-y-1.5 text-sm">
+          <p className="text-xs font-semibold text-muted">판매 현황</p>
+          <p className="flex justify-between"><span className="text-muted">판매</span><b className="tabular-nums">{e.sold.toLocaleString()} / {o.totalSlots.toLocaleString()}장</b></p>
+          <p className="flex justify-between"><span className="text-muted">매출</span><b className="tabular-nums">{e.earned.toLocaleString()}P</b></p>
+          <p className="flex justify-between"><span className="text-muted">1회 가격 · 최대</span><b className="tabular-nums">{o.pricePerDraw.toLocaleString()}P · {o.maxPerDraw}장</b></p>
+          {o.seedHash && <p className="text-[10px] text-subtle font-mono break-all pt-1">해시 {o.seedHash}</p>}
+          {o.serverSeed && <p className="text-[10px] text-amber-300 font-mono break-all">시드 {o.serverSeed}</p>}
+        </div>
       </div>
 
-      {msg && (
-        <div className={`px-4 py-2 rounded-lg text-sm flex items-center justify-between ${msg.type === 'ok' ? 'bg-emerald-900/30 border border-emerald-700 text-emerald-300' : 'bg-red-900/30 border border-red-700 text-red-300'}`}>
-          {msg.text}
-          <button onClick={() => setMsg(null)}><X size={14} /></button>
-        </div>
-      )}
-
-      <button onClick={() => setShowAdd(true)}
-        className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-        <Plus size={16} /> 카드 추가
-      </button>
-
-      {/* 카드 추가 폼 */}
-      {showAdd && (
-        <div className="bg-gray-900 border border-indigo-500/50 rounded-xl p-5 space-y-4">
-          <h2 className="font-semibold">카드 추가</h2>
-
-          {/* 카드 검색 */}
-          <div className="space-y-2">
-            <label className="block text-xs text-gray-400">카드 검색 *</label>
-            <input
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
-              value={cardSearch}
-              onChange={(e) => { setCardSearch(e.target.value); setSelectedCard(null) }}
-              placeholder="카드명 입력..."
-            />
-            {cardResults?.cards?.length > 0 && !selectedCard && (
-              <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden max-h-48 overflow-y-auto">
-                {cardResults.cards.map((c: Card) => (
-                  <button key={c.id} onClick={() => { setSelectedCard(c); setCardSearch(c.name) }}
-                    className="w-full text-left px-3 py-2.5 hover:bg-gray-700 text-sm border-b border-gray-700/50 last:border-0 transition-colors">
-                    <span className="font-medium">{c.name}</span>
-                    <span className="text-gray-400 ml-2">{c.setName} · {c.rarity}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-            {selectedCard && (
-              <div className="flex items-center gap-2 bg-indigo-600/20 border border-indigo-500/40 rounded-lg px-3 py-2 text-sm">
-                <Check size={14} className="text-indigo-400 shrink-0" />
-                <span className="font-medium">{selectedCard.name}</span>
-                <span className="text-gray-400">{selectedCard.setName} · {selectedCard.rarity}</span>
-              </div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">수량</label>
-              <input type="number" min="1" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
-                value={quantity} onChange={(e) => setQuantity(e.target.value)} />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">등급</label>
-              <select className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
-                value={grade} onChange={(e) => setGrade(e.target.value)}>
-                <option value="1">★ 일반 (확률 높음)</option>
-                <option value="2">★★ 레어 (중간)</option>
-                <option value="3">★★★ 최상위 (확률 낮음)</option>
-              </select>
-            </div>
-          </div>
-
-          {/* 커스텀 가중치 & 라스트 원 */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">
-                커스텀 가중치
-                <span className="text-gray-600 ml-1">(0 = 등급 기반 자동)</span>
-              </label>
-              <input type="number" min="0" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
-                value={weight} onChange={(e) => setWeight(e.target.value)} />
-            </div>
-            <div className="flex flex-col justify-end">
-              <label className="flex items-center gap-2.5 cursor-pointer select-none py-2">
-                <div
-                  onClick={() => setIsLastOne((v) => !v)}
-                  className={`relative w-10 h-5 rounded-full transition-colors ${isLastOne ? 'bg-orange-500' : 'bg-gray-700'}`}
-                >
-                  <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${isLastOne ? 'translate-x-5' : ''}`} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-1 text-sm font-medium">
-                    <Trophy size={13} className={isLastOne ? 'text-orange-400' : 'text-gray-500'} />
-                    Last One 보장
-                  </div>
-                  <div className="text-xs text-gray-500">마지막 슬롯 확정 획득</div>
-                </div>
-              </label>
-            </div>
-          </div>
-
-          {isLastOne && (
-            <div className="flex items-center gap-2 bg-orange-500/10 border border-orange-500/30 rounded-lg px-3 py-2 text-xs text-orange-300">
-              <Trophy size={12} /> 이 카드는 오리파의 마지막 슬롯에서 반드시 등장합니다.
-            </div>
-          )}
-
-          <div className="flex gap-2">
-            <button onClick={() => addMut.mutate()} disabled={addMut.isPending || !selectedCard}
-              className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1">
-              <Check size={14} /> {addMut.isPending ? '추가 중...' : '추가'}
-            </button>
-            <button onClick={() => { setShowAdd(false); setSelectedCard(null); setCardSearch(''); setWeight('0'); setIsLastOne(false) }}
-              className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-1">
-              <X size={14} /> 취소
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* 아이템 목록 */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-800 text-gray-500 text-xs">
-              <th className="text-left px-4 py-3">카드명</th>
-              <th className="text-left px-4 py-3">세트</th>
-              <th className="text-left px-4 py-3">등급</th>
-              <th className="text-right px-4 py-3">가중치</th>
-              <th className="text-right px-4 py-3">수량</th>
-              <th className="text-center px-4 py-3">Last One</th>
-              <th className="text-right px-4 py-3">관리</th>
-            </tr>
-          </thead>
+      {/* 상품 목록 */}
+      <div className="rounded-2xl border border-line bg-surface overflow-x-auto">
+        <table className="w-full text-sm min-w-[760px]">
+          <thead><tr className="border-b border-line text-xs text-subtle">
+            <th className="text-left px-4 py-2.5">등급</th><th className="text-left px-2 py-2.5">상품</th><th className="text-right px-2 py-2.5">수량</th>
+            <th className="text-right px-2 py-2.5">남은</th><th className="text-right px-2 py-2.5">교환가/지급</th><th className="text-right px-2 py-2.5">1장 확률</th><th className="px-4 py-2.5" />
+          </tr></thead>
           <tbody>
-            {items.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-600">수록 카드가 없습니다.</td></tr>
-            ) : items.map((item) => (
-              <tr key={item.id} className={`border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors ${item.isLastOne ? 'bg-orange-500/5' : ''}`}>
-                <td className="px-4 py-3 font-medium">{item.card.name}</td>
-                <td className="px-4 py-3 text-gray-400 text-xs">{item.card.setName}</td>
-                <td className="px-4 py-3"><Badge variant={gradeVariant(item.grade)}>{gradeLabel(item.grade)}</Badge></td>
-                <td className="px-4 py-3 text-right text-gray-400 text-xs">{item.weight > 0 ? item.weight : '자동'}</td>
-                <td className="px-4 py-3 text-right text-gray-300">{item.quantity}장</td>
-                <td className="px-4 py-3 text-center">
-                  {item.isLastOne && <Trophy size={14} className="text-orange-400 mx-auto" />}
+            {o.items.length === 0 && <tr><td colSpan={7} className="px-4 py-10 text-center text-subtle">아래에서 상품을 추가해주세요.</td></tr>}
+            {o.items.map(i => (
+              <tr key={i.id} className={`border-b border-line/60 ${editingId === i.id ? 'bg-accent-tint/30' : ''}`}>
+                <td className="px-4 py-2"><span className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${i.isLastOne ? LAST_ONE.chip : gradeOf(i.grade).chip}`}>{i.isLastOne ? '라스트원' : gradeOf(i.grade).label}</span></td>
+                <td className="px-2 py-2">
+                  <span className="flex items-center gap-2">
+                    <span className="relative w-9 h-9 shrink-0 rounded-md overflow-hidden bg-sunken border border-line">{i.prizeType === 'POINT' ? <Coins size={16} className="m-auto mt-2.5 text-amber-300" /> : i.card?.imageUrl && <Image src={i.card.imageUrl} alt="" fill sizes="36px" className="object-contain" />}</span>
+                    <span className="truncate max-w-[260px] text-fg-2">{prizeName(i)}</span>
+                  </span>
                 </td>
-                <td className="px-4 py-3 text-right">
-                  <button onClick={() => { if (confirm('이 카드를 제거할까요?')) removeMut.mutate(item.id) }}
-                    className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors">
-                    <Trash2 size={14} />
-                  </button>
+                <td className="px-2 py-2 text-right tabular-nums">{i.quantity}</td>
+                <td className="px-2 py-2 text-right tabular-nums text-muted">{draft ? '-' : i.remaining}</td>
+                <td className="px-2 py-2 text-right tabular-nums">{i.prizeType === 'POINT' ? `${(i.pointAmount ?? 0).toLocaleString()}P` : i.exchangeValue ? `${i.exchangeValue.toLocaleString()}P` : <span className="text-subtle">교환 불가</span>}</td>
+                <td className="px-2 py-2 text-right tabular-nums text-muted">{i.isLastOne ? '마지막 1장' : `${((i.quantity / Math.max(1, o.readiness.tickets)) * 100).toFixed(2)}%`}</td>
+                <td className="px-4 py-2 text-right whitespace-nowrap">
+                  {draft && <>
+                    <button onClick={() => startEdit(i)} aria-label="수정" className="p-1.5 text-muted hover:text-fg"><Pencil size={14} /></button>
+                    <button onClick={() => del.mutate(i.id)} aria-label="삭제" className="p-1.5 text-muted hover:text-rose-300"><Trash2 size={14} /></button>
+                  </>}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-        <div className="px-4 py-2 border-t border-gray-800 text-xs text-gray-500">총 {items.length}종 수록</div>
       </div>
+
+      {/* 상품 추가·수정 */}
+      {draft && (
+        <div className="rounded-2xl border border-line bg-surface p-4 space-y-3">
+          <p className="text-sm font-semibold text-fg">{editingId ? '상품 수정' : '상품 추가'}</p>
+          <div className="flex flex-wrap gap-2">
+            {(['CARD', 'POINT'] as const).map(t => (
+              <button key={t} onClick={() => setPrize(p => ({ ...p, prizeType: t }))} className={`h-8 px-3 rounded-lg text-xs font-semibold border ${prize.prizeType === t ? 'bg-accent-tint border-accent-line text-accent-soft' : 'border-line text-muted'}`}>{t === 'CARD' ? '카드' : '포인트'}</button>
+            ))}
+            <span className="w-px bg-line mx-1" />
+            {[4, 3, 2, 1].map(g => (
+              <button key={g} onClick={() => setPrize(p => ({ ...p, grade: g }))} className={`h-8 px-3 rounded-lg text-xs font-bold ${prize.grade === g ? GRADE[g as 1 | 2 | 3 | 4].chip : 'border border-line text-muted'}`}>{GRADE[g as 1 | 2 | 3 | 4].label}</button>
+            ))}
+            <label className="h-8 px-3 rounded-lg border border-line text-xs text-fg-2 inline-flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={prize.isLastOne} onChange={e => setPrize(p => ({ ...p, isLastOne: e.target.checked }))} /><Crown size={12} />라스트원상</label>
+          </div>
+
+          {prize.prizeType === 'CARD' ? (
+            <div className="space-y-2">
+              {prize.card ? (
+                <div className="flex items-center gap-3 rounded-xl bg-sunken px-3 py-2">
+                  <span className="relative w-10 h-12 rounded-md overflow-hidden">{prize.card.imageUrl && <Image src={prize.card.imageUrl} alt="" fill sizes="40px" className="object-contain" />}</span>
+                  <span className="flex-1 min-w-0 text-sm"><span className="block truncate text-fg">{prize.card.nameKo ?? prize.card.name}</span><span className="text-xs text-muted">{prize.card.setName}{prize.card.snkrdunkPrice ? ` · 시세 ${prize.card.snkrdunkPrice.toLocaleString()}원` : ''}</span></span>
+                  <button onClick={() => setPrize(p => ({ ...p, card: null }))} className="text-xs text-muted hover:text-fg">바꾸기</button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle" />
+                  <input value={q} onChange={e => setQ(e.target.value)} placeholder="카드 이름·번호로 검색" className={`${field} w-full pl-8`} />
+                  {!!cards?.cards.length && q && (
+                    <div className="absolute z-10 mt-1 w-full rounded-xl border border-line bg-bg shadow-xl max-h-72 overflow-y-auto">
+                      {cards.cards.map(c => (
+                        <button key={c.id} onClick={() => { pickCard(c); setQ('') }} className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-surface-2">
+                          <span className="relative w-8 h-10 shrink-0">{c.imageUrl && <Image src={c.imageUrl} alt="" fill sizes="32px" className="object-contain" />}</span>
+                          <span className="min-w-0 text-sm"><span className="block truncate text-fg">{c.nameKo ?? c.name}</span><span className="text-[11px] text-muted">{c.setName} · {c.rarity}{c.snkrdunkPrice ? ` · 시세 ${c.snkrdunkPrice.toLocaleString()}원` : ''}</span></span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          <div className="grid sm:grid-cols-4 gap-2">
+            <label className="space-y-1"><span className="text-[11px] text-muted">표시 이름 (선택)</span><input className={`${field} w-full`} value={prize.label} onChange={e => setPrize(p => ({ ...p, label: e.target.value }))} placeholder="예: 1등 · PSA10" /></label>
+            {!prize.isLastOne && <label className="space-y-1"><span className="text-[11px] text-muted">수량 (티켓 수)</span><input type="number" min={1} className={`${field} w-full`} value={prize.quantity} onChange={e => setPrize(p => ({ ...p, quantity: e.target.value }))} /></label>}
+            {prize.prizeType === 'CARD'
+              ? <label className="space-y-1"><span className="text-[11px] text-muted">포인트 교환가 (비우면 교환 불가)</span><input type="number" min={0} className={`${field} w-full`} value={prize.exchangeValue} onChange={e => setPrize(p => ({ ...p, exchangeValue: e.target.value }))} /></label>
+              : <label className="space-y-1"><span className="text-[11px] text-muted">지급 포인트</span><input type="number" min={1} className={`${field} w-full`} value={prize.pointAmount} onChange={e => setPrize(p => ({ ...p, pointAmount: e.target.value }))} /></label>}
+            <div className="flex items-end gap-2">
+              <button onClick={() => save.mutate()} disabled={save.isPending || (prize.prizeType === 'CARD' ? !prize.card : !Number(prize.pointAmount))} className="h-9 flex-1 rounded-lg bg-accent text-sm font-semibold text-white disabled:opacity-40 inline-flex items-center justify-center gap-1.5">{save.isPending && <Loader2 size={14} className="animate-spin" />}{editingId ? '수정' : '추가'}</button>
+              {editingId && <button onClick={() => { setEditingId(null); setPrize(EMPTY_PRIZE) }} className="h-9 px-3 rounded-lg border border-line text-sm text-muted">취소</button>}
+            </div>
+          </div>
+          <p className="text-[11px] text-subtle">교환가는 시세의 70%로 자동 제안돼요. 하위상은 포인트 상품(예: 500P)으로 채우면 티켓 수를 맞추기 쉬워요.</p>
+        </div>
+      )}
     </div>
   )
 }

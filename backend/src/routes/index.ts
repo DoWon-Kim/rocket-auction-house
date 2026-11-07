@@ -8,7 +8,6 @@ import {
   getListings,
   getListing,
   createListing,
-  buyNow,
   placeBid,
   makeOffer,
   respondToOffer,
@@ -17,8 +16,12 @@ import {
   cancelAutoBid,
   getAutoBid,
 } from '../controllers/listing.controller'
-import { getOripaList, getOripa, getOripaHistory, drawOripa } from '../controllers/oripa.controller'
-import { getInventory, deleteInventoryItem } from '../controllers/inventory.controller'
+import { getOripaList, getOripa, getOripaHistory, drawOripa, getRecentHits } from '../controllers/oripa.controller'
+import {
+  adminListOripas, adminGetOripa, adminCreateOripa, adminUpdateOripa, adminAddOripaItem, adminUpdateOripaItem,
+  adminDeleteOripaItem, adminStartOripa, adminSetOripaPaused, adminDeleteOripa,
+} from '../controllers/adminOripa.controller'
+import { getInventory, deleteInventoryItem, exchangeInventoryItems } from '../controllers/inventory.controller'
 import {
   createWithdrawal, getMyWithdrawals, cancelWithdrawal,
   getAdminWithdrawals, processWithdrawal, executeTransfer,
@@ -36,7 +39,6 @@ import {
 import {
   getStats,
   getCards, createCard, updateCard, deleteCard, deleteAllCards,
-  getOripas, createOripa, updateOripa, toggleOripa, addOripaItem, removeOripaItem,
   getUsers, grantBalance, setUserRole, resetUserPassword,
   getMyPermissions, getSubAdmins, updateUserPermissions,
 } from '../controllers/admin.controller'
@@ -80,7 +82,13 @@ import {
   getShopHome, listShopItems, getShopItemDetail, listShopReviews, getCart, addToCart, updateCartItem, removeCartItems,
   checkout, listMyPurchases, getMyPurchase, getLastAddress, createShopReview, adminGetShopSettings, adminUpdateShopSettings,
 } from '../controllers/shopMall.controller'
-import { getOrCreateRoom, getMyRooms, getRoomMessages, getUnreadCount } from '../controllers/chat.controller'
+import { previewPokehit, importPokehit, refreshPokehitRefs } from '../controllers/shopImport.controller'
+import { getOrCreateRoom, getMyRooms, getRoom, getRoomMessages, getUnreadCount, leaveRoom, toggleBlock, getMyBlocks } from '../controllers/chat.controller'
+import {
+  toggleLike, getMyLikes, bumpListing, reserveListing, cancelReservation, updateListing,
+  checkoutListing, setTransactionAddress, getMyLastAddress, getShop, toggleFollow, getFollows, updateMyShop,
+} from '../controllers/market.controller'
+import { getOpsOverview, listTrades, getTrade, postTradeNotice, refundTrade, listMarketListings, moderateListing } from '../controllers/adminOps.controller'
 import { shipItem, confirmReceipt, adminReleaseEscrow, getCarriers } from '../controllers/escrow.controller'
 import { getMenus, toggleMenu, updateMenuOrder } from '../controllers/menu.controller'
 import { getMaintenanceStatus, updateMaintenance } from '../controllers/siteConfig.controller'
@@ -164,10 +172,16 @@ router.post('/payments/confirm', authenticate, paymentLimiter, confirmPayment)
 
 // 리스팅
 router.get('/listings/market-summary', getMarketSummary)
-router.get('/listings', getListings)
-router.get('/listings/:id', getListing)
+router.get('/listings', optionalAuth, getListings)
+router.get('/listings/:id', optionalAuth, getListing)
 router.post('/listings', authenticate, createListing)
-router.post('/listings/:id/buy', authenticate, buyNow)
+router.patch('/listings/:id', authenticate, updateListing)
+router.post('/listings/:id/buy', authenticate, checkoutListing)       // 구 경로 호환
+router.post('/listings/:id/checkout', authenticate, checkoutListing)  // 안전결제 (배송지 포함)
+router.post('/listings/:id/like', authenticate, toggleLike)
+router.post('/listings/:id/bump', authenticate, bumpListing)
+router.post('/listings/:id/reserve', authenticate, reserveListing)
+router.delete('/listings/:id/reserve', authenticate, cancelReservation)
 router.post('/listings/:id/bid', authenticate, placeBid)
 router.get('/listings/:id/auto-bid', authenticate, getAutoBid)
 router.post('/listings/:id/auto-bid', authenticate, setAutoBid)
@@ -198,6 +212,9 @@ router.patch('/admin/shop/settings', authenticate, requireSection('shop'), admin
 router.get('/admin/shop/stats',                    authenticate, requireSection('shop'), adminGetShopStats)
 router.get('/admin/shop/orders',                   authenticate, requireSection('shop'), adminGetShopOrders)
 router.patch('/admin/shop/orders/:id/shipping',    authenticate, requireSection('shop'), adminUpdateShopOrderShipping)
+router.get('/admin/shop/import/pokehit',          authenticate, requireSection('shop'), previewPokehit)
+router.post('/admin/shop/import/pokehit',         authenticate, requireSection('shop'), importPokehit)
+router.post('/admin/shop/import/pokehit/refresh', authenticate, requireSection('shop'), refreshPokehitRefs)
 router.get('/admin/shop',                authenticate, requireSection('shop'), adminGetShopItems)
 router.post('/admin/shop',           authenticate, requireSection('shop'), adminCreateShopItem)
 router.patch('/admin/shop/:id',      authenticate, requireSection('shop'), adminUpdateShopItem)
@@ -207,6 +224,7 @@ router.patch('/admin/shop/:id/soldout', authenticate, requireSection('shop'), ad
 
 // 오리파
 router.get('/oripas', getOripaList)
+router.get('/oripas/recent-hits', getRecentHits)
 router.get('/oripas/:id', getOripa)
 router.get('/oripas/:id/history', getOripaHistory)
 router.post('/oripas/:id/draw', authenticate, drawOripa)
@@ -226,18 +244,33 @@ router.get('/my/oripas', authenticate, getMyOripaHistory)
 // 채팅
 router.post('/chat/listings/:listingId', authenticate, getOrCreateRoom)
 router.get('/chat/rooms', authenticate, getMyRooms)
+router.get('/chat/rooms/:roomId', authenticate, getRoom)
 router.get('/chat/rooms/:roomId/messages', authenticate, getRoomMessages)
 router.get('/chat/unread', authenticate, getUnreadCount)
+router.post('/chat/rooms/:roomId/leave', authenticate, leaveRoom)
+router.post('/users/:id/block', authenticate, toggleBlock)
+router.get('/my/blocks', authenticate, getMyBlocks)
 
 // 거래 (번개장터식)
 router.get('/carriers', getCarriers)
 router.post('/transactions/:id/ship', authenticate, shipItem)
 router.post('/transactions/:id/confirm', authenticate, confirmReceipt)
+router.patch('/transactions/:id/address', authenticate, setTransactionAddress)
+
+// 번개장터식 상점 · 찜 · 팔로우
+router.get('/my/likes', authenticate, getMyLikes)
+router.get('/my/last-address', authenticate, getMyLastAddress)
+router.patch('/my/shop', authenticate, updateMyShop)
+router.get('/users/:id/shop', optionalAuth, getShop)
+router.post('/users/:id/follow', authenticate, toggleFollow)
+router.get('/users/:id/followers', getFollows)
+router.get('/users/:id/following', getFollows)
 router.post('/admin/transactions/:id/release', authenticate, requireSuperAdmin, adminReleaseEscrow)
 
 // 인벤토리
 router.get('/my/inventory', authenticate, getInventory)
 router.delete('/my/inventory/:id', authenticate, deleteInventoryItem)
+router.post('/my/inventory/exchange', authenticate, exchangeInventoryItems)
 
 // 배송 신청
 router.get('/my/shipping', authenticate, getMyShippingRequests)
@@ -246,6 +279,15 @@ router.patch('/my/shipping/:id/cancel', authenticate, cancelShippingRequest)
 
 // 관리자 — 공통 (ADMIN + SUPER_ADMIN)
 router.get('/admin/stats',          authenticate, requireAdmin, getStats)
+
+// 관제실 (전체 현황) · 안전결제 거래 · 마켓 상품 모니터링
+router.get('/admin/ops/overview',               authenticate, requireAdmin, getOpsOverview)
+router.get('/admin/trades',                     authenticate, requireSection('trades'), listTrades)
+router.get('/admin/trades/:id',                 authenticate, requireSection('trades'), getTrade)
+router.post('/admin/trades/:id/notice',         authenticate, requireSection('trades'), postTradeNotice)
+router.post('/admin/trades/:id/refund',         authenticate, requireSuperAdmin, refundTrade)
+router.get('/admin/market/listings',            authenticate, requireSection('trades'), listMarketListings)
+router.patch('/admin/market/listings/:id',      authenticate, requireSection('trades'), moderateListing)
 router.get('/admin/my-permissions', authenticate, requireAdmin, getMyPermissions)
 
 // 관리자 — 카드
@@ -265,12 +307,17 @@ router.delete('/admin/cards',     authenticate, requireSection('cards'), deleteA
 router.delete('/admin/cards/:id', authenticate, requireSection('cards'), deleteCard)
 
 // 관리자 — 오리파
-router.get('/admin/oripas',                      authenticate, requireSection('oripas'), getOripas)
-router.post('/admin/oripas',                     authenticate, requireSection('oripas'), createOripa)
-router.patch('/admin/oripas/:id',                authenticate, requireSection('oripas'), updateOripa)
-router.patch('/admin/oripas/:id/toggle',         authenticate, requireSection('oripas'), toggleOripa)
-router.post('/admin/oripas/:id/items',           authenticate, requireSection('oripas'), addOripaItem)
-router.delete('/admin/oripas/:id/items/:itemId', authenticate, requireSection('oripas'), removeOripaItem)
+router.get('/admin/oripas',                        authenticate, requireSection('oripas'), adminListOripas)
+router.post('/admin/oripas',                       authenticate, requireSection('oripas'), adminCreateOripa)
+router.get('/admin/oripas/:id',                    authenticate, requireSection('oripas'), adminGetOripa)
+router.patch('/admin/oripas/:id',                  authenticate, requireSection('oripas'), adminUpdateOripa)
+router.delete('/admin/oripas/:id',                 authenticate, requireSection('oripas'), adminDeleteOripa)
+router.post('/admin/oripas/:id/items',             authenticate, requireSection('oripas'), adminAddOripaItem)
+router.patch('/admin/oripas/:id/items/:itemId',    authenticate, requireSection('oripas'), adminUpdateOripaItem)
+router.delete('/admin/oripas/:id/items/:itemId',   authenticate, requireSection('oripas'), adminDeleteOripaItem)
+router.post('/admin/oripas/:id/start',             authenticate, requireSection('oripas'), adminStartOripa)
+router.post('/admin/oripas/:id/pause',             authenticate, requireSection('oripas'), adminSetOripaPaused)
+router.post('/admin/oripas/:id/resume',            authenticate, requireSection('oripas'), adminSetOripaPaused)
 
 // 관리자 — 유저 (SUPER_ADMIN 전용)
 router.get('/admin/users',                     authenticate, requireSuperAdmin, getUsers)

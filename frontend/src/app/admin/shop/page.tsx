@@ -6,6 +6,7 @@ import { api } from '@/lib/api'
 import Image from 'next/image'
 import { TCG_LABELS } from '@/lib/utils'
 import { ImageUpload } from '@/components/ImageUpload'
+import { PokehitImportModal } from '@/components/admin/PokehitImportModal'
 import {
   Plus, Pencil, Eye, EyeOff, Package, X, Layers, AlertCircle,
   Search, ShoppingBag, BarChart2, TrendingUp, ShoppingCart,
@@ -37,6 +38,7 @@ interface ShopItem {
   tcgType: string; category: string; price: number; stock: number
   imageUrl: string | null; isActive: boolean; isSoldOut: boolean; createdAt: string
   originalPrice: number | null; images: string[]; isFeatured: boolean; soldCount: number
+  sourceSite: string | null; sourceUrl: string | null; refPrice: number | null; refSoldOut: boolean | null; refCheckedAt: string | null
   _count?: { orders: number }
 }
 interface DayData   { date: string; revenue: number; orders: number }
@@ -646,6 +648,12 @@ function ItemsTab({ triggerCreate, onCreateHandled }: { triggerCreate: boolean; 
   const [toast, setToast]             = useState<string | null>(null)
 
   const showToast = useCallback((msg: string) => setToast(msg), [])
+  const [importing, setImporting] = useState(false)
+  const refreshRefs = useMutation({
+    mutationFn: () => api.post('/admin/shop/import/pokehit/refresh').then(r => r.data as { message: string }),
+    onSuccess: d => { qc.invalidateQueries({ queryKey: ['admin-shop'] }); showToast(`포케히트 가격 확인: ${d.message}`) },
+    onError: () => showToast('포케히트 가격을 확인하지 못했어요.'),
+  })
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-shop', page],
@@ -710,6 +718,17 @@ function ItemsTab({ triggerCreate, onCreateHandled }: { triggerCreate: boolean; 
   return (
     <>
       <ShippingSettings />
+
+      {/* 외부 상품 가져오기 */}
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-surface px-4 py-3 text-sm">
+        <span className="font-semibold text-fg">포케히트 상품</span>
+        <span className="text-xs text-muted">상품명·가격만 초안으로 가져오고, 가격을 비교해요</span>
+        <button onClick={() => setImporting(true)} className="ml-auto h-8 px-3 rounded-lg bg-accent text-xs font-semibold text-white">가져오기</button>
+        <button onClick={() => refreshRefs.mutate()} disabled={refreshRefs.isPending} className="h-8 px-3 rounded-lg border border-line text-xs text-fg-2 hover:bg-surface-2 disabled:opacity-50">
+          {refreshRefs.isPending ? '확인 중…' : '가격 다시 확인'}
+        </button>
+      </div>
+      {importing && <PokehitImportModal onClose={() => setImporting(false)} onDone={msg => { setImporting(false); showToast(msg) }} />}
 
       {/* 검색 + 필터 바 */}
       <div className="flex items-center gap-2 flex-wrap">
@@ -776,6 +795,14 @@ function ItemsTab({ triggerCreate, onCreateHandled }: { triggerCreate: boolean; 
                     item.stock <= 10 ? 'text-yellow-500' : 'text-muted'
                   }`}>재고 {item.stock}개</span>
                   {item._count && <span className="text-subtle">판매 {item._count.orders}건</span>}
+                  {item.refPrice != null && (
+                    <a href={item.sourceUrl ?? '#'} target="_blank" rel="noreferrer" title={item.refCheckedAt ? `${formatDistanceToNow(new Date(item.refCheckedAt), { locale: ko, addSuffix: true })} 확인` : ''}
+                      className={`px-1.5 py-0.5 rounded-md border text-[10px] font-semibold tabular-nums ${item.price > item.refPrice ? 'border-rose-800/40 text-rose-300' : item.price < item.refPrice ? 'border-emerald-800/40 text-emerald-300' : 'border-line text-muted'}`}>
+                      포케히트 {item.refPrice.toLocaleString()}원{item.refSoldOut ? ' · 품절' : ''}
+                      {item.price !== item.refPrice && ` (${item.price > item.refPrice ? '+' : ''}${(item.price - item.refPrice).toLocaleString()})`}
+                    </a>
+                  )}
+                  {item.sourceSite && !item.imageUrl && <span className="text-[10px] text-amber-300">사진·설명 필요</span>}
                 </div>
               </div>
 

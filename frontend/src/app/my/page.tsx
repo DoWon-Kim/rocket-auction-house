@@ -1,9 +1,9 @@
 ﻿'use client'
 
-import { useState, useEffect } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
 import { useAuthStore, useAuthHydrated } from '@/lib/store'
 import { LISTING_TYPE_LABELS, CONDITION_LABELS, TCG_LABELS, resolveImageSrc } from '@/lib/utils'
@@ -15,6 +15,7 @@ import {
   Handshake, Gavel, Package, X, Check, AlertCircle,
   Archive, Truck, Trash2, ChevronDown, ChevronUp, Banknote, MessageCircle, Store, Star,
   TrendingUp, BarChart2, Shield, Flag, Loader2,
+  Coins,
 } from 'lucide-react'
 import Image from 'next/image'
 import { ReviewModal } from '@/components/ReviewModal'
@@ -56,6 +57,8 @@ function StatusBadge({ status }: { status: string }) {
     ACTIVE:    { label: '판매 중',  v: 'green' },
     SOLD:      { label: '판매완료', v: 'indigo' },
     CANCELLED: { label: '취소',    v: 'red' },
+    RESERVED:  { label: '예약중',  v: 'yellow' },
+    SUSPENDED: { label: '숨김',    v: 'red' },
     EXPIRED:   { label: '만료',    v: 'default' },
     PENDING:   { label: '대기 중', v: 'yellow' },
     ACCEPTED:  { label: '수락',    v: 'green' },
@@ -233,81 +236,103 @@ function SellerStatsDashboard() {
   )
 }
 
+// 끌올은 하루 한 번 (서버와 같은 기준)
+const bumpReady = (iso: string, now = Date.now()) => new Date(iso).getTime() + 86400_000 <= now
+
 function ListingsTab() {
   const qc = useQueryClient()
   const [filter, setFilter] = useState('')
-  const [msg, setMsg] = useState('')
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [page, setPage] = useState(1)
 
   const { data, isLoading } = useQuery({
     queryKey: ['my', 'listings', filter, page],
     queryFn: () => api.get('/my/listings', { params: { status: filter || undefined, page } }).then((r) => r.data),
   })
-  const listings = data?.listings ?? []
+  const listings: Array<{
+    id: string; listingType: string; condition: string; status: string; title: string | null
+    buyNowPrice?: number; startingPrice?: number; currentPrice?: number; minOfferPrice?: number
+    quantity: number; createdAt: string; bumpedAt: string; likeCount: number; viewCount: number; imageUrls: string[]
+    reservedFor: { nickname: string } | null
+    card: { name: string; nameKo: string | null; imageUrl: string | null; tcgType: string; rarity: string; setName: string }
+    _count: { bids: number; offers: number; chatRooms: number }
+  }> = data?.listings ?? []
   const totalPages = data ? Math.ceil(data.total / data.limit) : 0
+  const refresh = () => qc.invalidateQueries({ queryKey: ['my', 'listings'] })
+  const errText = (e: unknown, fb: string) => (e as { response?: { data?: { message?: string } } }).response?.data?.message ?? fb
 
   const cancelMut = useMutation({
     mutationFn: (id: string) => api.delete(`/my/listings/${id}`),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['my', 'listings'] }); setMsg('리스팅이 취소되었습니다.') },
+    onSuccess: () => { refresh(); setMsg({ ok: true, text: '판매를 중지했어요.' }) },
+    onError: (e) => setMsg({ ok: false, text: errText(e, '판매 중지에 실패했어요.') }),
+  })
+  const bumpMut = useMutation({
+    mutationFn: (id: string) => api.post(`/listings/${id}/bump`),
+    onSuccess: () => { refresh(); setMsg({ ok: true, text: '목록 맨 위로 올렸어요.' }) },
+    onError: (e) => setMsg({ ok: false, text: errText(e, '끌올에 실패했어요.') }),
   })
 
   return (
     <div className="space-y-4">
-      <FilterBar
-        value={filter}
-        onChange={(v) => { setFilter(v); setPage(1) }}
-        options={[
-          { value: '', label: '전체' },
-          { value: 'ACTIVE', label: '판매 중' },
-          { value: 'SOLD', label: '판매완료' },
-          { value: 'CANCELLED', label: '취소' },
-        ]}
-      />
-      {msg && (
-        <div className="bg-emerald-950/50 border border-emerald-800/50 text-emerald-400 rounded-xl px-4 py-3 text-sm">
-          {msg}
+      <div className="flex flex-wrap items-center gap-2">
+        <FilterBar
+          value={filter}
+          onChange={(v) => { setFilter(v); setPage(1) }}
+          options={[
+            { value: '', label: '전체' },
+            { value: 'ACTIVE', label: '판매 중' },
+            { value: 'RESERVED', label: '예약중' },
+            { value: 'SOLD', label: '판매완료' },
+            { value: 'CANCELLED', label: '판매중지' },
+          ]}
+        />
+        <Link href="/sell" className="ml-auto h-9 px-3.5 rounded-xl bg-accent text-sm font-semibold text-white inline-flex items-center gap-1">+ 판매하기</Link>
+      </div>
+      {msg && <p className={`text-sm ${msg.ok ? 'text-emerald-400' : 'text-red-400'}`}>{msg.text}</p>}
+      {isLoading ? <SkeletonList /> : listings.length === 0 ? (
+        <div className="text-center py-14 space-y-3">
+          <p className="text-muted text-sm">{filter ? '해당하는 상품이 없어요.' : '아직 판매 중인 상품이 없어요.'}</p>
+          <Link href="/sell" className="inline-flex h-10 px-4 rounded-xl bg-accent text-sm font-semibold text-white items-center">첫 상품 등록하기</Link>
         </div>
-      )}
-      {isLoading ? <SkeletonList /> : listings.length === 0 ? <EmptyState text="리스팅이 없습니다." /> : (
+      ) : (
         <div className="space-y-2">
-          {listings.map((l: {
-            id: string; listingType: string; condition: string; status: string;
-            buyNowPrice?: number; startingPrice?: number; currentPrice?: number; minOfferPrice?: number;
-            quantity: number; createdAt: string;
-            card: { name: string; tcgType: string; rarity: string; setName: string };
-            _count: { bids: number; offers: number };
-          }) => (
-            <div key={l.id} className="bg-surface border border-line hover:border-line-strong rounded-2xl p-4 flex items-center gap-4 transition-colors">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <Link href={`/listings/${l.id}`} className="font-semibold text-fg hover:text-accent-fg transition-colors">
-                    {l.card.name}
-                  </Link>
-                  <Badge>{TCG_LABELS[l.card.tcgType]}</Badge>
-                  <Badge variant="default">{LISTING_TYPE_LABELS[l.listingType]}</Badge>
-                  <StatusBadge status={l.status} />
+          {listings.map((l) => {
+            const thumb = l.imageUrls?.[0] ?? l.card.imageUrl
+            const selling = l.status === 'ACTIVE' || l.status === 'RESERVED'
+            const ready = bumpReady(l.bumpedAt ?? l.createdAt)
+            return (
+              <div key={l.id} className="bg-surface border border-line hover:border-line-strong rounded-2xl p-3 sm:p-4 flex items-center gap-3 sm:gap-4 transition-colors">
+                <Link href={`/listings/${l.id}`} className="relative w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-sunken border border-line">
+                  {thumb && <Image src={thumb} alt="" fill sizes="64px" className={l.imageUrls?.length ? 'object-cover' : 'object-contain p-1'} />}
+                </Link>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <StatusBadge status={l.status} />
+                    <Link href={`/listings/${l.id}`} className="font-semibold text-sm text-fg hover:text-accent-fg truncate max-w-full">{l.title || l.card.nameKo || l.card.name}</Link>
+                  </div>
+                  <p className="text-sm font-bold text-fg tabular-nums mt-0.5">
+                    {(l.buyNowPrice ?? l.currentPrice ?? l.minOfferPrice ?? 0).toLocaleString()}P
+                    <span className="ml-1.5 text-[11px] font-normal text-muted">{LISTING_TYPE_LABELS[l.listingType]} · {CONDITION_LABELS[l.condition]}</span>
+                  </p>
+                  <p className="text-[11px] text-muted flex flex-wrap gap-x-2.5 mt-0.5">
+                    <span>찜 {l.likeCount}</span><span>채팅 {l._count.chatRooms}</span><span>조회 {l.viewCount}</span>
+                    {l._count.offers > 0 && <span>제안 {l._count.offers}</span>}
+                    {l._count.bids > 0 && <span>입찰 {l._count.bids}</span>}
+                    {l.reservedFor && <span className="text-yellow-300">{l.reservedFor.nickname}님과 예약</span>}
+                  </p>
                 </div>
-                <div className="flex items-center gap-3 text-xs text-muted-2 flex-wrap">
-                  <span>{l.card.setName} · {l.card.rarity}</span>
-                  <span>{CONDITION_LABELS[l.condition]}</span>
-                  <span className="text-accent-2 font-bold tabular-nums">
-                    {(l.buyNowPrice ?? l.currentPrice ?? l.minOfferPrice ?? 0).toLocaleString()} P
-                  </span>
-                  {l._count.bids > 0 && <span className="text-muted">입찰 {l._count.bids}건</span>}
-                  {l._count.offers > 0 && <span className="text-muted">제안 {l._count.offers}건</span>}
-                  <span>{format(new Date(l.createdAt), 'yy/MM/dd', { locale: ko })}</span>
-                </div>
+                {selling && (
+                  <div className="flex flex-col sm:flex-row gap-1.5 shrink-0">
+                    <button onClick={() => bumpMut.mutate(l.id)} disabled={!ready || bumpMut.isPending} title={ready ? '목록 맨 위로' : '하루에 한 번 가능'}
+                      className="h-8 px-3 rounded-lg border border-line text-xs text-fg-2 hover:text-fg disabled:opacity-40">끌올</button>
+                    <Link href={`/listings/${l.id}`} className="h-8 px-3 rounded-lg border border-line text-xs text-fg-2 hover:text-fg inline-flex items-center justify-center">관리</Link>
+                    <button onClick={() => { if (confirm('판매를 중지할까요?')) cancelMut.mutate(l.id) }}
+                      className="h-8 px-3 rounded-lg border border-line text-xs text-muted hover:text-red-400">중지</button>
+                  </div>
+                )}
               </div>
-              {l.status === 'ACTIVE' && (
-                <button
-                  onClick={() => { if (confirm('리스팅을 취소할까요?')) cancelMut.mutate(l.id) }}
-                  className="p-2 text-subtle hover:text-red-400 hover:bg-red-950/40 rounded-xl transition-colors shrink-0"
-                >
-                  <X size={16} />
-                </button>
-              )}
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
       <Pagination page={page} total={totalPages} onPageChange={setPage} />
@@ -921,6 +946,8 @@ interface InventoryItem {
   createdAt: string
   card: { id: string; name: string; tcgType: string; rarity: string; setName: string; imageUrl?: string }
   ids?: string[]  // 그룹된 오리파 아이템의 구성 ID 목록
+  exchangeTotal?: number   // 오리파: 포인트로 교환 가능한 합계
+  exchangeIds?: string[]
 }
 
 interface ShippingRequestItem {
@@ -973,6 +1000,20 @@ function InventoryTab() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['my', 'inventory'] }),
   })
 
+  // 오리파 카드 → 포인트 교환
+  const [exchangeMsg, setExchangeMsg] = useState('')
+  const exchangeMut = useMutation({
+    mutationFn: (ids: string[]) => api.post<{ message: string; balance: number }>('/my/inventory/exchange', { ids }).then(r => r.data),
+    onSuccess: d => {
+      setExchangeMsg(d.message); setSelectedIds([])
+      useAuthStore.setState(st => (st.user ? { user: { ...st.user, balance: d.balance } } : st))
+      qc.invalidateQueries({ queryKey: ['my', 'inventory'] })
+    },
+    onError: (e: unknown) => setExchangeMsg((e as { response?: { data?: { message?: string } } }).response?.data?.message ?? '교환에 실패했어요.'),
+  })
+  const selectedExchange = items.filter(i => isSelected(i) && i.exchangeIds?.length)
+  const selectedExchangeTotal = selectedExchange.reduce((n, i) => n + (i.exchangeTotal ?? 0), 0)
+
   // 그룹 아이템: ids 배열의 모든 ID를 토글, 개별 아이템: id 하나만 토글
   const toggleSelect = (item: InventoryItem) => {
     const itemIds = item.ids ?? [item.id]
@@ -1011,6 +1052,15 @@ function InventoryTab() {
             { value: 'ORIPA', label: '오리파' },
           ]}
         />
+        {selectedExchangeTotal > 0 && (
+          <button
+            onClick={() => { if (confirm(`선택한 오리파 카드를 ${selectedExchangeTotal.toLocaleString()}P로 교환할까요? 교환한 카드는 보관함에서 사라져요.`)) exchangeMut.mutate(selectedExchange.flatMap(i => i.exchangeIds ?? [])) }}
+            disabled={exchangeMut.isPending}
+            className="flex items-center gap-1.5 border border-amber-400/40 text-amber-200 px-3 py-1.5 rounded-xl text-sm font-semibold hover:bg-amber-500/10 disabled:opacity-50"
+          >
+            <Coins size={14} /> {selectedExchangeTotal.toLocaleString()}P로 교환
+          </button>
+        )}
         {selectedIds.length > 0 && (
           <button
             onClick={() => setShowShipForm(true)}
@@ -1020,6 +1070,8 @@ function InventoryTab() {
           </button>
         )}
       </div>
+
+      {exchangeMsg && <p className="text-xs text-emerald-400">{exchangeMsg}</p>}
 
       {/* 배송 신청 폼 (인라인) */}
       {showShipForm && (
@@ -1080,7 +1132,10 @@ function InventoryTab() {
                     {item.condition && ` · ${CONDITION_LABELS[item.condition] ?? item.condition}`}
                     {item.gradingCompany && ` · ${item.gradingCompany}${item.gradingGrade ? ` ${item.gradingGrade}` : ''}`}
                   </p>
-                  <p className="text-xs text-subtle">{format(new Date(item.createdAt), 'yy/MM/dd', { locale: ko })}</p>
+                  <p className="text-xs text-subtle">
+                    {format(new Date(item.createdAt), 'yy/MM/dd', { locale: ko })}
+                    {!!item.exchangeTotal && <span className="ml-2 text-amber-300">포인트 교환 {item.exchangeTotal.toLocaleString()}P</span>}
+                  </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   {/* 수량 배지: 2장 이상이면 강조 표시 */}
@@ -1727,10 +1782,23 @@ function DisputesTab() {
 
 // ─── 메인 페이지 ──────────────────────────────────────────────────────────
 
+// 주소의 ?tab= 으로 바로 해당 탭 열기 (알림·오리파 결과 등에서 연결)
+const isTabId = (v: string | null): v is TabId => !!v && TABS.some(t => t.id === v)
+
 export default function MyPage() {
+  return <Suspense fallback={null}><MyPageContent /></Suspense>
+}
+
+function MyPageContent() {
   const { user } = useAuthStore()
   const router = useRouter()
-  const [tab, setTab] = useState<TabId>('profile')
+  const params = useSearchParams()
+  const urlTab = params.get('tab')
+  const [tab, setTabState] = useState<TabId>(isTabId(urlTab) ? urlTab : 'profile')
+  const setTab = (t: TabId) => { setTabState(t); router.replace(t === 'profile' ? '/my' : `/my?tab=${t}`, { scroll: false }) }
+  // 알림 등으로 같은 페이지에서 주소만 바뀌면 탭도 따라가기
+  const [seenUrlTab, setSeenUrlTab] = useState(urlTab)
+  if (urlTab !== seenUrlTab) { setSeenUrlTab(urlTab); if (isTabId(urlTab)) setTabState(urlTab) }
 
   const hydrated = useAuthHydrated()
 

@@ -3,9 +3,11 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { AuthRequest } from '../middleware/auth'
 import { notify } from '../lib/notify'
+import { txAmount } from '../lib/marketTrade'
+import { postTxSystemMessage } from '../lib/chatTrade'
 
 const TX_SELECT = {
-  id: true, buyerId: true, sellerId: true, finalPrice: true,
+  id: true, buyerId: true, sellerId: true, finalPrice: true, shippingFee: true,
   txStatus: true, escrowStatus: true,
   trackingCarrier: true, trackingNumber: true,
   shippedAt: true, confirmedAt: true, escrowReleasedAt: true,
@@ -57,6 +59,7 @@ export async function shipItem(req: AuthRequest, res: Response) {
       body: `${parsed.data.trackingCarrier} ${parsed.data.trackingNumber} — 수령 후 수령 확인을 눌러주세요.`,
       link: '/my?tab=purchases',
     }).catch(e => console.error('[notify TRANSACTION_SHIPPED]', e))
+    await postTxSystemMessage(id, req.userId!, `판매자가 상품을 발송했어요.\n${parsed.data.trackingCarrier} ${parsed.data.trackingNumber}\n받으신 후 구매 확정을 눌러주세요. (발송 3일 후 자동 확정)`)
 
     res.json({ message: '발송 처리가 완료되었습니다.', transaction: updated })
   } catch (err) {
@@ -94,7 +97,7 @@ export async function confirmReceipt(req: AuthRequest, res: Response) {
       }),
       prisma.user.update({
         where: { id: tx.sellerId },
-        data: { balance: { increment: tx.finalPrice } },
+        data: { balance: { increment: txAmount(tx) } },
       }),
     ])
 
@@ -103,9 +106,10 @@ export async function confirmReceipt(req: AuthRequest, res: Response) {
       userId: tx.sellerId,
       type: 'TRANSACTION_COMPLETED',
       title: '거래가 완료되었습니다',
-      body: `${tx.finalPrice.toLocaleString()}P가 잔액에 정산되었습니다.`,
+      body: `${txAmount(tx).toLocaleString()}P가 잔액에 정산되었습니다.`,
       link: '/my?tab=sales',
     }).catch(e => console.error('[notify TRANSACTION_COMPLETED]', e))
+    await postTxSystemMessage(id, req.userId!, `구매자가 구매를 확정했어요. 판매자에게 ${txAmount(tx).toLocaleString()}P가 정산되었습니다.\n거래 후기를 남겨주세요!`)
 
     res.json({ message: '수령 확인 완료! 판매자에게 대금이 정산되었습니다.' })
   } catch (err) {
@@ -137,10 +141,11 @@ export async function adminReleaseEscrow(req: AuthRequest, res: Response) {
       }),
       prisma.user.update({
         where: { id: tx.sellerId },
-        data: { balance: { increment: tx.finalPrice } },
+        data: { balance: { increment: txAmount(tx) } },
       }),
     ])
 
+    await postTxSystemMessage(id, req.userId!, `[운영자] 거래가 확정 처리되어 판매자에게 ${txAmount(tx).toLocaleString()}P가 정산되었습니다.`)
     res.json({ message: '에스크로가 강제 해제되었습니다.' })
   } catch (err) {
     console.error('[adminReleaseEscrow]', err)

@@ -717,7 +717,7 @@ export default function CardDetailPage() {
                   </Link>
                 )}
                 <Link
-                  href={`/listings?tab=sell&cardId=${card.id}`}
+                  href={`/sell?cardId=${card.id}`}
                   className={`h-12 px-6 inline-flex items-center gap-2 rounded-full text-sm font-semibold transition-colors ${
                     cheapestBuyNow
                       ? 'border border-line-strong text-fg-2 hover:bg-surface-2'
@@ -1056,7 +1056,7 @@ export default function CardDetailPage() {
             <Package size={36} className="text-line" />
             <p className="text-subtle text-sm">현재 판매 중인 리스팅이 없습니다.</p>
             <Link
-              href={`/listings?tab=sell&cardId=${card.id}`}
+              href={`/sell?cardId=${card.id}`}
               className="text-sm text-accent-fg hover:text-accent-soft transition-colors"
             >
               첫 번째로 판매 등록하기 →
