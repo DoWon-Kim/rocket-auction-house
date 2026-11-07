@@ -25,13 +25,14 @@ const TX_STATUS: Record<string, { label: string; cls: string }> = {
   COMPLETED: { label: '구매확정', cls: 'bg-emerald-500/15 text-emerald-300' },
   AUTO_COMPLETED: { label: '자동 확정', cls: 'bg-emerald-500/10 text-emerald-300/80' },
   CANCELLED: { label: '취소·환불', cls: 'bg-surface-2 text-muted' },
-  AUTO_CANCELLED: { label: '미발송 자동취소', cls: 'bg-surface-2 text-muted' },
+  AUTO_CANCELLED: { label: '자동취소', cls: 'bg-surface-2 text-muted' },
   DISPUTED: { label: '분쟁중', cls: 'bg-rose-500/15 text-rose-300' },
 }
 const FLAG: Record<string, { label: string; cls: string }> = {
   SHIP_OVERDUE: { label: '발송 기한 초과', cls: 'bg-rose-500/15 text-rose-300' },
   SHIP_DUE_SOON: { label: '발송 임박', cls: 'bg-amber-500/15 text-amber-300' },
-  NO_ADDRESS: { label: '배송지 없음', cls: 'bg-amber-500/15 text-amber-300' },
+  NO_ADDRESS: { label: '배송지 미입력', cls: 'bg-amber-500/15 text-amber-300' },
+  ADDRESS_OVERDUE: { label: '배송지 기한 초과', cls: 'bg-rose-500/15 text-rose-300' },
   CONFIRM_WAITING: { label: '확정 대기', cls: 'bg-sky-500/10 text-sky-300' },
   DISPUTED: { label: '분쟁', cls: 'bg-rose-500/15 text-rose-300' },
 }
@@ -49,7 +50,7 @@ interface MiniListing { id: string; title: string | null; imageUrls: string[]; c
 interface TradeRow {
   id: string; txStatus: string; escrowStatus: string; finalPrice: number; shippingFee: number; total: number
   completedAt: string; shippedAt: string | null; address: string | null; flags: string[]
-  shipDeadline: string | null; autoConfirmAt: string | null; trackingCarrier: string | null; trackingNumber: string | null
+  shipDeadline: string | null; addressDeadline: string | null; autoConfirmAt: string | null; trackingCarrier: string | null; trackingNumber: string | null
   listing: MiniListing; buyer: { id: string; nickname: string }; seller: { id: string; nickname: string }
   chatRoom: { id: string } | null
 }
@@ -134,7 +135,7 @@ function TradesTab({ params, setParams }: TabProps) {
             {data?.trades.length === 0 && <tr><td colSpan={6} className="px-4 py-10 text-center text-subtle">해당하는 거래가 없어요.</td></tr>}
             {data?.trades.map(t => {
               const thumb = listingThumb(t.listing)
-              const next = t.shipDeadline ? `발송 ${timeUntil(t.shipDeadline)}` : t.autoConfirmAt ? `자동확정 ${timeUntil(t.autoConfirmAt)}` : '-'
+              const next = t.shipDeadline ? `발송 ${timeUntil(t.shipDeadline)}` : t.addressDeadline ? `배송지 ${timeUntil(t.addressDeadline)}` : t.autoConfirmAt ? `자동확정 ${timeUntil(t.autoConfirmAt)}` : '-'
               return (
                 <tr key={t.id} onClick={() => setParams({ id: t.id })} className={`border-b border-line/60 cursor-pointer hover:bg-surface-2 ${openId === t.id ? 'bg-surface-2' : ''}`}>
                   <td className="px-4 py-2.5">
@@ -147,7 +148,7 @@ function TradesTab({ params, setParams }: TabProps) {
                   <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-fg">{P(t.total)}</td>
                   <td className="px-3 py-2.5"><span className="flex flex-wrap gap-1"><Chip m={TX_STATUS[t.txStatus]} />{t.flags.filter(f => f !== 'CONFIRM_WAITING').map(f => <Chip key={f} m={FLAG[f]} />)}</span></td>
                   <td className="px-3 py-2.5 text-xs text-muted whitespace-nowrap">{dt(t.completedAt)}</td>
-                  <td className={`px-3 py-2.5 text-xs whitespace-nowrap ${t.flags.includes('SHIP_OVERDUE') ? 'text-rose-300' : t.flags.includes('SHIP_DUE_SOON') ? 'text-amber-300' : 'text-muted'}`}>{next}</td>
+                  <td className={`px-3 py-2.5 text-xs whitespace-nowrap ${t.flags.includes('SHIP_OVERDUE') || t.flags.includes('ADDRESS_OVERDUE') ? 'text-rose-300' : t.flags.includes('SHIP_DUE_SOON') ? 'text-amber-300' : 'text-muted'}`}>{next}</td>
                 </tr>
               )
             })}
@@ -235,10 +236,10 @@ function TradeDrawer({ id, onClose }: { id: string; onClose: () => void }) {
             </div>
 
             {/* 기한 */}
-            {(t.shipDeadline || t.autoConfirmAt) && (
-              <p className={`rounded-xl px-3.5 py-2.5 text-xs flex items-center gap-2 ${t.flags.includes('SHIP_OVERDUE') ? 'bg-rose-500/10 text-rose-300' : 'bg-amber-500/10 text-amber-200'}`}>
+            {(t.shipDeadline || t.addressDeadline || t.autoConfirmAt) && (
+              <p className={`rounded-xl px-3.5 py-2.5 text-xs flex items-center gap-2 ${t.flags.includes('SHIP_OVERDUE') || t.flags.includes('ADDRESS_OVERDUE') ? 'bg-rose-500/10 text-rose-300' : 'bg-amber-500/10 text-amber-200'}`}>
                 <AlertTriangle size={14} />
-                {t.shipDeadline ? `발송 기한 ${dt(t.shipDeadline)} (${timeUntil(t.shipDeadline)}) — 넘기면 자동 취소·환불` : `자동 구매확정 ${dt(t.autoConfirmAt)} (${timeUntil(t.autoConfirmAt!)})`}
+                {t.shipDeadline ? `발송 기한 ${dt(t.shipDeadline)} (${timeUntil(t.shipDeadline)}) — 넘기면 자동 취소·환불` : t.addressDeadline ? `배송지 입력 기한 ${dt(t.addressDeadline)} (${timeUntil(t.addressDeadline)}) — 구매자가 입력 안 하면 자동 취소·환불` : `자동 구매확정 ${dt(t.autoConfirmAt)} (${timeUntil(t.autoConfirmAt!)})`}
               </p>
             )}
 

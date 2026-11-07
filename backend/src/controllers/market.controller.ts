@@ -7,6 +7,7 @@ import { notify } from '../lib/notify'
 import { analyzeUserRisk, issueWarning } from '../lib/fraudDetection'
 import { canBump, bumpAvailableAt, resolvePurchasePrice } from '../lib/marketTrade'
 import { postChatMessage } from '../lib/chatTrade'
+import { SHIP_DEADLINE_DAYS } from '../lib/adminOps'
 
 const fail = (res: Response, status: number, message: string) => { res.status(status).json({ message }) }
 const P = (n: number) => `${n.toLocaleString()}P`
@@ -231,6 +232,7 @@ export async function checkoutListing(req: AuthRequest, res: Response) {
         data: {
           listingId: listing.id, buyerId: req.userId!, sellerId: listing.sellerId,
           finalPrice: price, shippingFee: listing.shippingFee, escrowStatus: 'HELD',
+          shipClockAt: new Date(), // 배송지를 함께 받았으니 발송 기한 바로 시작
           ...addr, addressDetail: addr.addressDetail || null, shippingMemo: addr.shippingMemo || null,
         },
       })
@@ -276,14 +278,21 @@ export async function setTransactionAddress(req: AuthRequest, res: Response) {
   const parsed = addressSchema.safeParse(req.body)
   if (!parsed.success) return fail(res, 400, '받는 분·연락처·주소를 확인해주세요.')
   try {
-    const tx = await prisma.transaction.findUnique({ where: { id: String(req.params['id']) }, select: { id: true, buyerId: true, sellerId: true, txStatus: true } })
+    const tx = await prisma.transaction.findUnique({ where: { id: String(req.params['id']) }, select: { id: true, buyerId: true, sellerId: true, txStatus: true, shipClockAt: true } })
     if (!tx) return fail(res, 404, '거래를 찾을 수 없습니다.')
     if (tx.buyerId !== req.userId) return fail(res, 403, '구매자만 배송지를 입력할 수 있습니다.')
     if (tx.txStatus !== 'PENDING_SHIPMENT') return fail(res, 400, '발송 전에만 배송지를 바꿀 수 있습니다.')
     const a = parsed.data
-    await prisma.transaction.update({ where: { id: tx.id }, data: { ...a, addressDetail: a.addressDetail || null, shippingMemo: a.shippingMemo || null } })
+    const first = !tx.shipClockAt
+    // 처음 입력하는 순간부터 판매자 발송 기한 시작 (수정할 때는 기한 그대로)
+    const r = await prisma.transaction.updateMany({
+      where: { id: tx.id, txStatus: 'PENDING_SHIPMENT', escrowStatus: 'HELD' },
+      data: { ...a, addressDetail: a.addressDetail || null, shippingMemo: a.shippingMemo || null, ...(first ? { shipClockAt: new Date() } : {}) },
+    })
+    if (r.count === 0) return fail(res, 409, '이미 취소되었거나 발송된 거래입니다.')
     const room = await prisma.chatRoom.findUnique({ where: { transactionId: tx.id }, select: { id: true } })
-    if (room) await postChatMessage({ roomId: room.id, senderId: req.userId!, type: 'SYSTEM', content: '구매자가 배송지를 입력했어요.' })
+    if (room) await postChatMessage({ roomId: room.id, senderId: req.userId!, type: 'SYSTEM', content: first ? `구매자가 배송지를 입력했어요.\n판매자는 ${SHIP_DEADLINE_DAYS}일 안에 발송해주세요. 기한을 넘기면 자동 취소·환불돼요.` : '구매자가 배송지를 변경했어요. 발송 전에 꼭 확인해주세요.' })
+    notify({ userId: tx.sellerId, type: 'SYSTEM', title: first ? '배송지가 입력되었어요 · 발송해주세요' : '구매자가 배송지를 변경했어요', body: first ? `${SHIP_DEADLINE_DAYS}일 안에 발송하지 않으면 자동 취소돼요.` : '발송 전에 바뀐 주소를 확인해주세요.', link: room ? `/chat/${room.id}` : '/my?tab=sales' }).catch(() => {})
     res.json({ message: '배송지를 저장했어요.' })
   } catch (err) {
     console.error('[setTransactionAddress]', err)

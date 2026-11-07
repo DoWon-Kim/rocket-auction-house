@@ -9,6 +9,7 @@ import { detectAbnormalBidding, issueWarning } from '../lib/fraudDetection'
 import { acceptsOffers } from '../lib/marketTrade'
 import { ensureChatRoom, postChatMessage } from '../lib/chatTrade'
 import { notifyFollowersOfListing } from './market.controller'
+import { createAuctionTrade, announceAuctionWin } from '../lib/auctionTrade'
 
 const GRADING_COMPANIES = ['PSA', 'BGS', 'CGC', 'SGC', 'HGA', 'ACE', '기타'] as const
 
@@ -373,14 +374,7 @@ export async function placeBid(req: AuthRequest, res: Response) {
 
     // ── 즉시낙찰 처리 ────────────────────────────────────────────────────────
     if (listing.instantBuyPrice != null && amount >= listing.instantBuyPrice) {
-      await prisma.$transaction(async (tx) => {
-        const deducted = await tx.user.updateMany({
-          where: { id: req.userId!, balance: { gte: amount } },
-          data: { balance: { decrement: amount } },
-        })
-        if (deducted.count === 0) {
-          throw Object.assign(new Error('INSUFFICIENT_BALANCE'), { status: 400, message: '잔액이 부족합니다.' })
-        }
+      const won = await prisma.$transaction(async (tx) => {
         const sold = await tx.listing.updateMany({
           where: { id: listing.id, status: 'ACTIVE' },
           data: { currentPrice: amount, status: 'SOLD' },
@@ -390,30 +384,14 @@ export async function placeBid(req: AuthRequest, res: Response) {
         }
         await tx.bid.updateMany({ where: { listingId: listing.id }, data: { isWinning: false } })
         await tx.bid.create({ data: { listingId: listing.id, bidderId: req.userId!, amount, isWinning: true } })
-        const txRecord = await tx.transaction.create({
-          data: {
-            listingId: listing.id, buyerId: req.userId!, sellerId: listing.sellerId,
-            finalPrice: amount, escrowStatus: 'HELD',
-          },
-        })
-        await tx.inventoryItem.create({
-          data: {
-            userId: req.userId!, cardId: listing.cardId, quantity: listing.quantity,
-            source: 'PURCHASE', sourceId: txRecord.id,
-            condition: listing.condition, gradingCompany: listing.gradingCompany,
-            gradingGrade: listing.gradingGrade, imageUrls: listing.imageUrls,
-          },
-        })
-        await tx.chatRoom.upsert({
-          where: { listingId_buyerId: { listingId: listing.id, buyerId: req.userId! } },
-          create: { listingId: listing.id, buyerId: req.userId!, sellerId: listing.sellerId, transactionId: txRecord.id },
-          update: { transactionId: txRecord.id },
-        })
+        // 낙찰가 + 배송비 차감, 거래·보관함·채팅방 생성 (잔액 부족이면 전체 롤백)
+        return createAuctionTrade(tx, listing, req.userId!, amount)
       })
       getIo()?.to(`listing:${listing.id}`).emit('auction:sold', {
         listingId: listing.id, winnerId: req.userId, finalPrice: amount, isInstantBuy: true,
       })
-      res.json({ message: '즉시낙찰되었습니다!', currentPrice: amount, instantBuy: true })
+      await announceAuctionWin({ listingId: listing.id, sellerId: listing.sellerId, buyerId: req.userId!, amount, shippingFee: listing.shippingFee, roomId: won.roomId, instant: true })
+      res.json({ message: '즉시낙찰되었습니다! 채팅방에서 배송지를 입력해주세요.', currentPrice: amount, instantBuy: true, roomId: won.roomId })
       return
     }
 
@@ -535,6 +513,8 @@ export async function placeBid(req: AuthRequest, res: Response) {
       ...(extended ? { newEndsAt: newEndsAt?.toISOString(), extended: true } : {}),
     })
   } catch (err) {
+    const e = err as { status?: number; message?: string }
+    if (e.status) { res.status(e.status).json({ message: e.message }); return }
     console.error('[placeBid]', err)
     res.status(500).json({ message: '서버 오류가 발생했습니다.' })
   }

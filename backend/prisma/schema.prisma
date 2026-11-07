@@ -585,6 +585,9 @@ model Transaction {
   addressDetail    String?
   shippingMemo     String?
 
+  // 발송 기한 시작 시각 — 배송지가 확정된 순간 (결제 때 입력하면 결제 시각, 경매 낙찰은 배송지 입력 시각)
+  shipClockAt      DateTime?
+
   // 번개장터식 거래 단계
   txStatus         TxStatus          @default(PENDING_SHIPMENT)
 
@@ -616,6 +619,7 @@ model Transaction {
   @@index([txStatus])
   @@index([escrowStatus])
   @@index([txStatus, escrowStatus, shippedAt])
+  @@index([txStatus, shipClockAt])
 }
 
 enum TxStatus {

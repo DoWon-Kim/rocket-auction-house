@@ -144,6 +144,8 @@ io.on('connection', (socket: Socket) => {
       await prisma.friendRoom.update({ where: { id: roomId }, data: { lastMessageAt: new Date() } })
 
       io.to(`dm:${roomId}`).emit('dm:message', msg)
+      // 메시지함 목록·안 읽은 수 배지 갱신
+      for (const uid of [room.user1Id, room.user2Id]) io.to(`user:${uid}`).emit('chat:room-updated', { roomId, dm: true })
     } catch (err) {
       console.error('[socket dm:send]', err)
     }
@@ -153,11 +155,12 @@ io.on('connection', (socket: Socket) => {
     try {
       const room = await prisma.friendRoom.findUnique({ where: { id: roomId } })
       if (!room || (room.user1Id !== userId && room.user2Id !== userId)) return
-      await prisma.friendMessage.updateMany({
+      const r = await prisma.friendMessage.updateMany({
         where: { roomId, senderId: { not: userId }, readAt: null },
         data: { readAt: new Date() },
       })
       socket.to(`dm:${roomId}`).emit('dm:read', { roomId, userId })
+      if (r.count > 0) io.to(`user:${userId}`).emit('chat:room-updated', { roomId, dm: true })
     } catch (err) {
       console.error('[socket dm:read]', err)
     }

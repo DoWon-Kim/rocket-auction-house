@@ -1,8 +1,7 @@
 import cron from 'node-cron'
-import { CardCondition } from '@prisma/client'
 import { prisma } from '../lib/prisma'
 import { getIo } from '../lib/socketio'
-import { notify } from '../lib/notify'
+import { createAuctionTrade, announceAuctionWin, InsufficientBalanceError, type AuctionListing } from '../lib/auctionTrade'
 
 let isRunning = false
 
@@ -16,63 +15,24 @@ async function processExpiredAuctions() {
   }
 }
 
-type SettleListing = {
-  id: string
-  sellerId: string
-  cardId: string
-  quantity: number
-  condition: CardCondition
-  gradingCompany: string | null
-  gradingGrade: string | null
-  imageUrls: string[]
-}
-
-async function trySettleWithBidder(
-  listing: SettleListing,
-  bidderId: string,
-  bidId: string,
-  amount: number,
-): Promise<boolean> {
+// 이 입찰자로 낙찰 정산 시도 — 잔액(낙찰가 + 배송비)이 모자라면 false → 다음 순위 입찰자로
+async function trySettleWithBidder(listing: AuctionListing, bidderId: string, bidId: string, amount: number): Promise<string | null> {
   try {
-    await prisma.$transaction(async (tx) => {
-      // 잔액 차감을 트랜잭션 안에서 원자적으로 처리
-      const deducted = await tx.user.updateMany({
-        where: { id: bidderId, balance: { gte: amount } },
-        data: { balance: { decrement: amount } },
-      })
-      if (deducted.count === 0) throw new Error('INSUFFICIENT_BALANCE')
-
+    const won = await prisma.$transaction(async (tx) => {
+      // 그 사이 즉시낙찰 등으로 이미 팔렸으면 중단
+      const sold = await tx.listing.updateMany({ where: { id: listing.id, status: 'ACTIVE' }, data: { status: 'SOLD' } })
+      if (sold.count === 0) throw new Error('ALREADY_SOLD')
       // isWinning 플래그도 트랜잭션 안에서 처리 — 크래시 시 일관성 보장
       await tx.bid.updateMany({ where: { listingId: listing.id }, data: { isWinning: false } })
       await tx.bid.update({ where: { id: bidId }, data: { isWinning: true } })
-
-      await tx.listing.update({ where: { id: listing.id }, data: { status: 'SOLD' } })
-      const txRecord = await tx.transaction.create({
-        data: {
-          listingId: listing.id, buyerId: bidderId, sellerId: listing.sellerId,
-          finalPrice: amount, escrowStatus: 'HELD',
-        },
-      })
-      await tx.inventoryItem.create({
-        data: {
-          userId: bidderId, cardId: listing.cardId, quantity: listing.quantity,
-          source: 'PURCHASE', sourceId: txRecord.id,
-          condition: listing.condition, gradingCompany: listing.gradingCompany,
-          gradingGrade: listing.gradingGrade, imageUrls: listing.imageUrls,
-        },
-      })
-      await tx.chatRoom.upsert({
-        where: { listingId_buyerId: { listingId: listing.id, buyerId: bidderId } },
-        create: { listingId: listing.id, buyerId: bidderId, sellerId: listing.sellerId, transactionId: txRecord.id },
-        update: { transactionId: txRecord.id },
-      })
+      return createAuctionTrade(tx, listing, bidderId, amount)
     })
-    return true
+    return won.roomId
   } catch (err) {
-    if (err instanceof Error && err.message !== 'INSUFFICIENT_BALANCE') {
+    if (!(err instanceof InsufficientBalanceError) && !(err instanceof Error && err.message === 'ALREADY_SOLD')) {
       console.error(`[AuctionExpiry] listingId=${listing.id} 정산 실패:`, err)
     }
-    return false
+    return null
   }
 }
 
@@ -98,23 +58,12 @@ async function doProcess() {
       continue
     }
 
-    const settleListing: SettleListing = {
-      id: listing.id,
-      sellerId: listing.sellerId,
-      cardId: listing.cardId,
-      quantity: listing.quantity,
-      condition: listing.condition,
-      gradingCompany: listing.gradingCompany,
-      gradingGrade: listing.gradingGrade,
-      imageUrls: listing.imageUrls,
-    }
-
     let settled = false
     for (const bid of listing.bids) {
       if (!bid.bidder) continue  // FK 보호로 발생하지 않지만 방어적 처리
 
-      const ok = await trySettleWithBidder(settleListing, bid.bidder.id, bid.id, bid.amount)
-      if (ok) {
+      const roomId = await trySettleWithBidder(listing, bid.bidder.id, bid.id, bid.amount)
+      if (roomId) {
         getIo()?.to(`listing:${listing.id}`).emit('auction:sold', {
           listingId: listing.id,
           winnerId: bid.bidder.id,
@@ -122,13 +71,7 @@ async function doProcess() {
           finalPrice: bid.amount,
           isRunnerUp: bid !== listing.bids[0],
         })
-        notify({
-          userId: bid.bidder.id,
-          type: 'BID_WON',
-          title: '경매에 낙찰되셨습니다!',
-          body: `${bid.amount.toLocaleString()}P에 낙찰되었습니다. 거래를 진행해 주세요.`,
-          link: '/my?tab=purchases',
-        })
+        await announceAuctionWin({ listingId: listing.id, sellerId: listing.sellerId, buyerId: bid.bidder.id, amount: bid.amount, shippingFee: listing.shippingFee, roomId })
         settled = true
         break
       }

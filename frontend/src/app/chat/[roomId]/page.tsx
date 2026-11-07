@@ -10,7 +10,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import {
   ArrowLeft, CheckCheck, Package, Truck, Check, ChevronDown, ShieldCheck,
-  Handshake, CalendarCheck, Undo2, MapPin, Star, Info, Ban, Flag, X,
+  Handshake, CalendarCheck, Undo2, MapPin, Star, Info, Ban, Flag, X, Clock,
 } from 'lucide-react'
 import { type ChatMsg, QUICK_REPLIES, lastSeenLabel, newClientId } from '@/lib/chat'
 import { MessageList } from '@/components/chat/MessageList'
@@ -30,6 +30,7 @@ interface RoomListing {
 }
 interface RoomTransaction {
   id: string; txStatus: string; escrowStatus: string; finalPrice: number; shippingFee: number
+  completedAt: string; shipClockAt: string | null
   trackingCarrier: string | null; trackingNumber: string | null; shippedAt: string | null
   recipientName: string | null; recipientPhone: string | null; zipCode: string | null
   address: string | null; addressDetail: string | null; shippingMemo: string | null
@@ -54,6 +55,16 @@ const PAGE = 30
 const REPORT_REASONS = [
   ['FRAUD', '사기 의심'], ['FAKE_ITEM', '가짜/위조 카드'], ['HARASSMENT', '욕설·비매너'], ['NO_SHIPMENT', '미발송/잠수'], ['OTHER', '기타'],
 ] as const
+// 발송 대기 거래의 기한 — 배송지가 있으면 발송 기한(배송지 확정 + 3일), 없으면 배송지 입력 기한(결제 + 3일)
+const DEADLINE_DAYS = 3
+function dueText(fromIso: string) {
+  const at = new Date(new Date(fromIso).getTime() + DEADLINE_DAYS * 86400_000)
+  const left = at.getTime() - Date.now()
+  const when = `${at.getMonth() + 1}/${at.getDate()} ${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`
+  if (left <= 0) return { text: `${when} 마감 (곧 자동 취소돼요)`, urgent: true }
+  const h = Math.floor(left / 3600_000)
+  return { text: `${when}까지 · ${h >= 24 ? `${Math.floor(h / 24)}일 ${h % 24}시간` : `${Math.max(1, h)}시간`} 남음`, urgent: h < 24 }
+}
 const errMsg = (e: unknown, fb: string) => (e as { response?: { data?: { message?: string } } }).response?.data?.message ?? fb
 
 function Avatar({ user, size = 32 }: { user: MsgSender; size?: number }) {
@@ -329,6 +340,7 @@ function ChatRoomContent() {
             <span className="flex items-center gap-2 font-medium">
               {done ? <span className="flex items-center gap-1.5 text-emerald-400"><Check size={12} />거래 완료</span>
                 : tx.txStatus === 'SHIPPED' ? <span className="flex items-center gap-1.5 text-yellow-300"><Truck size={12} />배송중</span>
+                : tx.txStatus === 'PENDING_SHIPMENT' && !tx.address ? <span className="flex items-center gap-1.5 text-amber-300"><MapPin size={12} />배송지 입력 대기</span>
                 : tx.txStatus === 'PENDING_SHIPMENT' ? <span className="flex items-center gap-1.5 text-accent-fg"><Package size={12} />발송 대기</span>
                 : <span className="text-muted">{tx.txStatus === 'DISPUTED' ? '분쟁 처리중' : '취소됨'}</span>}
               <span className="text-fg font-bold tabular-nums">{(tx.finalPrice + tx.shippingFee).toLocaleString()}P 안전결제</span>
@@ -354,11 +366,22 @@ function ChatRoomContent() {
                   {tx.shippingMemo && <p className="text-muted">메모: {tx.shippingMemo}</p>}
                   {isBuyer && tx.txStatus === 'PENDING_SHIPMENT' && <button onClick={() => { setAddr({ ...EMPTY_ADDRESS, ...Object.fromEntries(Object.entries({ recipientName: tx.recipientName, recipientPhone: tx.recipientPhone, zipCode: tx.zipCode, address: tx.address, addressDetail: tx.addressDetail, shippingMemo: tx.shippingMemo }).map(([k, v]) => [k, v ?? ''])) }); setPanel('address') }} className="text-accent-fg hover:underline">배송지 변경</button>}
                 </div>
-              ) : tx.txStatus === 'PENDING_SHIPMENT' && (
-                isBuyer
-                  ? <button onClick={() => setPanel('address')} className="w-full h-9 rounded-lg bg-accent text-white font-semibold">배송지 입력하기</button>
-                  : <p className="text-amber-300">구매자가 배송지를 입력하면 발송할 수 있어요.</p>
-              )}
+              ) : tx.txStatus === 'PENDING_SHIPMENT' && (() => {
+                const due = dueText(tx.completedAt)
+                return (
+                  <div className={`rounded-lg px-3 py-2.5 space-y-2 ${due.urgent ? 'bg-rose-500/10' : 'bg-amber-500/10'}`}>
+                    <p className={`flex items-center gap-1.5 font-semibold ${due.urgent ? 'text-rose-300' : 'text-amber-300'}`}><Clock size={12} />배송지 입력 마감 {due.text}</p>
+                    {isBuyer ? (
+                      <>
+                        <p className="text-fg-3">배송지를 입력해야 판매자가 발송할 수 있어요. 마감까지 입력하지 않으면 거래가 자동 취소되고 환불돼요.</p>
+                        {panel !== 'address' && <button onClick={() => setPanel('address')} className="w-full h-9 rounded-lg bg-accent text-white font-semibold">배송지 입력하기</button>}
+                      </>
+                    ) : (
+                      <p className="text-fg-3">구매자가 배송지를 입력하면 그때부터 {DEADLINE_DAYS}일 안에 발송하면 돼요.</p>
+                    )}
+                  </div>
+                )
+              })()}
               {panel === 'address' && isBuyer && (
                 <div className="space-y-2 rounded-lg border border-line p-3">
                   <AddressForm value={addr} onChange={setAddr} compact />
@@ -366,6 +389,10 @@ function ChatRoomContent() {
                 </div>
               )}
 
+              {tx.txStatus === 'PENDING_SHIPMENT' && tx.address && (() => {
+                const due = dueText(tx.shipClockAt ?? tx.completedAt)
+                return <p className={`flex items-center gap-1.5 font-medium ${due.urgent ? 'text-rose-300' : 'text-fg-3'}`}><Clock size={12} />발송 기한 {due.text}</p>
+              })()}
               {tx.txStatus === 'PENDING_SHIPMENT' && !isBuyer && tx.address && (
                 panel === 'ship' ? (
                   <div className="flex gap-1.5">

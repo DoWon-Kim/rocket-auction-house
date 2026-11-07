@@ -544,6 +544,8 @@ export default function ListingDetailPage() {
   const bidMut = useMutation({
     mutationFn: (amount: number) => api.post(`/listings/${id}/bid`, { amount }),
     onSuccess: res => {
+      // 즉시낙찰 → 바로 채팅방에서 배송지 입력
+      if (res.data.instantBuy && res.data.roomId) { router.push(`/chat/${res.data.roomId}`); return }
       const msg = res.data.outbid
         ? res.data.message
         : res.data.instantBuy ? '즉시낙찰 완료!'
@@ -877,6 +879,10 @@ export default function ListingDetailPage() {
                         </button>
                       )}
                     </div>
+                    <p className="text-[11px] text-muted leading-relaxed">
+                      낙찰되면 낙찰가{listing.shippingFee ? <> + 배송비 <b className="text-fg-3">{listing.shippingFee.toLocaleString()}P</b></> : ''}가 잔액에서 안전결제되고,
+                      3일 안에 채팅방에서 배송지를 입력해야 해요. 잔액이 모자라면 다음 순위 입찰자에게 넘어가요.
+                    </p>
 
                     {/* 자동 입찰 패널 */}
                     <div className="border-t border-line pt-2.5">

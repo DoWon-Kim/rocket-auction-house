@@ -270,10 +270,10 @@ export default function Navbar() {
                   <Zap size={10} className="text-accent-2/40 group-hover:text-accent-2/80 transition-colors" />
                 </Link>
 
-                {/* Chat (listing) */}
+                {/* 채팅 메시지함 (거래 채팅 + 1:1 메시지) */}
                 <Link href="/chat"
                   className="relative h-9 w-9 flex items-center justify-center text-white/60 hover:text-white hover:bg-surface rounded-full transition-colors duration-150"
-                  title="채팅">
+                  title="채팅" aria-label="채팅">
                   <MessageCircle size={17} />
                   {(unread ?? 0) > 0 && (
                     <span className="absolute -top-0.5 -right-0.5 bg-accent text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center leading-none shadow-[0_0_8px_rgba(139,92,246,0.5)]">
@@ -304,10 +304,10 @@ export default function Navbar() {
                 {/* 알림 */}
                 <NotificationBell />
 
-                {/* DM + Friends */}
-                <Link href="/dm"
+                {/* 친구 (1:1 메시지는 채팅 메시지함으로 합쳐짐) */}
+                <Link href="/my/friends"
                   className="relative h-9 w-9 flex items-center justify-center text-white/60 hover:text-white hover:bg-surface rounded-full transition-colors duration-150"
-                  title="DM / 친구">
+                  title="친구" aria-label="친구">
                   <Users size={17} />
                   {(friendReqCount ?? 0) > 0 && (
                     <span className="absolute -top-0.5 -right-0.5 bg-emerald-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center leading-none">
@@ -405,8 +405,8 @@ export default function Navbar() {
                   <span className="bg-accent text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unread}</span>
                 )}
               </Link>
-              <Link href="/dm" onClick={() => setMobileOpen(false)} className="flex items-center justify-between px-4 py-2.5 text-sm text-white/70 hover:bg-surface hover:text-white rounded-xl transition-colors">
-                <span className="flex items-center gap-2.5"><Users size={15} /> DM / 친구</span>
+              <Link href="/my/friends" onClick={() => setMobileOpen(false)} className="flex items-center justify-between px-4 py-2.5 text-sm text-white/70 hover:bg-surface hover:text-white rounded-xl transition-colors">
+                <span className="flex items-center gap-2.5"><Users size={15} /> 친구</span>
                 {(friendReqCount ?? 0) > 0 && (
                   <span className="bg-emerald-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{friendReqCount}</span>
                 )}

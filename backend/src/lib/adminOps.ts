@@ -1,30 +1,44 @@
 // 관제실: 거래 상태 판단 (순수 함수 — 컨트롤러·테스트 공용)
 
-export const SHIP_DEADLINE_DAYS = 3  // shipmentDeadlineJob 과 동일: 결제 후 N일 미발송 → 자동 취소·환불
-export const AUTO_CONFIRM_DAYS = 3   // escrowAutoRelease 와 동일: 발송 후 N일 → 자동 구매확정
-const DAY = 86400_000
+export const SHIP_DEADLINE_DAYS = 3     // shipmentDeadlineJob 과 동일: 배송지 확정 후 N일 미발송 → 자동 취소·환불 (판매자 사유)
+export const ADDRESS_DEADLINE_DAYS = 3  // shipmentDeadlineJob 과 동일: 낙찰 후 N일 배송지 미입력 → 자동 취소·환불 (구매자 사유)
+export const AUTO_CONFIRM_DAYS = 3      // escrowAutoRelease 와 동일: 발송 후 N일 → 자동 구매확정
+export const DAY = 86400_000
 
-export type TradeFlag = 'NO_ADDRESS' | 'SHIP_DUE_SOON' | 'SHIP_OVERDUE' | 'CONFIRM_WAITING' | 'DISPUTED'
+export type TradeFlag = 'NO_ADDRESS' | 'ADDRESS_OVERDUE' | 'SHIP_DUE_SOON' | 'SHIP_OVERDUE' | 'CONFIRM_WAITING' | 'DISPUTED'
 
 interface TradeLike {
   txStatus: string
-  completedAt: Date   // 결제(거래 생성) 시각
+  completedAt: Date           // 결제(거래 생성) 시각
+  shipClockAt?: Date | null   // 배송지 확정 시각 — 발송 기한의 시작점
   shippedAt: Date | null
   address: string | null
   disputeStatus?: string | null
 }
 
-export const shipDeadline = (paidAt: Date) => new Date(paidAt.getTime() + SHIP_DEADLINE_DAYS * DAY)
+export const shipDeadline = (clockAt: Date) => new Date(clockAt.getTime() + SHIP_DEADLINE_DAYS * DAY)
+export const addressDeadline = (paidAt: Date) => new Date(paidAt.getTime() + ADDRESS_DEADLINE_DAYS * DAY)
 export const autoConfirmAt = (shippedAt: Date) => new Date(shippedAt.getTime() + AUTO_CONFIRM_DAYS * DAY)
+
+// 발송 대기 거래의 다음 기한: 배송지가 있으면 발송 기한, 없으면 배송지 입력 기한
+export function pendingDeadline(tx: TradeLike): { kind: 'SHIP' | 'ADDRESS'; at: Date } | null {
+  if (tx.txStatus !== 'PENDING_SHIPMENT') return null
+  if (tx.address && tx.shipClockAt) return { kind: 'SHIP', at: shipDeadline(tx.shipClockAt) }
+  if (!tx.address) return { kind: 'ADDRESS', at: addressDeadline(tx.completedAt) }
+  return { kind: 'SHIP', at: shipDeadline(tx.completedAt) } // 기한 시작 시각이 없는 옛 거래
+}
 
 // 관리자가 챙겨야 할 신호
 export function tradeFlags(tx: TradeLike, now = new Date()): TradeFlag[] {
   const flags: TradeFlag[] = []
   if (tx.txStatus === 'DISPUTED' || tx.disputeStatus === 'OPEN' || tx.disputeStatus === 'REVIEWING') flags.push('DISPUTED')
-  if (tx.txStatus === 'PENDING_SHIPMENT') {
-    if (!tx.address) flags.push('NO_ADDRESS')
-    const left = shipDeadline(tx.completedAt).getTime() - now.getTime()
-    if (left <= 0) flags.push('SHIP_OVERDUE')
+  const due = pendingDeadline(tx)
+  if (due) {
+    const left = due.at.getTime() - now.getTime()
+    if (due.kind === 'ADDRESS') {
+      flags.push('NO_ADDRESS')
+      if (left <= 0) flags.push('ADDRESS_OVERDUE')
+    } else if (left <= 0) flags.push('SHIP_OVERDUE')
     else if (left < DAY) flags.push('SHIP_DUE_SOON')
   }
   if (tx.txStatus === 'SHIPPED') flags.push('CONFIRM_WAITING')

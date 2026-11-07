@@ -10,7 +10,7 @@ const TX_SELECT = {
   id: true, buyerId: true, sellerId: true, finalPrice: true, shippingFee: true,
   txStatus: true, escrowStatus: true,
   trackingCarrier: true, trackingNumber: true,
-  shippedAt: true, confirmedAt: true, escrowReleasedAt: true,
+  shippedAt: true, confirmedAt: true, escrowReleasedAt: true, address: true,
 }
 
 const CARRIERS = [
@@ -38,11 +38,15 @@ export async function shipItem(req: AuthRequest, res: Response) {
       res.status(403).json({ message: '판매자만 발송 처리할 수 있습니다.' }); return
     }
     if (tx.txStatus !== 'PENDING_SHIPMENT') {
-      res.status(409).json({ message: '이미 발송 처리된 거래입니다.' }); return
+      res.status(409).json({ message: '이미 발송 처리되었거나 취소된 거래입니다.' }); return
+    }
+    if (!tx.address) {
+      res.status(400).json({ message: '구매자가 배송지를 입력한 뒤에 발송할 수 있어요.' }); return
     }
 
-    const updated = await prisma.transaction.update({
-      where: { id },
+    // 같은 순간 자동 취소가 돌아도 둘 중 하나만 반영되도록 조건부 업데이트
+    const r = await prisma.transaction.updateMany({
+      where: { id, txStatus: 'PENDING_SHIPMENT', escrowStatus: 'HELD' },
       data: {
         txStatus: 'SHIPPED',
         trackingCarrier: parsed.data.trackingCarrier,
@@ -50,6 +54,8 @@ export async function shipItem(req: AuthRequest, res: Response) {
         shippedAt: new Date(),
       },
     })
+    if (r.count === 0) { res.status(409).json({ message: '이미 발송 처리되었거나 취소된 거래입니다.' }); return }
+    const updated = await prisma.transaction.findUnique({ where: { id }, select: TX_SELECT })
 
     // 구매자에게 발송 알림
     notify({

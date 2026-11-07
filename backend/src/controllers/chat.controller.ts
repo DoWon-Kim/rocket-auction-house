@@ -8,7 +8,7 @@ const ROOM_INCLUDE = {
   listing: { select: { id: true, status: true, title: true, listingType: true, buyNowPrice: true, minOfferPrice: true, currentPrice: true, shippingFee: true, negotiable: true, imageUrls: true, reservedForId: true, reservedPrice: true, sellerId: true, card: { select: { name: true, nameKo: true, imageUrl: true } } } },
   buyer:  { select: { id: true, nickname: true, avatarUrl: true } },
   seller: { select: { id: true, nickname: true, avatarUrl: true } },
-  transaction: { select: { id: true, txStatus: true, escrowStatus: true, finalPrice: true, shippingFee: true, trackingCarrier: true, trackingNumber: true, shippedAt: true, recipientName: true, recipientPhone: true, zipCode: true, address: true, addressDetail: true, shippingMemo: true } },
+  transaction: { select: { id: true, txStatus: true, escrowStatus: true, finalPrice: true, shippingFee: true, completedAt: true, shipClockAt: true, trackingCarrier: true, trackingNumber: true, shippedAt: true, recipientName: true, recipientPhone: true, zipCode: true, address: true, addressDetail: true, shippingMemo: true } },
 } as const
 
 // 채팅방 가져오기 (없으면 생성) — 구매자가 리스팅에서 채팅 시작
@@ -144,14 +144,24 @@ export async function getRoomMessages(req: AuthRequest, res: Response) {
 // 읽지 않은 메시지 수
 export async function getUnreadCount(req: AuthRequest, res: Response) {
   try {
-    const count = await prisma.chatMessage.count({
-      where: {
-        senderId: { not: req.userId! },
-        readAt: null,
-        room: { OR: [{ buyerId: req.userId! }, { sellerId: req.userId! }] },
-      },
-    })
-    res.json({ count })
+    // 거래 채팅 + 1:1 메시지(친구 DM)를 한 메시지함으로 — 배지 숫자는 합계
+    const [trade, dm] = await Promise.all([
+      prisma.chatMessage.count({
+        where: {
+          senderId: { not: req.userId! },
+          readAt: null,
+          room: { OR: [{ buyerId: req.userId! }, { sellerId: req.userId! }] },
+        },
+      }),
+      prisma.friendMessage.count({
+        where: {
+          senderId: { not: req.userId! },
+          readAt: null,
+          room: { OR: [{ user1Id: req.userId! }, { user2Id: req.userId! }] },
+        },
+      }),
+    ])
+    res.json({ count: trade + dm, trade, dm })
   } catch (err) {
     console.error('[getUnreadCount]', err)
     res.status(500).json({ message: '서버 오류가 발생했습니다.' })

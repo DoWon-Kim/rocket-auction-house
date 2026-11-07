@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { AuthRequest } from '../middleware/auth'
 import { removePurchasedItems } from '../lib/tradeCancel'
+import { txAmount } from '../lib/marketTrade'
 
 const VALID_REASONS = ['FAKE_ITEM', 'NO_SHIPMENT', 'WRONG_ITEM', 'DAMAGED_ITEM', 'FRAUD', 'HARASSMENT', 'OTHER'] as const
 const VALID_STATUSES = ['PENDING', 'INVESTIGATING', 'RESOLVED', 'DISMISSED'] as const
@@ -180,21 +181,20 @@ export async function updateReport(req: AuthRequest, res: Response) {
 
     // 분쟁 거래 처리 (RESOLVED + refundBuyer 옵션)
     if (isResolved && report.transaction && refundBuyer && report.transaction.escrowStatus === 'HELD') {
-      await prisma.$transaction([
-        prisma.transaction.update({
-          where: { id: report.transaction.id },
+      const txInfo = report.transaction
+      // 대금이 아직 보관 중일 때만 환불 — 관리자 두 명이 동시에 눌러도 한 번만 나감
+      const refunded = await prisma.$transaction(async t => {
+        const r = await t.transaction.updateMany({
+          where: { id: txInfo.id, escrowStatus: 'HELD' },
           data: { txStatus: 'CANCELLED', escrowStatus: 'REFUNDED', disputeStatus: 'RESOLVED' },
-        }),
-        prisma.user.update({
-          where: { id: report.transaction.buyerId },
-          data: { balance: { increment: report.transaction.finalPrice + report.transaction.shippingFee } },
-        }),
-        removePurchasedItems(prisma, report.transaction.id),
-        prisma.report.update({
-          where: { id },
-          data: { status, adminNote: adminNote?.trim() || null, resolvedAt: new Date() },
-        }),
-      ])
+        })
+        if (r.count === 0) return false
+        await t.user.update({ where: { id: txInfo.buyerId }, data: { balance: { increment: txAmount(txInfo) } } })
+        await removePurchasedItems(t, txInfo.id)
+        await t.report.update({ where: { id }, data: { status, adminNote: adminNote?.trim() || null, resolvedAt: new Date() } })
+        return true
+      })
+      if (!refunded) { res.status(409).json({ message: '이미 정산·환불된 거래입니다. 새로고침 후 다시 확인해주세요.' }); return }
     } else if (isResolved && report.transactionId) {
       await prisma.$transaction([
         prisma.transaction.update({

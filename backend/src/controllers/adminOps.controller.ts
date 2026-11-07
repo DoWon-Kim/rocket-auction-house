@@ -8,7 +8,7 @@ import { notify } from '../lib/notify'
 import { txAmount } from '../lib/marketTrade'
 import { removePurchasedItems } from '../lib/tradeCancel'
 import { postChatMessage } from '../lib/chatTrade'
-import { tradeFlags, shipDeadline, autoConfirmAt, TRADE_FILTERS, SHIP_DEADLINE_DAYS, kstDayStart, lastKstDays } from '../lib/adminOps'
+import { tradeFlags, pendingDeadline, autoConfirmAt, TRADE_FILTERS, SHIP_DEADLINE_DAYS, ADDRESS_DEADLINE_DAYS, kstDayStart, lastKstDays } from '../lib/adminOps'
 
 const DAY = 86400_000
 const P = (n: number) => `${n.toLocaleString()}P`
@@ -30,8 +30,8 @@ export async function getOpsOverview(_req: AuthRequest, res: Response) {
       escrow, balances,
       signups, newListings, paidToday, doneToday, shopToday, chargesToday, chatsToday, flaggedToday,
     ] = await Promise.all([
-      prisma.transaction.count({ where: { txStatus: 'PENDING_SHIPMENT', completedAt: { lt: overdueBefore } } }),
-      prisma.transaction.count({ where: { txStatus: 'PENDING_SHIPMENT', completedAt: { gte: overdueBefore, lt: dueSoonBefore } } }),
+      prisma.transaction.count({ where: { txStatus: 'PENDING_SHIPMENT', shipClockAt: { lt: overdueBefore } } }),
+      prisma.transaction.count({ where: { txStatus: 'PENDING_SHIPMENT', shipClockAt: { gte: overdueBefore, lt: dueSoonBefore } } }),
       prisma.transaction.count({ where: { txStatus: 'PENDING_SHIPMENT', address: null } }),
       prisma.transaction.count({ where: { txStatus: 'SHIPPED' } }),
       prisma.dispute.count({ where: { status: { in: ['OPEN', 'REVIEWING'] } } }),
@@ -59,7 +59,7 @@ export async function getOpsOverview(_req: AuthRequest, res: Response) {
       { key: 'disputes', label: '진행중 분쟁', hint: '구매자·판매자 분쟁', count: disputes, level: 'danger', link: '/admin/disputes' },
       { key: 'reports', label: '미처리 신고', hint: '사기·위조 신고 등', count: reports, level: 'danger', link: '/admin/reports' },
       { key: 'ship_due', label: '발송 기한 임박', hint: '24시간 안에 자동 취소', count: shipDueSoon, level: 'warn', link: '/admin/trades?flag=SHIP_DUE_SOON' },
-      { key: 'no_address', label: '배송지 미입력', hint: '결제됐지만 주소 없음', count: noAddress, level: 'warn', link: '/admin/trades?flag=NO_ADDRESS' },
+      { key: 'no_address', label: '배송지 미입력', hint: `경매 낙찰 후 ${ADDRESS_DEADLINE_DAYS}일 안에 입력 안 하면 자동 취소`, count: noAddress, level: 'warn', link: '/admin/trades?flag=NO_ADDRESS' },
       { key: 'withdrawals', label: '환전 신청', hint: withdrawAmount._sum.amount ? `${P(withdrawAmount._sum.amount)} 대기` : '송금 대기', count: withdrawals, level: 'warn', link: '/admin/withdrawal' },
       { key: 'shop_orders', label: '샵 주문 발송', hint: '결제 완료·포장중', count: shopOrders, level: 'info', link: '/admin/shop' },
       { key: 'shipping_requests', label: '보관함 배송 요청', hint: '오리파·구매 카드 실물 배송', count: shippingRequests, level: 'info', link: '/admin/shipping' },
@@ -179,12 +179,14 @@ const TRADE_INCLUDE = {
   dispute: { select: { id: true, status: true } },
 } satisfies Prisma.TransactionInclude
 
-function withSignals<T extends { txStatus: string; completedAt: Date; shippedAt: Date | null; address: string | null; disputeStatus: string | null; finalPrice: number; shippingFee: number }>(t: T) {
+function withSignals<T extends { txStatus: string; completedAt: Date; shipClockAt: Date | null; shippedAt: Date | null; address: string | null; disputeStatus: string | null; finalPrice: number; shippingFee: number }>(t: T) {
+  const due = pendingDeadline(t)
   return {
     ...t,
     total: txAmount(t),
     flags: tradeFlags(t),
-    shipDeadline: t.txStatus === 'PENDING_SHIPMENT' ? shipDeadline(t.completedAt) : null,
+    shipDeadline: due?.kind === 'SHIP' ? due.at : null,
+    addressDeadline: due?.kind === 'ADDRESS' ? due.at : null,
     autoConfirmAt: t.txStatus === 'SHIPPED' && t.shippedAt ? autoConfirmAt(t.shippedAt) : null,
   }
 }
@@ -200,8 +202,8 @@ export async function listTrades(req: AuthRequest, res: Response) {
 
     const where: Prisma.TransactionWhereInput = {}
     if (TRADE_FILTERS[filter]) where.txStatus = { in: TRADE_FILTERS[filter] as Prisma.EnumTxStatusFilter['in'] }
-    if (flag === 'SHIP_OVERDUE') Object.assign(where, { txStatus: 'PENDING_SHIPMENT', completedAt: { lt: new Date(now - SHIP_DEADLINE_DAYS * DAY) } })
-    if (flag === 'SHIP_DUE_SOON') Object.assign(where, { txStatus: 'PENDING_SHIPMENT', completedAt: { gte: new Date(now - SHIP_DEADLINE_DAYS * DAY), lt: new Date(now - (SHIP_DEADLINE_DAYS - 1) * DAY) } })
+    if (flag === 'SHIP_OVERDUE') Object.assign(where, { txStatus: 'PENDING_SHIPMENT', shipClockAt: { lt: new Date(now - SHIP_DEADLINE_DAYS * DAY) } })
+    if (flag === 'SHIP_DUE_SOON') Object.assign(where, { txStatus: 'PENDING_SHIPMENT', shipClockAt: { gte: new Date(now - SHIP_DEADLINE_DAYS * DAY), lt: new Date(now - (SHIP_DEADLINE_DAYS - 1) * DAY) } })
     if (flag === 'NO_ADDRESS') Object.assign(where, { txStatus: 'PENDING_SHIPMENT', address: null })
     if (q) {
       where.OR = [

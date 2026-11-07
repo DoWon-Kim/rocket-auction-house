@@ -120,7 +120,7 @@ export default function DmRoomPage() {
     <div className="flex flex-col h-[calc(100vh-4rem)]">
       {/* 헤더 */}
       <div className="flex items-center gap-3 px-4 py-3 bg-sunken border-b border-line shrink-0">
-        <button onClick={() => router.back()} className="text-muted hover:text-fg transition-colors p-1">
+        <button onClick={() => router.push('/chat?tab=dm')} className="text-muted hover:text-fg transition-colors p-1" aria-label="메시지함으로">
           <ArrowLeft size={18} />
         </button>
         {partner ? (
